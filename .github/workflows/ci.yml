@@ -1,0 +1,27 @@
+name: Web quality checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        working-directory: apps/web
+        run: npm install --no-audit --no-fund
+      - name: Test local inbox storage
+        working-directory: apps/web
+        run: npm test
+      - name: Build web client
+        working-directory: apps/web
+        run: npm run build
