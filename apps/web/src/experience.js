@@ -611,7 +611,13 @@ function showAccount({ firstRun = false } = {}) {
         const { openUrl } = await import("@tauri-apps/plugin-opener");
         await openUrl(authorizeUrl.toString());
       } else {
-        const redirectTo = new URL(window.location.pathname, window.location.origin).toString();
+        // Vercel preview URLs rotate per deployment and may not be on Supabase's
+        // redirect allow-list. Route preview sign-ins to the stable production
+        // origin; production/custom domains continue using their own origin.
+        const isVercelPreview = window.location.hostname.endsWith(".vercel.app") &&
+          window.location.hostname !== "linka-web-tau.vercel.app";
+        const origin = isVercelPreview ? "https://linka-web-tau.vercel.app" : window.location.origin;
+        const redirectTo = new URL(window.location.pathname, origin).toString();
         startGoogleOAuth({ url: config.url, key: config.key, redirectTo });
       }
     } catch (error) {
