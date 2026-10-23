@@ -1238,8 +1238,13 @@ private fun LinkaApp(
                 .remove("oauth_pending_access").remove("oauth_pending_refresh").apply()
             cloudEmail = oauth.email
             if (profileName.isBlank() && oauth.displayName.isNotBlank()) profileName = oauth.displayName
-            cloudStatus = "Google sign-in complete. Press Sync to sync this device."
-            cloudDialog = true
+            cloudStatus = "Google sign-in complete."
+            if (localProfileJson()?.optString("displayName").isNullOrBlank()) {
+                profileDialog = true
+                cloudDialog = false
+            } else {
+                cloudDialog = true
+            }
         } catch (e: Exception) {
             cloudStatus = e.message ?: "Google sign-in could not be completed."
             cloudDialog = true
