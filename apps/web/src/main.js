@@ -3,7 +3,8 @@ import { initLinkaExperience } from "./experience.js";
 import {
   addDeletedId, disconnectCloud, getCloudConfig, getCloudSession,
   getOtpCooldown, readDeletedIds, requestEmailOtp, saveCloudConfig, syncCloudCaptures,
-  verifyEmailOtp, readLinkaProfile, saveLinkaProfile, beginQrPairing, claimQrPairing
+  verifyEmailOtp, readLinkaProfile, saveLinkaProfile, beginQrPairing, claimQrPairing,
+  startGoogleOAuth, completeGoogleOAuthCallback
 } from "./cloud-sync.js";
 import QRCode from "qrcode";
 
@@ -301,7 +302,7 @@ function showCloudSyncНастройки() {
   meta.append(title, sub); head.append(logo, meta); content.append(head);
 
   const note = document.createElement("p");
-  note.textContent = "Войди по коду из письма. Пароль не нужен. Используй один аккаунт на телефоне, компьютере и сайте.";
+  note.textContent = "Войди через Google. Один аккаунт — твоя библиотека на телефоне, компьютере и сайте.";
   content.append(note);
 
   const config = getCloudConfig();
@@ -314,12 +315,12 @@ function showCloudSyncНастройки() {
     input.autocomplete = autocomplete || (type === "email" ? "email" : "off");
     wrap.append(label, input); form.append(wrap); return input;
   };
-  const email = field("Электронная почта", "email", session?.email || "", "you@example.com", "email");
+  const email = field("Электронная почта · запасной вход", "email", session?.email || "", "you@example.com", "email");
   const code = field("Код из письма", "text", "", "6 цифр", "one-time-code");
   code.inputMode = "numeric"; code.maxLength = 6; code.pattern = "[0-9]{6}";
   const profile = readLinkaProfile() || {};
   const profileWrap = document.createElement("div"); profileWrap.className = "cloud-form";
-  const displayName = field("Как тебя называть", "text", profile.displayName || "", "Имя или псевдоним", "nickname");
+  const displayName = field("Как тебя называть", "text", profile.displayName || session?.displayName || "", "Имя или псевдоним", "nickname");
   const age = field("Возраст (необязательно)", "number", profile.age == null ? "" : String(profile.age), "Можно оставить пустым", "off");
   age.min = "13"; age.max = "120";
   const profileFields = [displayName.parentElement, age.parentElement];
@@ -352,27 +353,34 @@ function showCloudSyncНастройки() {
   let otpSent = getOtpCooldown(email.value) > 0;
   let sessionVerified = Boolean(getCloudSession());
   let cooldownTimer = null;
-  const requestButton = makeButton("Отправить код для входа", "ghost", () => void requestCode(false));
+  const googleButton = makeButton("Продолжить с Google", "primary", () => { try { startGoogleOAuth({url:url.value,key:key.value,redirectTo:window.location.href.split("#")[0]}); } catch (error) { statusLine.textContent = error?.message || "Не удалось открыть Google."; } });
+  const requestButton = makeButton("Войти по коду из письма", "ghost", () => void requestCode(false));
   const registerButton = makeButton("Создать аккаунт", "ghost", () => void requestCode(true));
   const verifyButton = makeButton("Подтвердить код и синхронизировать", "primary", () => void verifyCode());
   const qrButton = makeButton("Войти по QR с телефона", "ghost", () => void startQrSignIn());
   const syncButton = makeButton("Синхронизировать", "primary", () => void runSync());
+  const profileSaveButton = makeButton("Сохранить профиль и синхронизировать", "primary", () => void saveProfileAndSync());
   const disconnectButton = makeButton("Выйти из аккаунта", "ghost", () => {
     disconnectCloud();
     statusLine.textContent = "Выход выполнен. Локальные сохранения остались на устройстве.";
     modalRoot.replaceChildren();
   });
   if (session) {
-    form.hidden = true; profileWrap.hidden = true; advanced.hidden = true;
-    requestButton.hidden = true; registerButton.hidden = true; verifyButton.hidden = true; qrButton.hidden = true;
+    form.hidden = true; advanced.hidden = true;
+    email.parentElement.hidden = true; code.parentElement.hidden = true;
+    googleButton.hidden = true; requestButton.hidden = true; registerButton.hidden = true; verifyButton.hidden = true; qrButton.hidden = true;
+    profileWrap.hidden = Boolean(readLinkaProfile());
+    profileSaveButton.hidden = Boolean(readLinkaProfile());
   } else {
+    form.hidden = true; profileWrap.hidden = true; profileSaveButton.hidden = true;
     syncButton.hidden = true; disconnectButton.hidden = true;
+    requestButton.hidden = true; registerButton.hidden = true; verifyButton.hidden = true;
   }
   actions.append(close); content.append(actions);
   modalShell(content, { dismissable: true });
 
   function setBusy(value) {
-    [requestButton,registerButton,verifyButton,qrButton,syncButton,disconnectButton].forEach(b => { b.disabled = value; });
+    [googleButton,requestButton,registerButton,verifyButton,qrButton,profileSaveButton,syncButton,disconnectButton].forEach(b => { b.disabled = value; });
   }
   function setCooldown() {
     const remaining = Math.ceil(getOtpCooldown(email.value) / 1000);
@@ -478,6 +486,23 @@ function showCloudSyncНастройки() {
       if (!pairingCancelled) statusLine.textContent = "QR-код истёк. Создай новый и попробуй ещё раз.";
     } catch (error) {
       statusLine.textContent = error?.message || "Не удалось выполнить вход по QR.";
+    } finally { setBusy(false); }
+  }
+  async function saveProfileAndSync() {
+    try {
+      setBusy(true);
+      saveLinkaProfile({
+        displayName: String(displayName.value || "").trim(),
+        age: age.value.trim() ? Number(age.value) : null,
+        updatedAt: Date.now()
+      });
+      const result = await syncNow({silent:true});
+      statusLine.textContent = result?.message ? `Профиль сохранён. ${result.message}` : "Профиль сохранён.";
+      profileWrap.hidden = true; profileSaveButton.hidden = true;
+      syncButton.hidden = false; disconnectButton.hidden = false;
+      say("Профиль Linka сохранён");
+    } catch (error) {
+      statusLine.textContent = error?.message || "Не удалось сохранить профиль.";
     } finally { setBusy(false); }
   }
   async function runSync() {
@@ -645,5 +670,17 @@ window.addEventListener("linka:authenticated", () => {
 });
 window.addEventListener("linka:profile-saved", () => {
   if (getCloudSession()) void syncNow({ silent: true }).catch(error => say(error?.message || "Sync unavailable"));
+});
+void completeGoogleOAuthCallback().then(session => {
+  if (!session) return;
+  const profile = readLinkaProfile();
+  if (!profile && session.displayName) {
+    // Pre-fill the profile from Google; the user can still edit it in the onboarding panel.
+    saveLinkaProfile({ displayName: session.displayName, age: null, updatedAt: Date.now() });
+  }
+  window.dispatchEvent(new Event("linka:authenticated"));
+  showCloudSyncНастройки();
+}).catch(error => {
+  say(error?.message || "Google sign-in could not be completed.");
 });
 initLinkaExperience();
