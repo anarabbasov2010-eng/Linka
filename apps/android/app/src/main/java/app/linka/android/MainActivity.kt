@@ -394,7 +394,57 @@ private val words = mapOf(
         "version" to "Sürüm", "manage" to "Linka deneyimini kişiselleştir", "local" to "BU CİHAZDA"
     )
 )
-private fun tr(lang: String, key: String) = words[lang]?.get(key) ?: words["en"]?.get(key) ?: key
+private val extraWords = mapOf(
+    "en" to mapOf(
+        "video" to "VIDEO", "article" to "ARTICLE", "website" to "WEBSITE",
+        "rememberTitle" to "A little throwback", "rememberBody" to "Something you saved a while ago.",
+        "cloudSync" to "Cloud sync", "cloudSyncBody" to "Keep this library in sync between devices using your own free Supabase project.",
+        "syncNow" to "Connect and sync", "createAccount" to "Create account", "syncEndpoint" to "Supabase project URL",
+        "syncAnonKey" to "Publishable / anon key", "syncEmail" to "Account email", "syncPassword" to "Password",
+        "syncHelp" to "Create a free Supabase project, paste its Project URL and publishable key, then copy the SQL below into its SQL Editor. Your password is not saved; the refresh session is encrypted with Android Keystore.",
+        "syncSetupSql" to "Copy database setup SQL", "syncForget" to "Forget this account", "syncClose" to "Close",
+        "syncWorking" to "Syncing…", "syncCopied" to "SQL copied. Run it in Supabase → SQL Editor.",
+        "syncRequired" to "Cloud sync needs your own Supabase project. Until connected, Linka continues to work locally.",
+        "syncLatest" to "Last sync", "syncOpen" to "Set up cloud sync"
+    ),
+    "ru" to mapOf(
+        "video" to "ВИДЕО", "article" to "СТАТЬЯ", "website" to "САЙТ",
+        "rememberTitle" to "Из прошлого", "rememberBody" to "То, что ты сохранил некоторое время назад.",
+        "cloudSync" to "Облачная синхронизация", "cloudSyncBody" to "Синхронизируй библиотеку между устройствами через собственный бесплатный проект Supabase.",
+        "syncNow" to "Подключить и синхронизировать", "createAccount" to "Создать аккаунт", "syncEndpoint" to "URL проекта Supabase",
+        "syncAnonKey" to "Публичный / anon-ключ", "syncEmail" to "Электронная почта", "syncPassword" to "Пароль",
+        "syncHelp" to "Создай бесплатный проект Supabase, вставь Project URL и публичный ключ, затем скопируй SQL ниже в SQL Editor проекта. Пароль не сохраняется; токен сессии шифруется Android Keystore.",
+        "syncSetupSql" to "Скопировать SQL для базы", "syncForget" to "Отключить этот аккаунт", "syncClose" to "Закрыть",
+        "syncWorking" to "Синхронизация…", "syncCopied" to "SQL скопирован. Выполни его в Supabase → SQL Editor.",
+        "syncRequired" to "Для облачной синхронизации нужен собственный проект Supabase. Пока он не подключён, Linka продолжит работать локально.",
+        "syncLatest" to "Последняя синхронизация", "syncOpen" to "Настроить синхронизацию"
+    ),
+    "az" to mapOf(
+        "video" to "VİDEO", "article" to "MƏQALƏ", "website" to "SAYT",
+        "rememberTitle" to "Keçmişdən bir xatirə", "rememberBody" to "Bir müddət əvvəl saxladığın material.",
+        "cloudSync" to "Bulud sinxronizasiyası", "cloudSyncBody" to "Öz pulsuz Supabase layihən vasitəsilə kitabxananı cihazlar arasında sinxronlaşdır.",
+        "syncNow" to "Qoşul və sinxronlaşdır", "createAccount" to "Hesab yarat", "syncEndpoint" to "Supabase layihəsinin URL-i",
+        "syncAnonKey" to "Açıq / anon açarı", "syncEmail" to "E-poçt", "syncPassword" to "Şifrə",
+        "syncHelp" to "Pulsuz Supabase layihəsi yarat, Project URL və açıq açarı daxil et, sonra aşağıdakı SQL-i layihənin SQL Editor bölməsində icra et. Şifrə saxlanmır; sessiya Android Keystore ilə şifrələnir.",
+        "syncSetupSql" to "Baza SQL-ini kopyala", "syncForget" to "Hesabı ayır", "syncClose" to "Bağla",
+        "syncWorking" to "Sinxronizasiya…", "syncCopied" to "SQL kopyalandı. Supabase → SQL Editor bölməsində icra et.",
+        "syncRequired" to "Bulud sinxronizasiyası üçün öz Supabase layihən lazımdır. Qoşulana qədər Linka yerli işləyəcək.",
+        "syncLatest" to "Son sinxronizasiya", "syncOpen" to "Sinxronizasiyanı qur"
+    ),
+    "tr" to mapOf(
+        "video" to "VİDEO", "article" to "MAKALE", "website" to "WEB SİTESİ",
+        "rememberTitle" to "Geçmişten bir hatırlatma", "rememberBody" to "Bir süre önce kaydettiğin bir içerik.",
+        "cloudSync" to "Bulut senkronizasyonu", "cloudSyncBody" to "Kendi ücretsiz Supabase projenle kitaplığını cihazlar arasında senkronize et.",
+        "syncNow" to "Bağlan ve senkronize et", "createAccount" to "Hesap oluştur", "syncEndpoint" to "Supabase proje URL'si",
+        "syncAnonKey" to "Yayınlanabilir / anon anahtarı", "syncEmail" to "E-posta", "syncPassword" to "Şifre",
+        "syncHelp" to "Ücretsiz Supabase projesi oluştur, Project URL ve yayınlanabilir anahtarı gir, ardından aşağıdaki SQL'i SQL Editor'da çalıştır. Şifre kaydedilmez; oturum Android Keystore ile şifrelenir.",
+        "syncSetupSql" to "Veritabanı SQL'ini kopyala", "syncForget" to "Bu hesabı unut", "syncClose" to "Kapat",
+        "syncWorking" to "Senkronize ediliyor…", "syncCopied" to "SQL kopyalandı. Supabase → SQL Editor'da çalıştır.",
+        "syncRequired" to "Bulut senkronizasyonu için kendi Supabase projen gerekir. Bağlanana kadar Linka yerel çalışır.",
+        "syncLatest" to "Son senkronizasyon", "syncOpen" to "Bulut senkronizasyonunu kur"
+    )
+)
+private fun tr(lang: String, key: String) = words[lang]?.get(key) ?: extraWords[lang]?.get(key) ?: words["en"]?.get(key) ?: extraWords["en"]?.get(key) ?: key
 
 class MainActivity : ComponentActivity() {
     private var incomingSharedText by mutableStateOf("")
@@ -416,7 +466,8 @@ class MainActivity : ComponentActivity() {
             val created = o.optLong("createdAt", 0L)
             if (value.isBlank() || created <= 0L) null else Capture(
                 o.optString("id", UUID.randomUUID().toString()), value.take(MAX_CAPTURE_CHARS),
-                created, o.optLong("updatedAt", created), o.optBoolean("pinned", false)
+                created, o.optLong("updatedAt", created), o.optBoolean("pinned", false),
+                o.optString("previewTitle", ""), o.optString("previewDescription", ""), o.optString("previewImageUrl", "")
             )
         }.sortedWith(compareByDescending<Capture> { it.pinned }.thenByDescending { it.updatedAt }).take(MAX_CAPTURES)
     } catch (_: Exception) { emptyList() }
@@ -424,7 +475,8 @@ class MainActivity : ComponentActivity() {
         val array = JSONArray()
         list.take(MAX_CAPTURES).forEach { c ->
             array.put(JSONObject().put("id", c.id).put("text", c.text.take(MAX_CAPTURE_CHARS))
-                .put("createdAt", c.createdAt).put("updatedAt", c.updatedAt).put("pinned", c.pinned))
+                .put("createdAt", c.createdAt).put("updatedAt", c.updatedAt).put("pinned", c.pinned)
+                .put("previewTitle", c.previewTitle).put("previewDescription", c.previewDescription).put("previewImageUrl", c.previewImageUrl))
         }
         prefs().edit().putString(CAPTURES_KEY, array.toString()).apply()
     }
@@ -784,7 +836,8 @@ private fun LinkaApp(
                 val text = o.optString("text", "").trim().take(MAX_CAPTURE_CHARS)
                 if (text.isBlank()) null else {
                     val now = System.currentTimeMillis()
-                    Capture(o.optString("id", UUID.randomUUID().toString()), text, o.optLong("createdAt", now), o.optLong("updatedAt", now), o.optBoolean("pinned", false))
+                    Capture(o.optString("id", UUID.randomUUID().toString()), text, o.optLong("createdAt", now), o.optLong("updatedAt", now), o.optBoolean("pinned", false),
+                    o.optString("previewTitle", ""), o.optString("previewDescription", ""), o.optString("previewImageUrl", ""))
                 }
             }
             captures = (imported + captures).distinctBy { it.id }.take(MAX_CAPTURES)
@@ -979,7 +1032,8 @@ private fun LinkaApp(
                         SettingsGroup(tr(lang, "data"), panel, border, main) {
                             SettingLine(Icons.Outlined.ContentCopy, tr(lang, "export"), "", main, muted) {
                                 val array = JSONArray()
-                                captures.forEach { c -> array.put(JSONObject().put("id", c.id).put("text", c.text).put("createdAt", c.createdAt).put("updatedAt", c.updatedAt).put("pinned", c.pinned)) }
+                                captures.forEach { c -> array.put(JSONObject().put("id", c.id).put("text", c.text).put("createdAt", c.createdAt).put("updatedAt", c.updatedAt).put("pinned", c.pinned)
+                                    .put("previewTitle", c.previewTitle).put("previewDescription", c.previewDescription).put("previewImageUrl", c.previewImageUrl)) }
                                 val send = Intent(Intent.ACTION_SEND).apply { type = "application/json"; putExtra(Intent.EXTRA_SUBJECT, "Linka backup"); putExtra(Intent.EXTRA_TEXT, array.toString(2)) }
                                 context.startActivity(Intent.createChooser(send, tr(lang, "export")))
                             }
