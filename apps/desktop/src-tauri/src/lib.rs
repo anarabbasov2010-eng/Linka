@@ -8,6 +8,7 @@ pub fn run() {
     {
         builder = builder.plugin(tauri_plugin_single_instance::init(|_app, _argv, _cwd| {}));
         builder = builder.plugin(tauri_plugin_deep_link::init());
+        builder = builder.plugin(tauri_plugin_opener::init());
     }
 
     builder = builder
