@@ -25,9 +25,8 @@ jobs:
         with:
           gradle-version: '8.10.2'
 
-      # Reuse one debug signing key so APKs from consecutive CI runs can update
-      # an existing CI-installed app. This is a hobby-project convenience, not
-      # production-grade signing; a Play Store release needs a protected key.
+      # The signing key is persisted in Actions cache. Never rotate it silently:
+      # a cache miss must fail the release rather than publish an incompatible APK.
       - name: Restore Linka update signing key
         uses: actions/cache@v4
         with:
@@ -37,23 +36,14 @@ jobs:
       # The Android Gradle plugin does not necessarily create debug.keystore
       # for a release build that reuses the debug signing config. Create it
       # explicitly on the first cache miss so actions/cache can persist it.
-      - name: Ensure Linka signing key exists
+      - name: Require preserved Linka signing key
         shell: bash
         run: |
           set -euo pipefail
           key="$HOME/.android/debug.keystore"
-          mkdir -p "$(dirname "$key")"
           if [[ ! -s "$key" ]]; then
-            echo "No cached Linka signing key found; generating the persistent CI key."
-            keytool -genkeypair -v \
-              -keystore "$key" \
-              -storepass android \
-              -alias androiddebugkey \
-              -keypass android \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -dname "CN=Android Debug,O=Android,C=US"
+            echo "::error::No preserved Linka signing key in Actions cache. Refusing to generate a replacement key or publish an incompatible APK."
+            exit 1
           fi
           keytool -list -keystore "$key" -storepass android -alias androiddebugkey >/dev/null
           fingerprint="$(keytool -list -v -keystore "$key" -storepass android -alias androiddebugkey | awk -F ': ' '/SHA256:/{gsub(":", "", $2); print tolower($2); exit}')"
@@ -115,7 +105,11 @@ jobs:
           tag_name: v0.4.${{ github.run_number }}
           name: Linka Android v0.4.${{ github.run_number }}
           body: |
-            What's new in this Android build:
+            IMPORTANT — migration from Linka 0.4.72:
+            - The signing key for the legacy 0.4.72 package was not preserved by CI, so Android cannot replace that installation in place.
+            - This recovery build uses the separate package app.linka.android.next and installs alongside the old app. Keep the old app installed until data migration is verified.
+            - In old Linka, open Settings → Your data → Export backup and save/share the JSON backup. In Linka Next, open Settings → Your data → Import backup. Verify your saved items before uninstalling the old app.
+          What's new in this Android build:
             - Optimized release build with R8 code shrinking and resource shrinking.
             - The inbox renders a limited batch of items at a time to reduce initial UI work.
             - Automated unit tests cover link/note filters, case-insensitive search, and pinned ordering.

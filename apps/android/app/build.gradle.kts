@@ -12,7 +12,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "app.linka.android"
+        applicationId = "app.linka.android.next"
         minSdk = 26
         targetSdk = 35
         versionCode = linkaVersionCode
