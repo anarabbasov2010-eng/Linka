@@ -217,7 +217,7 @@ export async function approveQrPairing({ id, secret, accessToken, refreshToken, 
   const session = await currentSession(config, getCloudSession());
   const result = await pairingRequest(config, "approve", {
     id: String(id || ""), secret: String(secret || ""),
-    refreshToken: String(refreshToken || session.refreshToken)
+    refreshToken: session.refreshToken
   }, session.accessToken);
   return result;
 }
