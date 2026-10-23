@@ -224,6 +224,7 @@ export async function approveQrPairing({ id, secret, accessToken, refreshToken, 
 export async function claimQrPairing({ id, secret, url, key }) {
   const config = requireConfig(url, key);
   const result = await pairingRequest(config, "claim", { id: String(id || ""), secret: String(secret || "") });
+  if (result.pending) return { pending: true };
   if (!result.refreshToken || !result.email) throw new Error("The QR login was not approved yet. Try again in a moment.");
   const renewed = await authRequest(config, "token?grant_type=refresh_token", { refresh_token: result.refreshToken });
   const session = storeSession({ ...renewed, email: result.email }, config);
