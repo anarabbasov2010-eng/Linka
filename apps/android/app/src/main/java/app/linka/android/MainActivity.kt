@@ -15,6 +15,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -66,6 +67,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -231,7 +233,7 @@ private fun LinkaHome(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Surface(shape = RoundedCornerShape(13.dp), color = panel, border = androidx.compose.foundation.BorderStroke(1.dp, border)) {
-                Text("↗", color = main, fontSize = 25.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(horizontal = 11.dp, vertical = 5.dp))
+                Image(painter = painterResource(id = R.drawable.linka_mark), contentDescription = "Linka logo", modifier = Modifier.size(42.dp))
             }
             Column {
                 Text("linka", color = main, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-1.3).sp)

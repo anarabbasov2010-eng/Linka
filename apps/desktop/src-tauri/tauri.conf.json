@@ -17,7 +17,6 @@
       "minWidth": 760,
       "minHeight": 560,
       "center": true,
-      "visible": false
     }],
     "security": {
       "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data: blob:; connect-src 'self'"
