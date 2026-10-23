@@ -432,6 +432,14 @@ class MainActivity : ComponentActivity() {
 
     private fun startUpdateDownload(info: UpdateInfo) {
         if (downloadingUpdate) return
+        val safeVersion = info.version.replace(Regex("[^A-Za-z0-9._-]"), "_")
+        val cachedApk = File(File(cacheDir, "updates"), "linka-update-$safeVersion.apk")
+        if (cachedApk.isFile && cachedApk.length() > 1024L) {
+            downloadedApkPath = cachedApk.absolutePath
+            downloadProgress = 100
+            downloadFailed = false
+            return
+        }
         if (!info.downloadUrl.startsWith("https://")) {
             downloadFailed = true
             return
