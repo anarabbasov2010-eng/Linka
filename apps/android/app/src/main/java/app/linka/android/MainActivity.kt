@@ -317,6 +317,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val preferredRate = window.decorView.display?.supportedModes?.maxByOrNull { it.refreshRate }?.refreshRate
+            if (preferredRate != null && preferredRate > 0f) {
+                window.attributes = window.attributes.apply { preferredRefreshRate = preferredRate }
+            }
+        }
         scheduleUpdateChecks()
         incomingSharedText = extractSharedText(intent)
         checkForUpdate(true)
@@ -519,6 +525,7 @@ private fun LinkaApp(
     var languageDialog by remember { mutableStateOf(false) }
     var agreementDialog by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
+    var updatePromptDismissed by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<Capture?>(null) }
     var clearDialog by remember { mutableStateOf(false) }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -727,6 +734,38 @@ private fun LinkaApp(
         }
     }
 
+    if (accepted && updateInfo != null && !updatePromptDismissed) {
+        AlertDialog(
+            onDismissRequest = { updatePromptDismissed = true },
+            containerColor = panel,
+            shape = RoundedCornerShape(24.dp),
+            title = {
+                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text(tr(lang, "available"), color = main, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Linka ${updateInfo.version}", color = muted, fontSize = 12.sp)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(tr(lang, "updateBody"), color = muted, fontSize = 13.sp, lineHeight = 19.sp)
+                    Text(tr(lang, "updateChanges"), color = main, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text(updateInfo.changes, color = muted, fontSize = 12.sp, lineHeight = 18.sp)
+                }
+            },
+            confirmButton = {
+                Button(onClick = { updatePromptDismissed = true; openUpdate(updateInfo.downloadUrl) },
+                    shape = RoundedCornerShape(13.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = main, contentColor = bg)) {
+                    Text(tr(lang, "updateNow"), fontSize = 12.sp)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { updatePromptDismissed = true }) {
+                    Text(tr(lang, "later"), color = muted, fontSize = 12.sp)
+                }
+            }
+        )
+    }
     if (!accepted || agreementDialog) AgreementDialog(lang, panel, border, main, muted, !accepted,
         onAgree = agree, onDecline = decline, onClose = { agreementDialog = false })
     if (languageDialog) AlertDialog(onDismissRequest = { languageDialog = false }, containerColor = panel,
@@ -790,12 +829,6 @@ private fun Header(lang: String, main: Color, muted: Color, panel: Color, border
             Text(tr(lang, "tagline"), color = muted, fontSize = 8.sp, letterSpacing = 1.2.sp)
         }
         Spacer(Modifier.weight(1f))
-        Surface(color = panel, shape = CircleShape, border = BorderStroke(1.dp, border)) {
-            Row(Modifier.padding(horizontal = 9.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                Box(Modifier.size(5.dp).background(Color(0xFF74B99B), CircleShape))
-                Text(tr(lang, "local"), color = muted, fontSize = 8.sp, letterSpacing = .5.sp)
-            }
-        }
         IconButton(onClick = onSettings) { Icon(Icons.Outlined.Tune, tr(lang, "settings"), tint = muted) }
     }
 }
