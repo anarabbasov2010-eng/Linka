@@ -602,7 +602,7 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return false
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= 26) manager.createNotificationChannel(NotificationChannel(NOTIFICATION_CHANNEL, "Linka updates", NotificationManager.IMPORTANCE_DEFAULT))
-        val pending = PendingIntent.getActivity(this, 42, Intent(Intent.ACTION_VIEW, Uri.parse(info.downloadUrl)),
+        val pending = PendingIntent.getActivity(this, 42, packageManager.getLaunchIntentForPackage(packageName) ?: Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val notification = if (Build.VERSION.SDK_INT >= 26) android.app.Notification.Builder(this, NOTIFICATION_CHANNEL) else {
             @Suppress("DEPRECATION") android.app.Notification.Builder(this)
@@ -621,7 +621,10 @@ private fun LinkaApp(
     theme: String, setTheme: (String) -> Unit, language: String, setLanguage: (String) -> Unit,
     animations: Boolean, setAnimations: (Boolean) -> Unit, fontScale: Float, setFontScale: (Float) -> Unit,
     alerts: Boolean, setAlerts: (Boolean) -> Unit, updateInfo: UpdateInfo?, updateStatus: String, checking: Boolean,
-    checkUpdates: () -> Unit, openUpdate: (String) -> Unit, version: String, accepted: Boolean, agree: () -> Unit, decline: () -> Unit
+    checkUpdates: () -> Unit, openUpdate: (UpdateInfo) -> Unit,
+    autoDownload: Boolean, setAutoDownload: (Boolean) -> Unit, downloadProgress: Int, downloadingUpdate: Boolean,
+    downloaded: Boolean, downloadFailed: Boolean, applyUpdate: () -> Unit, retryDownload: () -> Unit,
+    version: String, accepted: Boolean, agree: () -> Unit, decline: () -> Unit
 ) {
     val lang = language.ifBlank { "en" }
     val dark = MaterialTheme.colorScheme.background == DB
