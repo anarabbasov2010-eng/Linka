@@ -1,5 +1,6 @@
 import { loadCaptures, saveCaptures, makeCapture, visibleCaptures } from "./store.js";
 import { initLinkaExperience } from "./experience.js";
+import { initVisualSystem, setLinkaAccent, setLinkaDensity, setLinkaEffects } from "./visual-system.js";
 import {
   addDeletedId, disconnectCloud, getCloudConfig, getCloudSession,
   getOtpCooldown, readDeletedIds, requestEmailOtp, saveCloudConfig, syncCloudCaptures,
@@ -98,9 +99,11 @@ function compareVersions(a, b) {
   return 0;
 }
 function applyTheme(mode = themeMode) {
+  if (!["dark", "oled", "light", "system"].includes(mode)) mode = "dark";
   themeMode = mode;
   document.documentElement.dataset.theme = mode;
   localStorage.setItem("linka.theme", mode);
+  window.dispatchEvent(new CustomEvent("linka:theme-changed", { detail: { theme: mode } }));
 }
 applyTheme();
 
@@ -554,12 +557,49 @@ function showНастройки() {
   const themeMeta=document.createElement("div"); const themeTitle=document.createElement("strong"); themeTitle.textContent="Appearance";
   const themeDesc=document.createElement("p"); themeDesc.textContent="Выбери удобную цветовую тему"; themeMeta.append(themeTitle,themeDesc);
   const choices=document.createElement("div"); choices.className="theme-options"; choices.setAttribute("aria-label","Theme");
-  [["dark","Тёмная"],["light","Светлая"],["system","Системная"]].forEach(([value,label])=>{
+  [["dark","Тёмная"],["oled","OLED чёрная"],["light","Светлая"],["system","Системная"]].forEach(([value,label])=>{
     const b=document.createElement("button"); b.type="button"; b.className="theme-option"+(themeMode===value?" active":""); b.textContent=label;
     b.addEventListener("click",()=>{applyTheme(value);choices.querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b));});
     choices.append(b);
   });
   themeRow.append(themeMeta,choices); content.append(themeRow);
+  function addChoiceSetting(titleText, descriptionText, options, selectedValue, onSelect, ariaLabel) {
+    const row = document.createElement("div"); row.className = "setting-row visual-setting-row";
+    const meta = document.createElement("div");
+    const title = document.createElement("strong"); title.textContent = titleText;
+    const description = document.createElement("p"); description.textContent = descriptionText;
+    meta.append(title, description);
+    const group = document.createElement("div"); group.className = "theme-options"; group.setAttribute("aria-label", ariaLabel || titleText);
+    options.forEach(option => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "theme-option" + (selectedValue === option.value ? " active" : "");
+      button.textContent = option.label;
+      if (option.color) button.style.setProperty("--option-color", option.color);
+      button.addEventListener("click", () => {
+        onSelect(option.value);
+        group.querySelectorAll("button").forEach(node => node.classList.toggle("active", node === button));
+      });
+      group.append(button);
+    });
+    row.append(meta, group); content.append(row);
+  }
+  addChoiceSetting("Акцентный цвет", "Выбери фирменный цвет интерфейса", [
+    {value:"violet",label:"Violet",color:"#A99AFF"},
+    {value:"blue",label:"Blue",color:"#8CB8FF"},
+    {value:"mint",label:"Mint",color:"#8FE3CF"},
+    {value:"rose",label:"Rose",color:"#FFB6D2"}
+  ], localStorage.getItem("linka.accent") || "violet", setLinkaAccent, "Accent color");
+  addChoiceSetting("Плотность интерфейса", "Больше пространства или больше содержимого", [
+    {value:"compact",label:"Компактно"},
+    {value:"standard",label:"Стандарт"},
+    {value:"spacious",label:"Свободно"}
+  ], localStorage.getItem("linka.density") || "standard", setLinkaDensity, "Interface density");
+  addChoiceSetting("Интенсивность эффектов", "От спокойного режима до глубины и параллакса", [
+    {value:"quiet",label:"Тихо"},
+    {value:"balanced",label:"Баланс"},
+    {value:"atmosphere",label:"Атмосфера"}
+  ], localStorage.getItem("linka.effects") || "balanced", setLinkaEffects, "Visual effects intensity");
   const motionRow=document.createElement("div"); motionRow.className="setting-row";
   const motionMeta=document.createElement("div"); const mt=document.createElement("strong"); mt.textContent="Меньше анимации";
   const md=document.createElement("p"); md.textContent="Уменьшает движение и переходы интерфейса"; motionMeta.append(mt,md);
@@ -620,7 +660,23 @@ list.addEventListener("click",async event=>{
   const {action,id}=button.dataset;const item=captures.find(entry=>entry.id===id);if(!item)return;
   if(action==="expand"){if(expandedCards.has(id))expandedCards.delete(id);else expandedCards.add(id);render();}
   else if(action==="pin"){captures=captures.map(entry=>entry.id===id?{...entry,pinned:!entry.pinned,updatedAt:Date.now()}:entry);persist();render();say(item.pinned?"Откреплено":"Закреплено");}
-  else if(action==="delete"){addDeletedId(id);captures=captures.filter(entry=>entry.id!==id);if(editingId===id)resetEditor();persist();render();say("Запись удалена");}
+  else if(action==="delete"){
+    addDeletedId(id);
+    captures=captures.filter(entry=>entry.id!==id);
+    if(editingId===id)resetEditor();
+    persist();render();say("Запись удалена");
+    window.dispatchEvent(new CustomEvent("linka:toast", { detail: {
+      message: "Запись удалена",
+      actionLabel: "Отменить",
+      onAction: () => {
+        const deleted = readDeletedIds();
+        deleted.delete(id);
+        try { localStorage.setItem("linka.deletedIds.v1", JSON.stringify(Array.from(deleted))); } catch {}
+        captures = [...captures.filter(entry => entry.id !== id), item].sort((a,b) => b.updatedAt - a.updatedAt).slice(0,1000);
+        persist(); render(); say("Удаление отменено");
+      }
+    }}));
+  }
   else if(action==="edit"){editingId=id;draft.value=item.text;composeLabel.textContent="Edit capture";saveButton.textContent="Save changes ↗";saveButton.disabled=false;draft.focus();window.scrollTo({top:0,behavior:"smooth"});}
   else if(action==="copy"){try{await navigator.clipboard.writeText(item.text);say("Скопировано");}catch{draft.value=item.text;draft.focus();draft.select();say("Text selected for manual copying");}}
 });
@@ -671,3 +727,8 @@ void completeGoogleOAuthCallback().then(session => {
   say(error?.message || "Google sign-in could not be completed.");
 });
 initLinkaExperience();
+window.addEventListener("linka:appearance-theme", event => {
+  const mode = event.detail?.theme;
+  if (["dark", "oled", "light", "system"].includes(mode)) applyTheme(mode);
+});
+initVisualSystem();
