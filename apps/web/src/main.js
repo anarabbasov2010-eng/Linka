@@ -39,6 +39,7 @@ let statusTimer = null;
 let cloudSyncTimer = null;
 let cloudSyncBusy = false;
 let cloudSyncStatus = "";
+const expandedCards = new Set();
 const desktopBuildVersion = String(import.meta.env.VITE_LINKA_DESKTOP_VERSION || "").trim();
 let themeMode = localStorage.getItem("linka.theme") || "dark";
 let reduceMotion = localStorage.getItem("linka.reduceMotion") === "true";
@@ -117,7 +118,7 @@ function render() {
   shown.forEach((item, index) => {
     const card = document.createElement("article");
     card.dataset.itemId = item.id;
-    card.className = "item" + (item.pinned ? " pinned" : "");
+    card.className = "item" + (item.pinned ? " pinned" : "") + (expandedCards.has(item.id) ? " expanded" : "");
     card.style.setProperty("--index", String(index));
     const head = document.createElement("div"); head.className = "item-head";
     const kind = document.createElement("span"); kind.className = "kind";
@@ -146,6 +147,11 @@ function render() {
     const date = document.createElement("span"); date.className = "date"; date.textContent = formatDate(item.updatedAt || item.createdAt);
     const actions = document.createElement("div"); actions.className = "actions";
     actions.append(makeAction("Copy", "copy", item.id), makeAction("Edit", "edit", item.id), makeAction("Delete", "delete", item.id));
+    if (item.text.length > 240) {
+      const expand = makeAction(expandedCards.has(item.id) ? "Show less" : "Read more", "expand", item.id);
+      expand.setAttribute("aria-expanded", String(expandedCards.has(item.id)));
+      actions.prepend(expand);
+    }
     foot.append(date, actions); card.append(head, ...previewBits, body, foot); list.append(card);
   });
 }
@@ -248,7 +254,7 @@ function addTermsBody(container) {
   const body = document.createElement("div");
   const sections = [
     ["Your data stays local", "Captures live in this browser profile or local app storage. Browser resets, cleared data, device loss or uninstallation may erase them. Keep an export backup."],
-    ["No automatic sync yet", "Accounts and cloud synchronization are not available. Transfer between devices is manual through export, import or the system share sheet."],
+    ["Optional cloud sync", "Sign in to the same Linka account on Android, Windows and the web to sync your library. Local storage and manual export/import remain available even when you are offline. Sync needs a configured shared Supabase project; never enter a service-role or secret key into the app."],
     ["Use and responsibility", "You are responsible for what you save, protecting your device, and keeping backups. Do not use Linka as the only copy of critical information."],
     ["Links and early access", "Opened links are handled by external apps/sites. Linka is an early-stage utility; features can change and uninterrupted, error-free operation is not guaranteed."],
     ["Acceptable use", "Use Linka lawfully, respect other people’s rights, and avoid saving sensitive information on shared devices."]
@@ -490,7 +496,8 @@ filters.forEach(button=>button.addEventListener("click",()=>{
 list.addEventListener("click",async event=>{
   const button=event.target.closest("button[data-action]");if(!button)return;
   const {action,id}=button.dataset;const item=captures.find(entry=>entry.id===id);if(!item)return;
-  if(action==="pin"){captures=captures.map(entry=>entry.id===id?{...entry,pinned:!entry.pinned,updatedAt:Date.now()}:entry);persist();render();say(item.pinned?"Removed from pinned":"Pinned for later");}
+  if(action==="expand"){if(expandedCards.has(id))expandedCards.delete(id);else expandedCards.add(id);render();}
+  else if(action==="pin"){captures=captures.map(entry=>entry.id===id?{...entry,pinned:!entry.pinned,updatedAt:Date.now()}:entry);persist();render();say(item.pinned?"Removed from pinned":"Pinned for later");}
   else if(action==="delete"){addDeletedId(id);captures=captures.filter(entry=>entry.id!==id);if(editingId===id)resetEditor();persist();render();say("Capture deleted");}
   else if(action==="edit"){editingId=id;draft.value=item.text;composeLabel.textContent="Edit capture";saveButton.textContent="Save changes ↗";saveButton.disabled=false;draft.focus();window.scrollTo({top:0,behavior:"smooth"});}
   else if(action==="copy"){try{await navigator.clipboard.writeText(item.text);say("Copied to clipboard");}catch{draft.value=item.text;draft.focus();draft.select();say("Text selected for manual copying");}}

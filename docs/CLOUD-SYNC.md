@@ -7,7 +7,7 @@ Linka is local-first: links and notes are saved on the current device even while
 1. Create a Supabase project on a plan that suits your usage. Check current pricing and quotas in your Supabase dashboard before using it for a public service.
 2. Open the project's SQL Editor and run the schema shown by **Settings → Linka Cloud Sync → Copy database setup SQL** in the web app, or use the **Set up sync database** action in Android's Cloud Sync screen.
 3. Copy the project URL and the **publishable key** (or legacy public anon key) from the Supabase dashboard. Do not use a `service_role` or secret key in Linka.
-4. In Linka on each device, enter the same project URL and public key. Create the same email/password account once, confirm the email if Supabase requires it, and sign in with that account on every other device.
+4. In a build configured with the shared public project URL and publishable key, open Cloud Sync and create an email/password account once. Confirm the email if Supabase requires it, then sign in with the same Linka account on Android, Windows and the website. Builds without those defaults can still be configured manually in Settings.
 5. Make a backup before the first sync. Linka merges captures by ID and most-recent update time; deleted capture IDs are stored as tombstones so old copies should not reappear during a successful sync.
 
 ## Database schema

@@ -4,7 +4,7 @@
 
 ## Platforms
 
-- **Web:** responsive inbox with search, link/note filters, pinning, editing, deletion, copy, link opening and JSON import/export.
+- **Web:** responsive inbox with dedicated library search (Ctrl/⌘+K or /), metadata-aware search, fixed-ratio link covers, expandable capture cards, link/note filters, pinning, editing, deletion, copy, link opening and JSON import/export.
 - **Windows:** Tauri 2 desktop app using the same web inbox UI, with NSIS EXE and MSI installer targets.
 - **Android:** Kotlin + Jetpack Compose, share-intent capture, search and filters, pin/edit/delete/copy/open, link previews, configurable cloud sync, update notifications and a guarded APK updater that checks package ID, version code and signing certificate before installation.
 
