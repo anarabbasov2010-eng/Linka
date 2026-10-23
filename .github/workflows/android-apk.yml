@@ -109,7 +109,7 @@ jobs:
             - The signing key for the legacy 0.4.72 package was not preserved by CI, so Android cannot replace that installation in place.
             - This recovery build uses the separate package app.linka.android.next and installs alongside the old app. Keep the old app installed until data migration is verified.
             - In old Linka, open Settings → Your data → Export backup and save/share the JSON backup. In Linka Next, open Settings → Your data → Import backup. Verify your saved items before uninstalling the old app.
-          What's new in this Android build:
+            What's new in this Android build:
             - Optimized release build with R8 code shrinking and resource shrinking.
             - The inbox renders a limited batch of items at a time to reduce initial UI work.
             - Automated unit tests cover link/note filters, case-insensitive search, and pinned ordering.
