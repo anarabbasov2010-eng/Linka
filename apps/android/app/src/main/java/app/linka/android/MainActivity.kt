@@ -484,6 +484,7 @@ private fun tr(lang: String, key: String) = words[lang]?.get(key) ?: extraWords[
 class MainActivity : ComponentActivity() {
     private var incomingSharedText by mutableStateOf("")
     private var incomingSharedToken by mutableIntStateOf(0)
+    private var incomingPairingToken by mutableIntStateOf(0)
     private var updateInfo by mutableStateOf<UpdateInfo?>(null)
     private var updateStatus by mutableStateOf("")
     private var checkingUpdates by mutableStateOf(false)
@@ -596,6 +597,7 @@ class MainActivity : ComponentActivity() {
         val secret = uri.getQueryParameter("secret").orEmpty()
         if (id.isBlank() || secret.length < 32) return
         prefs().edit().putString("pending_pair_id", id).putString("pending_pair_secret", secret).apply()
+        incomingPairingToken++
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -638,7 +640,7 @@ class MainActivity : ComponentActivity() {
                 background = LB, surface = LS, primary = LT, onPrimary = LS, onBackground = LT, onSurface = LT, surfaceVariant = LR, outline = LBR
             )) {
                 LinkaApp(
-                    sharedText = incomingSharedText, sharedTrigger = incomingSharedToken,
+                    sharedText = incomingSharedText, sharedTrigger = incomingSharedToken, pairingTrigger = incomingPairingToken,
                     load = { loadCaptures() }, save = { saveCaptures(it) },
                     copy = { copyText(it) }, open = { openExternal(it) },
                     theme = theme, setTheme = { theme = it; prefs().edit().putString(THEME_KEY, it).apply() },
@@ -1174,6 +1176,12 @@ private fun LinkaApp(
             delay(60_000L)
         }
     }
+    LaunchedEffect(pairingTrigger) {
+        if (pairingTrigger > 0) {
+            pendingPairId = prefs.getString("pending_pair_id", "").orEmpty()
+            pendingPairSecret = prefs.getString("pending_pair_secret", "").orEmpty()
+        }
+    }
     LaunchedEffect(pendingPairId, pendingPairSecret, cloudDialog) {
         if (pendingPairId.isBlank() || pendingPairSecret.isBlank()) return@LaunchedEffect
         val encrypted = prefs.getString(SYNC_REFRESH_KEY, "").orEmpty()
@@ -1568,14 +1576,6 @@ private fun LinkaApp(
                         if (stored.isBlank() && localProfileJson()?.optString("displayName").isNullOrBlank() && result.profile?.optString("displayName").isNullOrBlank()) {
                             profileDialog = true
                             cloudDialog = false
-                        }
-                        if (pendingPairId.isNotBlank() && pendingPairSecret.isNotBlank()) {
-                            val approvedToken = approveQrPairing(cloudUrl, cloudAnonKey, result.encryptedRefreshToken, pendingPairId, pendingPairSecret)
-                            prefs.edit().putString(SYNC_REFRESH_KEY, approvedToken)
-                                .remove("pending_pair_id").remove("pending_pair_secret").apply()
-                            pendingPairId = ""
-                            pendingPairSecret = ""
-                            cloudStatus = tr(lang, "syncQrApproved")
                         }
                     } catch (e: Exception) {
                         cloudStatus = e.message ?: "Cloud sync failed"
