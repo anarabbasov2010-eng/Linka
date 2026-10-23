@@ -8,6 +8,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import java.io.File
+import java.io.FileOutputStream
 import android.os.Build
 import androidx.core.content.ContextCompat
 import androidx.work.Worker
@@ -19,6 +21,7 @@ import java.net.URL
 
 private const val LINKA_PREFS = "linka_local_v3"
 private const val UPDATE_ALERTS_KEY = "update_alerts"
+private const val AUTO_DOWNLOAD_KEY = "auto_download_updates"
 private const val LAST_NOTIFIED_KEY = "last_notified_version"
 private const val CHANNEL_ID = "linka_updates"
 private const val RELEASE_URL = "https://api.github.com/repos/anarabbasov2010-eng/Linka/releases/latest"
@@ -26,7 +29,9 @@ private const val RELEASE_URL = "https://api.github.com/repos/anarabbasov2010-en
 class UpdateCheckWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
     override fun doWork(): Result {
         val prefs = applicationContext.getSharedPreferences(LINKA_PREFS, Context.MODE_PRIVATE)
-        if (!prefs.getBoolean(UPDATE_ALERTS_KEY, true)) return Result.success()
+        val alertsEnabled = prefs.getBoolean(UPDATE_ALERTS_KEY, true)
+        val autoDownload = prefs.getBoolean(AUTO_DOWNLOAD_KEY, false)
+        if (!alertsEnabled && !autoDownload) return Result.success()
 
         return try {
             val connection = URL(RELEASE_URL).openConnection() as HttpURLConnection
@@ -54,8 +59,14 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters) : Worker(con
                 val currentVersion = applicationContext.packageManager
                     .getPackageInfo(applicationContext.packageName, 0).versionName ?: "0.4.0"
                 if (compareVersions(latestVersion, currentVersion) <= 0) return Result.success()
-                if ((prefs.getString(LAST_NOTIFIED_KEY, "") ?: "") == latestVersion) return Result.success()
 
+                var downloadedFile: File? = null
+                if (autoDownload) {
+                    downloadedFile = downloadApk(apkUrl, latestVersion)
+                    if (downloadedFile == null) return Result.retry()
+                }
+
+                if (!alertsEnabled || (prefs.getString(LAST_NOTIFIED_KEY, "") ?: "") == latestVersion) return Result.success()
                 if (Build.VERSION.SDK_INT >= 33 &&
                     ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                     return Result.success()
@@ -69,7 +80,8 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters) : Worker(con
                 }
                 val pending = PendingIntent.getActivity(
                     applicationContext, 4107,
-                    Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl)),
+                    applicationContext.packageManager.getLaunchIntentForPackage(applicationContext.packageName)
+                        ?: Intent(applicationContext, MainActivity::class.java),
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
                 val notification = if (Build.VERSION.SDK_INT >= 26) {
@@ -81,7 +93,7 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters) : Worker(con
                 manager.notify(4107, notification
                     .setSmallIcon(android.R.drawable.stat_sys_download_done)
                     .setContentTitle("Linka $latestVersion is available")
-                    .setContentText("Tap to download and install the latest version.")
+                    .setContentText(if (downloadedFile != null) "Update downloaded. Open Linka to apply it." else "A new version is available. Open Linka to download it.")
                     .setContentIntent(pending)
                     .setAutoCancel(true)
                     .build())
@@ -92,6 +104,53 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters) : Worker(con
             }
         } catch (_: Exception) {
             Result.retry()
+        }
+    }
+
+    private fun downloadApk(url: String, version: String): File? {
+        if (!url.startsWith("https://")) return null
+        val folder = File(applicationContext.cacheDir, "updates").apply { mkdirs() }
+        val safeVersion = version.replace(Regex("[^A-Za-z0-9._-]"), "_")
+        val target = File(folder, "linka-update-$safeVersion.apk")
+        if (target.isFile && target.length() > 1024L) return target
+        val temp = File(folder, "linka-update-$safeVersion.apk.part")
+        return try {
+            val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 15000
+                readTimeout = 20000
+                instanceFollowRedirects = true
+                setRequestProperty("User-Agent", "Linka-Android")
+                setRequestProperty("Accept", "application/octet-stream")
+            }
+            try {
+                if (connection.responseCode !in 200..299) return null
+                if (connection.contentLengthLong > 200L * 1024L * 1024L) return null
+                connection.inputStream.use { input ->
+                    FileOutputStream(temp).use { output ->
+                        val buffer = ByteArray(32 * 1024)
+                        var read: Int
+                        var total = 0L
+                        while (input.read(buffer).also { read = it } != -1) {
+                            total += read
+                            if (total > 200L * 1024L * 1024L) error("APK exceeds size limit")
+                            output.write(buffer, 0, read)
+                        }
+                        output.fd.sync()
+                    }
+                }
+                if (temp.length() < 1024L) return null
+                val magic = temp.inputStream().use { input -> ByteArray(4).also { input.read(it) } }
+                if (magic[0] != 0x50.toByte() || magic[1] != 0x4b.toByte()) return null
+                if (target.exists()) target.delete()
+                if (!temp.renameTo(target)) return null
+                target
+            } finally {
+                connection.disconnect()
+            }
+        } catch (_: Exception) {
+            null
+        } finally {
+            if (temp.exists()) temp.delete()
         }
     }
 
