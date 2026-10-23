@@ -12,6 +12,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -110,6 +111,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
@@ -117,6 +119,8 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
+import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.text.DateFormat
@@ -294,6 +298,10 @@ class MainActivity : ComponentActivity() {
     private var updateInfo by mutableStateOf<UpdateInfo?>(null)
     private var updateStatus by mutableStateOf("")
     private var checkingUpdates by mutableStateOf(false)
+    private var downloadingUpdate by mutableStateOf(false)
+    private var downloadProgress by mutableIntStateOf(0)
+    private var downloadedApkPath by mutableStateOf<String?>(null)
+    private var downloadFailed by mutableStateOf(false)
     private var permissionDialogPending = false
     private fun prefs() = getSharedPreferences(PREFS, MODE_PRIVATE)
     private fun appVersion() = runCatching { packageManager.getPackageInfo(packageName, 0).versionName ?: "0.4.0" }.getOrDefault("0.4.0")
@@ -341,6 +349,7 @@ class MainActivity : ComponentActivity() {
             var animations by remember { mutableStateOf(prefs().getBoolean(ANIMATIONS_KEY, true)) }
             var fontScale by remember { mutableFloatStateOf(prefs().getFloat(FONT_SCALE_KEY, 1f).coerceIn(.9f, 1.2f)) }
             var alerts by remember { mutableStateOf(prefs().getBoolean(UPDATE_ALERTS_KEY, true)) }
+            var autoDownload by remember { mutableStateOf(prefs().getBoolean(AUTO_DOWNLOAD_KEY, false)) }
             val darkSystem = androidx.compose.foundation.isSystemInDarkTheme()
             val dark = theme == "dark" || (theme == "system" && darkSystem)
             MaterialTheme(colorScheme = if (dark) darkColorScheme(
@@ -365,7 +374,14 @@ class MainActivity : ComponentActivity() {
                         if (enabled && updateInfo != null) notifyUpdate(updateInfo!!)
                     },
                     updateInfo = updateInfo, updateStatus = updateStatus, checking = checkingUpdates,
-                    checkUpdates = { checkForUpdate(false) }, openUpdate = { openExternal(it) },
+                    checkUpdates = { checkForUpdate(false) }, openUpdate = { startUpdateDownload(it) },
+                    autoDownload = autoDownload, setAutoDownload = { enabled ->
+                        autoDownload = enabled
+                        prefs().edit().putBoolean(AUTO_DOWNLOAD_KEY, enabled).apply()
+                        if (enabled && updateInfo != null && downloadedApkPath == null && !downloadingUpdate) startUpdateDownload(updateInfo!!)
+                    }, downloadProgress = downloadProgress, downloadingUpdate = downloadingUpdate,
+                    downloaded = downloadedApkPath != null, downloadFailed = downloadFailed,
+                    applyUpdate = { installDownloadedUpdate() }, retryDownload = { updateInfo?.let { startUpdateDownload(it) } },
                     version = appVersion(), accepted = accepted,
                     agree = {
                         prefs().edit().putString(TERMS_KEY, TERMS_VERSION).apply()
