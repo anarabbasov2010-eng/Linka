@@ -430,6 +430,109 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    private fun startUpdateDownload(info: UpdateInfo) {
+        if (downloadingUpdate) return
+        if (!info.downloadUrl.startsWith("https://")) {
+            downloadFailed = true
+            return
+        }
+        downloadingUpdate = true
+        downloadFailed = false
+        downloadProgress = 0
+        downloadedApkPath = null
+        Thread {
+            var finalFile: File? = null
+            try {
+                val connection = (URL(info.downloadUrl).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 15000
+                    readTimeout = 20000
+                    instanceFollowRedirects = true
+                    setRequestProperty("User-Agent", "Linka-Android")
+                    setRequestProperty("Accept", "application/octet-stream")
+                }
+                try {
+                    val code = connection.responseCode
+                    if (code !in 200..299) error("Download HTTP $code")
+                    val total = connection.contentLengthLong
+                    if (total > 200L * 1024L * 1024L) error("APK exceeds size limit")
+                    val folder = File(cacheDir, "updates").apply { mkdirs() }
+                    val temp = File(folder, "linka-update.apk.part")
+                    if (temp.exists()) temp.delete()
+                    connection.inputStream.use { input ->
+                        FileOutputStream(temp).use { output ->
+                            val buffer = ByteArray(32 * 1024)
+                            var read: Int
+                            var count = 0L
+                            var lastProgress = -1
+                            while (input.read(buffer).also { read = it } != -1) {
+                                count += read
+                                if (count > 200L * 1024L * 1024L) error("APK exceeds size limit")
+                                output.write(buffer, 0, read)
+                                if (total > 0L) {
+                                    val percent = ((count * 100L) / total).toInt().coerceIn(0, 100)
+                                    if (percent != lastProgress) {
+                                        lastProgress = percent
+                                        runOnUiThread { downloadProgress = percent }
+                                    }
+                                }
+                            }
+                            output.fd.sync()
+                        }
+                    }
+                    if (!temp.isFile || temp.length() < 1024L) error("Downloaded file is incomplete")
+                    val signature = temp.inputStream().use { input -> ByteArray(4).also { input.read(it) } }
+                    if (!(signature[0] == 0x50.toByte() && signature[1] == 0x4b.toByte())) error("Downloaded file is not an APK archive")
+                    finalFile = File(folder, "linka-update-${info.version.replace(Regex("[^A-Za-z0-9._-]"), "_")}.apk")
+                    if (finalFile!!.exists()) finalFile!!.delete()
+                    if (!temp.renameTo(finalFile!!)) error("Could not finalize update")
+                } finally {
+                    connection.disconnect()
+                }
+            } catch (_: Exception) {
+                finalFile?.delete()
+                runOnUiThread {
+                    downloadingUpdate = false
+                    downloadFailed = true
+                    downloadedApkPath = null
+                    downloadProgress = 0
+                }
+                return@Thread
+            }
+            val path = finalFile?.absolutePath
+            runOnUiThread {
+                downloadingUpdate = false
+                downloadFailed = false
+                downloadedApkPath = path
+                downloadProgress = 100
+            }
+        }.start()
+    }
+
+    private fun installDownloadedUpdate() {
+        val path = downloadedApkPath ?: return
+        val file = File(path)
+        if (!file.isFile || file.length() < 1024L) {
+            downloadedApkPath = null
+            downloadFailed = true
+            return
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
+            val settings = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName"))
+            runCatching { startActivity(settings) }
+            return
+        }
+        runCatching {
+            val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+            val install = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(install)
+        }.onFailure {
+            downloadFailed = true
+        }
+    }
+
     private fun checkForUpdate(quiet: Boolean) {
         if (checkingUpdates) return
         checkingUpdates = true
@@ -470,10 +573,15 @@ class MainActivity : ComponentActivity() {
                 checkingUpdates = false
                 updateInfo = newer
                 updateStatus = status
-                if (newer != null && prefs().getBoolean(UPDATE_ALERTS_KEY, true)) {
-                    val last = prefs().getString(LAST_NOTIFIED_KEY, "") ?: ""
-                    if (last != newer!!.version && notifyUpdate(newer!!)) {
-                        prefs().edit().putString(LAST_NOTIFIED_KEY, newer!!.version).apply()
+                if (newer != null) {
+                    if (prefs().getBoolean(UPDATE_ALERTS_KEY, true)) {
+                        val last = prefs().getString(LAST_NOTIFIED_KEY, "") ?: ""
+                        if (last != newer!!.version && notifyUpdate(newer!!)) {
+                            prefs().edit().putString(LAST_NOTIFIED_KEY, newer!!.version).apply()
+                        }
+                    }
+                    if (prefs().getBoolean(AUTO_DOWNLOAD_KEY, false) && downloadedApkPath == null && !downloadingUpdate) {
+                        startUpdateDownload(newer!!)
                     }
                 }
             }
