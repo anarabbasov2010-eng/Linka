@@ -340,7 +340,7 @@ function showCloudSyncНастройки() {
   content.append(form, profileWrap, advanced);
 
   const statusLine = document.createElement("p"); statusLine.className = "cloud-status";
-  statusLine.textContent = session ? `Вход выполнен: ${session.email || "твой аккаунт"}.` : "Создай аккаунт или войди по коду из письма.";
+  statusLine.textContent = session ? `Вход выполнен: ${session.email || "твой аккаунт"}.` : "Продолжи через Google, чтобы включить синхронизацию.";
   content.append(statusLine);
   const actions = document.createElement("div"); actions.className = "modal-actions";
   const close = document.createElement("button"); close.type = "button"; close.className = "ghost"; close.textContent = "Закрыть";
@@ -673,11 +673,6 @@ window.addEventListener("linka:profile-saved", () => {
 });
 void completeGoogleOAuthCallback().then(session => {
   if (!session) return;
-  const profile = readLinkaProfile();
-  if (!profile && session.displayName) {
-    // Pre-fill the profile from Google; the user can still edit it in the onboarding panel.
-    saveLinkaProfile({ displayName: session.displayName, age: null, updatedAt: Date.now() });
-  }
   window.dispatchEvent(new Event("linka:authenticated"));
   showCloudSyncНастройки();
 }).catch(error => {
