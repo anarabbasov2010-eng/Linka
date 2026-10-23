@@ -147,16 +147,16 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import coil.compose.AsyncImage
 
-private val DB = Color(0xFF08090D)
-private val DS = Color(0xFF11141B)
-private val DR = Color(0xFF1B202B)
-private val DBR = Color(0xFF2B3342)
+private val DB = Color(0xFF08080C)
+private val DS = Color(0xFF121119)
+private val DR = Color(0xFF201D2B)
+private val DBR = Color(0xFF343044)
 private val DT = Color(0xFFF6F7FB)
-private val DM = Color(0xFF9AA5B7)
-private val LB = Color(0xFFF3F5F9)
+private val DM = Color(0xFFA7A2B8)
+private val LB = Color(0xFFF5F4F9)
 private val LS = Color(0xFFFCFDFF)
-private val LR = Color(0xFFEBEFF6)
-private val LBR = Color(0xFFDDE3EE)
+private val LR = Color(0xFFEEEAF6)
+private val LBR = Color(0xFFDDD7EB)
 private val LT = Color(0xFF171B25)
 private val LM = Color(0xFF6D7789)
 private const val PREFS = "linka_local_v3"
@@ -658,9 +658,9 @@ class MainActivity : ComponentActivity() {
             val darkSystem = androidx.compose.foundation.isSystemInDarkTheme()
             val dark = theme == "dark" || (theme == "system" && darkSystem)
             MaterialTheme(colorScheme = if (dark) darkColorScheme(
-                background = DB, surface = DS, primary = DT, onPrimary = DB, onBackground = DT, onSurface = DT, surfaceVariant = DR, outline = DBR
+                background = DB, surface = DS, primary = Color(0xFFC9C0FF), onPrimary = Color(0xFF171323), onBackground = DT, onSurface = DT, surfaceVariant = DR, outline = DBR
             ) else lightColorScheme(
-                background = LB, surface = LS, primary = LT, onPrimary = LS, onBackground = LT, onSurface = LT, surfaceVariant = LR, outline = LBR
+                background = LB, surface = LS, primary = Color(0xFF6554A6), onPrimary = Color(0xFFFFFFFF), onBackground = LT, onSurface = LT, surfaceVariant = LR, outline = LBR
             )) {
                 LinkaApp(
                     sharedText = incomingSharedText, sharedTrigger = incomingSharedToken, pairingTrigger = incomingPairingToken, oauthTrigger = incomingOAuthToken,
@@ -1322,8 +1322,8 @@ private fun LinkaApp(
         ) { page ->
             Column(Modifier.fillMaxSize().background(
                 Brush.verticalGradient(
-                    if (dark) listOf(Color(0xFF111725), DB, Color(0xFF08090D))
-                    else listOf(Color(0xFFFFFFFF), LB, Color(0xFFEFF2F8))
+                    if (dark) listOf(Color(0xFF191528), DB, Color(0xFF08080C))
+                    else listOf(Color(0xFFFFFFFF), LB, Color(0xFFF0EDF8))
                 )
             ).verticalScroll(rememberScrollState()).imePadding()
                 .padding(horizontal = 18.dp).padding(top = 14.dp, bottom = 28.dp),
