@@ -467,11 +467,24 @@ class MainActivity : ComponentActivity() {
     private var waitingForInstallPermission = false
     private var permissionDialogPending = false
     private fun prefs() = getSharedPreferences(PREFS, MODE_PRIVATE)
+    private fun ensureNotificationChannel() {
+        if (Build.VERSION.SDK_INT < 26) return
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        if (manager.getNotificationChannel(NOTIFICATION_CHANNEL) == null) {
+            manager.createNotificationChannel(
+                NotificationChannel(NOTIFICATION_CHANNEL, "Linka updates", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                    description = "Notifications about new Linka versions and update status"
+                }
+            )
+        }
+    }
+
     private fun canPostNotifications(): Boolean {
+        ensureNotificationChannel()
         val appAllowed = NotificationManagerCompat.from(this).areNotificationsEnabled()
         val runtimeAllowed = Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
         val channelAllowed = Build.VERSION.SDK_INT < 26 ||
-            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).getNotificationChannel(NOTIFICATION_CHANNEL)?.importance != NotificationManager.IMPORTANCE_NONE
+            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).getNotificationChannel(NOTIFICATION_CHANNEL)?.importance?.let { it != NotificationManager.IMPORTANCE_NONE } == true
         return appAllowed && runtimeAllowed && channelAllowed
     }
     private fun openNotificationSettings() {
@@ -555,6 +568,7 @@ class MainActivity : ComponentActivity() {
                 window.attributes = window.attributes.apply { preferredRefreshRate = preferredRate }
             }
         }
+        ensureNotificationChannel()
         notificationsAllowed = canPostNotifications()
         scheduleUpdateChecks()
         incomingSharedText = extractSharedText(intent)
@@ -629,6 +643,12 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         notificationsAllowed = canPostNotifications()
+        val now = System.currentTimeMillis()
+        val lastForegroundCheck = prefs().getLong("last_foreground_update_check", 0L)
+        if (now - lastForegroundCheck > 30L * 60L * 1000L) {
+            prefs().edit().putLong("last_foreground_update_check", now).apply()
+            checkForUpdate(true)
+        }
         if (waitingForInstallPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && packageManager.canRequestPackageInstalls()) {
             waitingForInstallPermission = false
             installDownloadedUpdate()
@@ -666,10 +686,10 @@ class MainActivity : ComponentActivity() {
             .build()
         val workManager = WorkManager.getInstance(applicationContext)
         workManager.enqueueUniqueWork(
-            "linka-update-check-now", ExistingWorkPolicy.KEEP,
+            "linka-update-check-now", ExistingWorkPolicy.REPLACE,
             OneTimeWorkRequestBuilder<UpdateCheckWorker>()
                 .setConstraints(constraints)
-                .setInitialDelay(15, java.util.concurrent.TimeUnit.SECONDS)
+                .setInitialDelay(5, java.util.concurrent.TimeUnit.SECONDS)
                 .build()
         )
         workManager.enqueueUniquePeriodicWork("linka-update-checks", ExistingPeriodicWorkPolicy.KEEP, request)
@@ -877,16 +897,31 @@ class MainActivity : ComponentActivity() {
     private fun notifyUpdate(info: UpdateInfo): Boolean {
         if (!canPostNotifications()) return false
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (Build.VERSION.SDK_INT >= 26) manager.createNotificationChannel(NotificationChannel(NOTIFICATION_CHANNEL, "Linka updates", NotificationManager.IMPORTANCE_DEFAULT))
+        ensureNotificationChannel()
         val pending = PendingIntent.getActivity(this, 42, packageManager.getLaunchIntentForPackage(packageName) ?: Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val language = (prefs().getString(LANGUAGE_KEY, "") ?: "").ifBlank { Locale.getDefault().language }.lowercase(Locale.ROOT)
+        val title = when (language) {
+            "ru" -> "Доступна Linka ${info.version}"
+            "az" -> "Linka ${info.version} mövcuddur"
+            "tr" -> "Linka ${info.version} hazır"
+            else -> "Linka ${info.version} is available"
+        }
+        val body = when (language) {
+            "ru" -> "Нажми, чтобы посмотреть изменения и установить обновление."
+            "az" -> "Dəyişikliklərə baxmaq və yeniləməni quraşdırmaq üçün toxun."
+            "tr" -> "Değişiklikleri görmek ve güncellemeyi kurmak için dokun."
+            else -> "Tap to review changes and install the update."
+        }
         val notification = if (Build.VERSION.SDK_INT >= 26) android.app.Notification.Builder(this, NOTIFICATION_CHANNEL) else {
             @Suppress("DEPRECATION") android.app.Notification.Builder(this)
         }
         manager.notify(4107, notification.setSmallIcon(android.R.drawable.stat_sys_download_done)
-            .setContentTitle("Linka ${info.version} is available")
-            .setContentText("Tap to download the latest Android version.")
-            .setContentIntent(pending).setAutoCancel(true).build())
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(android.app.Notification.BigTextStyle().bigText(body))
+            .setContentIntent(pending).setAutoCancel(true)
+            .setPriority(android.app.Notification.PRIORITY_DEFAULT).build())
         return true
     }
 }
