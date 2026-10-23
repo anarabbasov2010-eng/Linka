@@ -1,8 +1,9 @@
 import { loadCaptures, saveCaptures, makeCapture, visibleCaptures } from "./store.js";
 import { initLinkaExperience } from "./experience.js";
 import {
-  addDeletedId, createCloudAccount, disconnectCloud, getCloudConfig, getCloudSession,
-  readDeletedIds, saveCloudConfig, signInCloud, syncCloudCaptures
+  addDeletedId, disconnectCloud, getCloudConfig, getCloudSession,
+  getOtpCooldown, readDeletedIds, requestEmailOtp, saveCloudConfig, syncCloudCaptures,
+  verifyEmailOtp, readLinkaProfile, saveLinkaProfile
 } from "./cloud-sync.js";
 
 const $ = selector => document.querySelector(selector);
@@ -294,106 +295,153 @@ function showCloudSyncНастройки() {
   const head = document.createElement("div"); head.className = "modal-head";
   const logo = document.createElement("img"); logo.className = "modal-logo"; logo.src = "/linka-mark.svg"; logo.alt = "";
   const meta = document.createElement("div");
-  const title = document.createElement("h2"); title.textContent = "Linka Cloud Sync";
-  const sub = document.createElement("p"); sub.textContent = "Use the same account on Android, Windows and the website.";
+  const title = document.createElement("h2"); title.textContent = "Linka";
+  const sub = document.createElement("p"); sub.textContent = "Один аккаунт · твои сохранения на всех устройствах";
   meta.append(title, sub); head.append(logo, meta); content.append(head);
 
   const note = document.createElement("p");
-  note.textContent = "Your inbox remains available offline. Облачная синхронизация needs the same Supabase project URL and public publishable/anon key on each device. Never enter a service_role or secret key here.";
+  note.textContent = "Войди по коду из письма. Пароль не нужен. Используй один аккаунт на телефоне, компьютере и сайте.";
   content.append(note);
+
   const config = getCloudConfig();
   const session = getCloudSession();
-  const setupSql = `create table if not exists public.linka_sync (
-    user_id uuid primary key references auth.users(id) on delete cascade,
-    data jsonb not null default '{"captures":[],"deletedIds":[]}'::jsonb,
-    updated_at timestamptz not null default now()
-  );
-  alter table public.linka_sync enable row level security;
-  grant select, insert, update, delete on public.linka_sync to authenticated;
-  drop policy if exists "linka_sync_own_data" on public.linka_sync;
-  create policy "linka_sync_own_data" on public.linka_sync for all to authenticated
-    using (auth.uid() = user_id) with check (auth.uid() = user_id);`;
-
   const form = document.createElement("div"); form.className = "cloud-form";
-  const field = (labelText, type, value, placeholder) => {
+  const field = (labelText, type, value, placeholder, autocomplete) => {
     const wrap = document.createElement("label"); wrap.className = "cloud-field";
     const label = document.createElement("span"); label.textContent = labelText;
-    const input = document.createElement("input"); input.type = type; input.value = value || ""; input.placeholder = placeholder || ""; input.autocomplete = type === "password" ? "current-password" : (type === "email" ? "email" : "url");
+    const input = document.createElement("input"); input.type = type; input.value = value || ""; input.placeholder = placeholder || "";
+    input.autocomplete = autocomplete || (type === "email" ? "email" : "off");
     wrap.append(label, input); form.append(wrap); return input;
   };
-  const sqlButton = document.createElement("button"); sqlButton.type = "button"; sqlButton.className = "ghost"; sqlButton.textContent = "Copy database setup SQL";
-  sqlButton.addEventListener("click", async () => {
-    try {
-      await navigator.clipboard.writeText(setupSql);
-      statusLine.textContent = "SQL copied. Run it once in your Supabase project's SQL Editor.";
-    } catch {
-      const area = document.createElement("textarea"); area.value = setupSql; area.setAttribute("readonly", "");
-      area.style.position = "fixed"; area.style.opacity = "0"; document.body.append(area); area.select();
-      const copied = document.execCommand("copy"); area.remove();
-      statusLine.textContent = copied ? "SQL copied. Run it once in Supabase SQL Editor." : "Copy failed. Open docs/CLOUD-SYNC.md in the repository for the SQL.";
-    }
-  });
-  const url = field("Supabase project URL", "url", config.url, "https://your-project.supabase.co");
-  const key = field("Public publishable / anon key", "text", config.key, "sb_publishable_… or legacy anon key");
-  const email = field("Email", "email", session?.email || "", "you@example.com");
-  const password = field("Password", "password", "", "At least 8 characters");
-  content.append(sqlButton, form);
+  const email = field("Электронная почта", "email", session?.email || "", "you@example.com", "email");
+  const code = field("Код из письма", "text", "", "6 цифр", "one-time-code");
+  code.inputMode = "numeric"; code.maxLength = 6; code.pattern = "[0-9]{6}";
+  const profile = readLinkaProfile() || {};
+  const profileWrap = document.createElement("div"); profileWrap.className = "cloud-form";
+  const displayName = field("Как тебя называть", "text", profile.displayName || "", "Имя или псевдоним", "nickname");
+  const age = field("Возраст (необязательно)", "number", profile.age == null ? "" : String(profile.age), "Можно оставить пустым", "off");
+  age.min = "1"; age.max = "120";
+  const profileFields = [displayName.parentElement, age.parentElement];
+  profileFields.forEach(el => { if (el) profileWrap.append(el); });
+  const sqlButton = document.createElement("button"); sqlButton.type = "button"; sqlButton.className = "ghost";
+  sqlButton.textContent = "Настройки подключения";
+  const advanced = document.createElement("details"); advanced.className = "linka-config";
+  const summary = document.createElement("summary"); summary.textContent = "Для разработчика · настройки проекта";
+  const advancedForm = document.createElement("div"); advancedForm.className = "cloud-form";
+  const oldForm = form;
+  const urlWrap = document.createElement("label"); urlWrap.className = "cloud-field";
+  const urlLabel = document.createElement("span"); urlLabel.textContent = "Project URL";
+  const url = document.createElement("input"); url.type = "url"; url.value = config.url; url.placeholder = "https://…supabase.co"; url.autocomplete = "url";
+  urlWrap.append(urlLabel,url); advancedForm.append(urlWrap);
+  const keyWrap = document.createElement("label"); keyWrap.className = "cloud-field";
+  const keyLabel = document.createElement("span"); keyLabel.textContent = "Public publishable key";
+  const key = document.createElement("input"); key.type = "text"; key.value = config.key; key.placeholder = "sb_publishable_…"; key.autocomplete = "off";
+  keyWrap.append(keyLabel,key); advancedForm.append(keyWrap);
+  advanced.append(summary,advancedForm);
+  content.append(form, profileWrap, advanced);
 
   const statusLine = document.createElement("p"); statusLine.className = "cloud-status";
-  statusLine.textContent = session ? `Signed in as ${session.email || "your account"}.` : "Нет подключения. Создай аккаунт Linka или войди в существующий.";
+  statusLine.textContent = session ? `Вход выполнен: ${session.email || "твой аккаунт"}.` : "Создай аккаунт или войди по коду из письма.";
   content.append(statusLine);
   const actions = document.createElement("div"); actions.className = "modal-actions";
   const close = document.createElement("button"); close.type = "button"; close.className = "ghost"; close.textContent = "Закрыть";
   close.addEventListener("click", () => modalRoot.replaceChildren());
-  const runAction = async action => {
-    const buttons = actions.querySelectorAll("button");
-    buttons.forEach(button => { button.disabled = true; });
-    statusLine.textContent = "Выполняем…";
-    try {
-      saveCloudConfig(url.value, key.value);
-      if (action === "signup") {
-        const result = await createCloudAccount({ url: url.value, key: key.value, email: email.value, password: password.value });
-        if (result.verificationRequired) {
-          statusLine.textContent = result.message;
-          return;
-        }
-      } else if (action === "signin") {
-        await signInCloud({ url: url.value, key: key.value, email: email.value, password: password.value });
-      } else if (action === "sync") {
-        const result = await syncNow({ silent: true });
-        statusLine.textContent = result?.message || "Sync complete.";
-        password.value = "";
-        return;
-      }
-      password.value = "";
-      const result = await syncNow({ silent: true });
-      statusLine.textContent = result?.message ? `Connected. ${result.message}.` : "Подключено. Синхронизация готова.";
-      say("Облачная синхронизация Linka подключена");
-    } catch (error) {
-      statusLine.textContent = error?.message || "Облачная синхронизация failed.";
-    } finally {
-      buttons.forEach(button => { button.disabled = false; });
-    }
-  };
   const makeButton = (label, cls, fn) => {
     const button = document.createElement("button"); button.type = "button"; button.className = cls; button.textContent = label;
     button.addEventListener("click", fn); actions.append(button); return button;
   };
+  let otpSent = getOtpCooldown(email.value) > 0;
+  let cooldownTimer = null;
+  const requestButton = makeButton("Отправить код для входа", "ghost", () => void requestCode(false));
+  const registerButton = makeButton("Создать аккаунт", "ghost", () => void requestCode(true));
+  const verifyButton = makeButton("Подтвердить код и синхронизировать", "primary", () => void verifyCode());
+  const syncButton = makeButton("Синхронизировать", "primary", () => void runSync());
+  const disconnectButton = makeButton("Выйти из аккаунта", "ghost", () => {
+    disconnectCloud();
+    statusLine.textContent = "Выход выполнен. Локальные сохранения остались на устройстве.";
+    modalRoot.replaceChildren();
+  });
   if (session) {
-    makeButton("Отключить", "ghost", () => {
-      disconnectCloud();
-      statusLine.textContent = "Отключитьed. Your local captures were not deleted.";
-      password.value = "";
-    });
-    makeButton("Синхронизировать", "primary", () => { void runAction("sync"); });
+    form.hidden = true; profileWrap.hidden = true; advanced.hidden = true;
+    requestButton.hidden = true; registerButton.hidden = true; verifyButton.hidden = true;
   } else {
-    makeButton("Создать аккаунт", "ghost", () => { void runAction("signup"); });
-    makeButton("Войти", "primary", () => { void runAction("signin"); });
+    syncButton.hidden = true; disconnectButton.hidden = true;
   }
   actions.append(close); content.append(actions);
   modalShell(content, { dismissable: true });
-}
 
+  function setBusy(value) {
+    [requestButton,registerButton,verifyButton,syncButton,disconnectButton].forEach(b => { b.disabled = value; });
+  }
+  function setCooldown() {
+    const remaining = Math.ceil(getOtpCooldown(email.value) / 1000);
+    requestButton.disabled = remaining > 0;
+    registerButton.disabled = remaining > 0;
+    if (remaining > 0) {
+      requestButton.textContent = `Повторить через ${remaining} с`;
+      registerButton.textContent = `Повторить через ${remaining} с`;
+      otpSent = true;
+    } else {
+      requestButton.textContent = "Отправить код для входа";
+      registerButton.textContent = "Создать аккаунт";
+      if (cooldownTimer) { clearInterval(cooldownTimer); cooldownTimer = null; }
+    }
+  }
+  async function requestCode(createUser) {
+    try {
+      setBusy(true);
+      saveCloudConfig(url.value, key.value);
+      statusLine.textContent = "Отправляем код…";
+      await requestEmailOtp({url:url.value,key:key.value,email:email.value,createUser});
+      otpSent = true;
+      statusLine.textContent = "Код отправлен. Проверь входящие и папку «Спам». Код действует около двух минут.";
+      setCooldown();
+      if (cooldownTimer) clearInterval(cooldownTimer);
+      cooldownTimer = setInterval(setCooldown, 1000);
+      code.focus();
+    } catch (error) {
+      statusLine.textContent = error?.message || "Не удалось отправить код.";
+    } finally { setBusy(false); setCooldown(); }
+  }
+  async function verifyCode() {
+    if (!otpSent && getOtpCooldown(email.value) <= 0) {
+      statusLine.textContent = "Сначала запроси код из письма.";
+      return;
+    }
+    try {
+      setBusy(true);
+      saveCloudConfig(url.value,key.value);
+      statusLine.textContent = "Проверяем код…";
+      await verifyEmailOtp({url:url.value,key:key.value,email:email.value,token:code.value});
+      if (!String(displayName.value || "").trim()) {
+        statusLine.textContent = "Вход выполнен. Укажи имя или псевдоним, чтобы завершить профиль.";
+        displayName.focus();
+        return;
+      }
+      saveLinkaProfile({
+        displayName:String(displayName.value).trim().slice(0,60),
+        age:age.value.trim() ? Math.max(1,Math.min(120,Number(age.value))) : null,
+        updatedAt:Date.now()
+      });
+      const result = await syncNow({silent:true});
+      statusLine.textContent = result?.message ? `Готово. ${result.message}` : "Вход выполнен.";
+      form.hidden = true; profileWrap.hidden = true; advanced.hidden = true;
+      requestButton.hidden = true; registerButton.hidden = true; verifyButton.hidden = true;
+      syncButton.hidden = false; disconnectButton.hidden = false;
+      say("Linka синхронизирована");
+    } catch (error) {
+      statusLine.textContent = error?.message || "Не удалось подтвердить код.";
+    } finally { setBusy(false); }
+  }
+  async function runSync() {
+    try {
+      setBusy(true);
+      const result = await syncNow({silent:true});
+      statusLine.textContent = result?.message || "Синхронизация завершена.";
+    } catch (error) { statusLine.textContent = error?.message || "Ошибка синхронизации."; }
+    finally { setBusy(false); }
+  }
+}
 async function checkWindowsInstaller(statusLine, downloadLink) {
   statusLine.textContent = "Проверитьing the latest Linka release…";
   downloadLink.hidden = true;
