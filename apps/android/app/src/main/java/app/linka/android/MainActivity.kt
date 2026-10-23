@@ -284,7 +284,7 @@ private val words = mapOf(
         "empty" to "Nothing here yet", "emptyBody" to "Save something above, or share text from another app to Linka. Migrating from 0.4.72? Export a backup in old Linka, then import it here from Settings → Your data.",
         "private" to "Private by default", "privacyBody" to "Stored on this device. Export a backup whenever you need it.",
         "appearance" to "Appearance", "language" to "App language", "animations" to "Smooth animations",
-        "fontSize" to "Text size", "updateAlerts" to "Update notifications", "updateAlertsBody" to "Notify me when a newer Android version is released.", "notificationsEnabled" to "Notifications are allowed on this device.", "notificationsBlocked" to "Android is blocking Linka notifications. Enable them in system settings.", "notificationSettings" to "Open notification settings",
+        "fontSize" to "Text size", "updateAlerts" to "Update notifications", "updateAlertsBody" to "Notify me when a newer Android version is released.", "notificationsEnabled" to "Notifications are allowed on this device.", "notificationsBlocked" to "Android is blocking Linka notifications. Enable them in system settings.", "notificationSettings" to "Open notification settings", "testNotification" to "Send test notification",
         "updates" to "App updates", "checkUpdates" to "Check for updates", "checking" to "Checking…", "latest" to "You're up to date",
         "failed" to "Couldn't check for updates. Check your connection and try again.", "available" to "A newer Linka is ready",
         "updateBody" to "A new version is available. Download the APK and confirm installation when Android asks.",
@@ -315,7 +315,7 @@ private val words = mapOf(
         "empty" to "Пока здесь пусто", "emptyBody" to "Сохрани запись выше или отправь текст в Linka из другого приложения. Переносишь данные из Linka 0.4.72? Экспортируй копию в старом приложении, затем импортируй её здесь: Настройки → Твои данные.",
         "private" to "Приватность по умолчанию", "privacyBody" to "Данные хранятся на устройстве. При необходимости создай резервную копию.",
         "appearance" to "Внешний вид", "language" to "Язык приложения", "animations" to "Плавные анимации",
-        "fontSize" to "Размер текста", "updateAlerts" to "Уведомления об обновлениях", "updateAlertsBody" to "Сообщать о новых версиях Linka для Android.", "notificationsEnabled" to "Уведомления разрешены на этом устройстве.", "notificationsBlocked" to "Android блокирует уведомления Linka. Разреши их в системных настройках.", "notificationSettings" to "Открыть настройки уведомлений",
+        "fontSize" to "Размер текста", "updateAlerts" to "Уведомления об обновлениях", "updateAlertsBody" to "Сообщать о новых версиях Linka для Android.", "notificationsEnabled" to "Уведомления разрешены на этом устройстве.", "notificationsBlocked" to "Android блокирует уведомления Linka. Разреши их в системных настройках.", "notificationSettings" to "Открыть настройки уведомлений", "testNotification" to "Отправить тестовое уведомление",
         "updates" to "Обновления приложения", "checkUpdates" to "Проверить обновления", "checking" to "Проверяем…", "latest" to "У тебя актуальная версия",
         "failed" to "Не удалось проверить обновления. Проверь подключение и повтори попытку.", "available" to "Доступна новая версия Linka",
         "updateBody" to "Вышла новая версия. Скачай APK и подтверди установку, когда Android попросит.",
@@ -346,7 +346,7 @@ private val words = mapOf(
         "empty" to "Hələ heç nə yoxdur", "emptyBody" to "Yuxarıdan qeyd saxla və ya başqa tətbiqdən mətni Linka-ya göndər. 0.4.72-dən keçirsən? Köhnə tətbiqdə ehtiyat nüsxəni ixrac et, sonra burada Parametrlər → Məlumatların bölməsindən idxal et.",
         "private" to "Məxfilik standartdır", "privacyBody" to "Məlumat bu cihazda saxlanılır. Lazım olduqda ehtiyat nüsxə yarat.",
         "appearance" to "Görünüş", "language" to "Tətbiqin dili", "animations" to "Axıcı animasiyalar",
-        "fontSize" to "Mətn ölçüsü", "updateAlerts" to "Yeniləmə bildirişləri", "updateAlertsBody" to "Yeni Android versiyası çıxanda xəbər ver.", "notificationsEnabled" to "Bu cihazda bildirişlərə icazə verilib.", "notificationsBlocked" to "Android Linka bildirişlərini bloklayır. Sistem tənzimləmələrində icazə ver.", "notificationSettings" to "Bildiriş tənzimləmələrini aç",
+        "fontSize" to "Mətn ölçüsü", "updateAlerts" to "Yeniləmə bildirişləri", "updateAlertsBody" to "Yeni Android versiyası çıxanda xəbər ver.", "notificationsEnabled" to "Bu cihazda bildirişlərə icazə verilib.", "notificationsBlocked" to "Android Linka bildirişlərini bloklayır. Sistem tənzimləmələrində icazə ver.", "notificationSettings" to "Bildiriş tənzimləmələrini aç", "testNotification" to "Test bildirişi göndər",
         "updates" to "Tətbiq yeniləmələri", "checkUpdates" to "Yeniləmələri yoxla", "checking" to "Yoxlanılır…", "latest" to "Ən son versiyadasan",
         "failed" to "Yeniləməni yoxlamaq mümkün olmadı. İnternet bağlantısını yoxla.", "available" to "Yeni Linka versiyası mövcuddur",
         "updateBody" to "Yeni versiya hazırdır. APK faylını endir və Android quraşdırmanı təsdiqləyəndə davam et.",
@@ -377,7 +377,7 @@ private val words = mapOf(
         "empty" to "Henüz bir şey yok", "emptyBody" to "Yukarıdan kaydet veya başka uygulamadan metni Linka'ya paylaş. 0.4.72'den geçiş yapıyor musun? Eski uygulamada yedeği dışa aktar, sonra burada Ayarlar → Verilerin bölümünden içe aktar.",
         "private" to "Varsayılan olarak gizli", "privacyBody" to "Veriler bu cihazda tutulur. Gerektiğinde yedek dışa aktar.",
         "appearance" to "Görünüm", "language" to "Uygulama dili", "animations" to "Akıcı animasyonlar",
-        "fontSize" to "Metin boyutu", "updateAlerts" to "Güncelleme bildirimleri", "updateAlertsBody" to "Yeni Android sürümü çıktığında bildir.", "notificationsEnabled" to "Bu cihazda bildirimlere izin verildi.", "notificationsBlocked" to "Android Linka bildirimlerini engelliyor. Sistem ayarlarından izin ver.", "notificationSettings" to "Bildirim ayarlarını aç",
+        "fontSize" to "Metin boyutu", "updateAlerts" to "Güncelleme bildirimleri", "updateAlertsBody" to "Yeni Android sürümü çıktığında bildir.", "notificationsEnabled" to "Bu cihazda bildirimlere izin verildi.", "notificationsBlocked" to "Android Linka bildirimlerini engelliyor. Sistem ayarlarından izin ver.", "notificationSettings" to "Bildirim ayarlarını aç", "testNotification" to "Test bildirimi gönder",
         "updates" to "Uygulama güncellemeleri", "checkUpdates" to "Güncellemeleri kontrol et", "checking" to "Kontrol ediliyor…", "latest" to "Güncelsin",
         "failed" to "Güncellemeler kontrol edilemedi. Bağlantını kontrol edip tekrar dene.", "available" to "Yeni Linka sürümü hazır",
         "updateBody" to "Yeni bir sürüm var. APK dosyasını indir ve Android istediğinde kurulumu onayla.",
@@ -479,6 +479,45 @@ class MainActivity : ComponentActivity() {
         else Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
         runCatching { startActivity(intent) }
     }
+    private fun sendTestNotification() {
+        if (!canPostNotifications()) {
+            val lacksRuntimePermission = Build.VERSION.SDK_INT >= 33 &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+            if (lacksRuntimePermission) {
+                permissionDialogPending = true
+                prefs().edit().putBoolean("notification_permission_asked", true).apply()
+                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 7402)
+            } else {
+                openNotificationSettings()
+            }
+            return
+        }
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        if (Build.VERSION.SDK_INT >= 26) {
+            manager.createNotificationChannel(NotificationChannel(NOTIFICATION_CHANNEL, "Linka updates", NotificationManager.IMPORTANCE_DEFAULT))
+        }
+        val language = (prefs().getString(LANGUAGE_KEY, "") ?: "").ifBlank { Locale.getDefault().language }.lowercase(Locale.ROOT)
+        val title = when (language) {
+            "ru" -> "Уведомления Linka работают"
+            "az" -> "Linka bildirişləri işləyir"
+            "tr" -> "Linka bildirimleri çalışıyor"
+            else -> "Linka notifications are working"
+        }
+        val body = when (language) {
+            "ru" -> "Это тестовое уведомление. Системные уведомления разрешены."
+            "az" -> "Bu test bildirişidir. Sistem bildirişlərinə icazə verilib."
+            "tr" -> "Bu bir test bildirimidir. Sistem bildirimlerine izin verildi."
+            else -> "This is a test notification. System notifications are allowed."
+        }
+        val launch = packageManager.getLaunchIntentForPackage(packageName) ?: Intent(this, MainActivity::class.java)
+        val pending = PendingIntent.getActivity(this, 43, launch, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val notification = if (Build.VERSION.SDK_INT >= 26) android.app.Notification.Builder(this, NOTIFICATION_CHANNEL) else {
+            @Suppress("DEPRECATION")
+            android.app.Notification.Builder(this)
+        }
+        manager.notify(4108, notification.setSmallIcon(android.R.drawable.stat_sys_download_done)
+            .setContentTitle(title).setContentText(body).setContentIntent(pending).setAutoCancel(true).build())
+    }
     private fun appVersion() = runCatching { packageManager.getPackageInfo(packageName, 0).versionName ?: "0.4.0" }.getOrDefault("0.4.0")
     private fun loadCaptures(): List<Capture> = try {
         val array = JSONArray(prefs().getString(CAPTURES_KEY, "[]") ?: "[]")
@@ -544,7 +583,7 @@ class MainActivity : ComponentActivity() {
                     language = language, setLanguage = { language = it; prefs().edit().putString(LANGUAGE_KEY, it).apply() },
                     animations = animations, setAnimations = { animations = it; prefs().edit().putBoolean(ANIMATIONS_KEY, it).apply() },
                     fontScale = fontScale, setFontScale = { fontScale = it; prefs().edit().putFloat(FONT_SCALE_KEY, it).apply() },
-                    alerts = alerts, notificationPermissionGranted = notificationsAllowed, openNotificationSettings = { openNotificationSettings() }, setAlerts = { enabled ->
+                    alerts = alerts, notificationPermissionGranted = notificationsAllowed, openNotificationSettings = { openNotificationSettings() }, sendTestNotification = { sendTestNotification() }, setAlerts = { enabled ->
                         if (enabled && Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                             permissionDialogPending = true
                             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 7402)
@@ -857,7 +896,7 @@ private fun LinkaApp(
     sharedText: String, sharedTrigger: Int, load: () -> List<Capture>, save: (List<Capture>) -> Unit, copy: (String) -> Unit, open: (String) -> Unit,
     theme: String, setTheme: (String) -> Unit, language: String, setLanguage: (String) -> Unit,
     animations: Boolean, setAnimations: (Boolean) -> Unit, fontScale: Float, setFontScale: (Float) -> Unit,
-    alerts: Boolean, notificationPermissionGranted: Boolean, openNotificationSettings: () -> Unit, setAlerts: (Boolean) -> Unit, updateInfo: UpdateInfo?, updateStatus: String, checking: Boolean,
+    alerts: Boolean, notificationPermissionGranted: Boolean, openNotificationSettings: () -> Unit, sendTestNotification: () -> Unit, setAlerts: (Boolean) -> Unit, updateInfo: UpdateInfo?, updateStatus: String, checking: Boolean,
     checkUpdates: () -> Unit, openUpdate: (UpdateInfo) -> Unit,
     autoDownload: Boolean, setAutoDownload: (Boolean) -> Unit, downloadProgress: Int, downloadingUpdate: Boolean,
     downloaded: Boolean, downloadFailed: Boolean, downloadFailureReason: String, applyUpdate: () -> Unit, retryDownload: () -> Unit,
@@ -1144,6 +1183,9 @@ private fun LinkaApp(
                                 }
                             } else if (alerts) {
                                 Text(tr(lang, "notificationsEnabled"), color = muted, fontSize = 10.sp)
+                            }
+                            TextButton(onClick = sendTestNotification, modifier = Modifier.align(Alignment.Start)) {
+                                Text(tr(lang, "testNotification"), color = main, fontSize = 11.sp)
                             }
                             SettingSwitch(tr(lang, "autoDownload"), autoDownload, setAutoDownload, main, muted, tr(lang, "autoDownloadBody"))
                             Button(onClick = checkUpdates, enabled = !checking, modifier = Modifier.fillMaxWidth().height(46.dp),
