@@ -496,6 +496,7 @@ class MainActivity : ComponentActivity() {
     private var incomingSharedText by mutableStateOf("")
     private var incomingSharedToken by mutableIntStateOf(0)
     private var incomingPairingToken by mutableIntStateOf(0)
+    private var incomingOAuthToken by mutableIntStateOf(0)
     private var updateInfo by mutableStateOf<UpdateInfo?>(null)
     private var updateStatus by mutableStateOf("")
     private var checkingUpdates by mutableStateOf(false)
@@ -603,12 +604,30 @@ class MainActivity : ComponentActivity() {
 
     private fun rememberPairingIntent(value: Intent?) {
         val uri = value?.data ?: return
-        if (!uri.scheme.equals("linka", ignoreCase = true) || !uri.host.equals("pair", ignoreCase = true)) return
-        val id = uri.getQueryParameter("id").orEmpty()
-        val secret = uri.getQueryParameter("secret").orEmpty()
-        if (id.isBlank() || secret.length < 32) return
-        prefs().edit().putString("pending_pair_id", id).putString("pending_pair_secret", secret).apply()
-        incomingPairingToken++
+        if (!uri.scheme.equals("linka", ignoreCase = true)) return
+        if (uri.host.equals("pair", ignoreCase = true)) {
+            val id = uri.getQueryParameter("id").orEmpty()
+            val secret = uri.getQueryParameter("secret").orEmpty()
+            if (id.isBlank() || secret.length < 32) return
+            prefs().edit().putString("pending_pair_id", id).putString("pending_pair_secret", secret).apply()
+            incomingPairingToken++
+            return
+        }
+        if (uri.host.equals("auth", ignoreCase = true) && uri.path.equals("/callback", ignoreCase = true)) {
+            val fragment = uri.fragment.orEmpty()
+            val params = Uri.parse("https://linka.invalid/?$fragment")
+            val access = params.getQueryParameter("access_token").orEmpty()
+            val refresh = params.getQueryParameter("refresh_token").orEmpty()
+            if (access.isBlank() || refresh.isBlank()) {
+                prefs().edit().putString("oauth_callback_error", params.getQueryParameter("error_description").orEmpty()).apply()
+                incomingOAuthToken++
+                return
+            }
+            prefs().edit().putString("oauth_pending_access", access)
+                .putString("oauth_pending_refresh", refresh)
+                .remove("oauth_callback_error").apply()
+            incomingOAuthToken++
+        }
     }
 
 
@@ -644,7 +663,7 @@ class MainActivity : ComponentActivity() {
                 background = LB, surface = LS, primary = LT, onPrimary = LS, onBackground = LT, onSurface = LT, surfaceVariant = LR, outline = LBR
             )) {
                 LinkaApp(
-                    sharedText = incomingSharedText, sharedTrigger = incomingSharedToken, pairingTrigger = incomingPairingToken,
+                    sharedText = incomingSharedText, sharedTrigger = incomingSharedToken, pairingTrigger = incomingPairingToken, oauthTrigger = incomingOAuthToken,
                     load = { loadCaptures() }, save = { saveCaptures(it) },
                     copy = { copyText(it) }, open = { openExternal(it) },
                     theme = theme, setTheme = { theme = it; prefs().edit().putString(THEME_KEY, it).apply() },
@@ -989,7 +1008,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun LinkaApp(
-    sharedText: String, sharedTrigger: Int, pairingTrigger: Int, load: () -> List<Capture>, save: (List<Capture>) -> Unit, copy: (String) -> Unit, open: (String) -> Unit,
+    sharedText: String, sharedTrigger: Int, pairingTrigger: Int, oauthTrigger: Int, load: () -> List<Capture>, save: (List<Capture>) -> Unit, copy: (String) -> Unit, open: (String) -> Unit,
     theme: String, setTheme: (String) -> Unit, language: String, setLanguage: (String) -> Unit,
     animations: Boolean, setAnimations: (Boolean) -> Unit, fontScale: Float, setFontScale: (Float) -> Unit,
     alerts: Boolean, notificationPermissionGranted: Boolean, openNotificationSettings: () -> Unit, sendTestNotification: () -> Unit, setAlerts: (Boolean) -> Unit, updateInfo: UpdateInfo?, updateStatus: String, checking: Boolean,
@@ -1197,6 +1216,35 @@ private fun LinkaApp(
         if (pairingTrigger > 0) {
             pendingPairId = prefs.getString("pending_pair_id", "").orEmpty()
             pendingPairSecret = prefs.getString("pending_pair_secret", "").orEmpty()
+        }
+    }
+    LaunchedEffect(oauthTrigger) {
+        if (oauthTrigger <= 0) return@LaunchedEffect
+        val callbackError = prefs.getString("oauth_callback_error", "").orEmpty()
+        if (callbackError.isNotBlank()) {
+            cloudStatus = callbackError.take(220)
+            prefs.edit().remove("oauth_callback_error").apply()
+            cloudDialog = true
+            return@LaunchedEffect
+        }
+        val access = prefs.getString("oauth_pending_access", "").orEmpty()
+        val refresh = prefs.getString("oauth_pending_refresh", "").orEmpty()
+        if (access.isBlank() || refresh.isBlank()) return@LaunchedEffect
+        cloudBusy = true
+        try {
+            val oauth = completeGoogleOAuthSession(cloudUrl, cloudAnonKey, access, refresh)
+            prefs.edit().putString(SYNC_REFRESH_KEY, oauth.encryptedRefreshToken)
+                .putString(SYNC_EMAIL_KEY, oauth.email)
+                .remove("oauth_pending_access").remove("oauth_pending_refresh").apply()
+            cloudEmail = oauth.email
+            if (profileName.isBlank() && oauth.displayName.isNotBlank()) profileName = oauth.displayName
+            cloudStatus = "Google sign-in complete. Press Sync to sync this device."
+            cloudDialog = true
+        } catch (e: Exception) {
+            cloudStatus = e.message ?: "Google sign-in could not be completed."
+            cloudDialog = true
+        } finally {
+            cloudBusy = false
         }
     }
     LaunchedEffect(pendingPairId, pendingPairSecret, cloudDialog) {
@@ -1527,6 +1575,25 @@ private fun LinkaApp(
                     }, modifier = Modifier.align(Alignment.Start)) {
                         Text(tr(lang, "syncSetupSql"), color = muted, fontSize = 10.sp)
                     }
+                }
+                if (prefs.getString(SYNC_REFRESH_KEY, "").orEmpty().isBlank()) {
+                    Button(
+                        enabled = !cloudBusy,
+                        onClick = {
+                            val redirect = "linka://auth/callback"
+                            val authorize = Uri.parse("${cloudUrl.trim().trimEnd('/')}/auth/v1/authorize")
+                                .buildUpon()
+                                .appendQueryParameter("provider", "google")
+                                .appendQueryParameter("redirect_to", redirect)
+                                .build().toString()
+                            prefs.edit().putString(SYNC_URL_KEY, cloudUrl.trim().trimEnd('/'))
+                                .putString(SYNC_ANON_KEY, cloudAnonKey.trim()).apply()
+                            open(authorize)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = main, contentColor = bg)
+                    ) { Text("Continue with Google", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
                 }
                 OutlinedTextField(value = cloudEmail, onValueChange = { cloudEmail = it }, label = { Text(tr(lang, "syncEmail")) },
                     singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
