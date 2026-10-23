@@ -6,8 +6,8 @@ plugins {
 
 val linkaVersionCode = providers.gradleProperty("linkaVersionCode").orNull?.toIntOrNull() ?: 5
 val linkaVersionName = providers.gradleProperty("linkaVersionName").orNull ?: "0.4.0"
-val linkaSupabaseUrl = (System.getenv("LINKA_SUPABASE_URL") ?: "").replace("\\", "\\\\").replace("\"", "\\\"")
-val linkaSupabaseKey = (System.getenv("LINKA_SUPABASE_PUBLISHABLE_KEY") ?: "").replace("\\", "\\\\").replace("\"", "\\\"")
+val linkaSupabaseUrl = (System.getenv("LINKA_SUPABASE_URL")?.takeIf { it.isNotBlank() } ?: "${projectUrl}").replace("\\", "\\\\").replace("\"", "\\\"")
+val linkaSupabaseKey = (System.getenv("LINKA_SUPABASE_PUBLISHABLE_KEY")?.takeIf { it.isNotBlank() } ?: "sb_publishable_MZT9UvH4uKukY3KpBQr3wQ_9HIP9xJB").replace("\\", "\\\\").replace("\"", "\\\"")
 
 android {
     namespace = "app.linka.android"
