@@ -1530,10 +1530,29 @@ private fun LinkaApp(
                 )
             ).drawBehind {
                 if (theme != "oled" && effects != "quiet" && animations) {
-                    val center = Offset(size.width * .52f, size.height * .12f)
-                    val radius = size.width * (.38f + .035f * ambientPulse)
-                    val strength = if (effects == "atmosphere") .20f else .105f
-                    drawCircle(brush = Brush.radialGradient(listOf(sphereAccent.copy(alpha = strength + .025f * ambientPulse), Color(0xFF7564B5).copy(alpha = strength * .48f), Color.Transparent), center = center, radius = radius), radius = radius, center = center)
+                    val center = Offset(size.width * .52f, size.height * .13f)
+                    val radius = size.width * (.27f + .012f * ambientPulse)
+                    val strength = if (effects == "atmosphere") .19f else .10f
+                    val glowRadius = radius * 1.85f
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            listOf(sphereAccent.copy(alpha = strength * .68f), Color(0xFF7564B5).copy(alpha = strength * .34f), Color.Transparent),
+                            center = center, radius = glowRadius
+                        ), radius = glowRadius, center = center
+                    )
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            listOf(sphereAccent.copy(alpha = strength + .025f * ambientPulse), Color(0xFF4B3A7A).copy(alpha = strength * .74f), Color(0xFF181321).copy(alpha = strength * .35f), Color.Transparent),
+                            center = center, radius = radius
+                        ), radius = radius, center = center
+                    )
+                    val highlight = Offset(center.x - radius * .32f, center.y - radius * .34f)
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            listOf(Color.White.copy(alpha = .075f), sphereAccent.copy(alpha = .035f), Color.Transparent),
+                            center = highlight, radius = radius * .62f
+                        ), radius = radius * .62f, center = highlight
+                    )
                 }
             }.verticalScroll(rememberScrollState()).imePadding()
                 .padding(horizontal = 18.dp).padding(top = 14.dp, bottom = 28.dp),
