@@ -40,6 +40,7 @@ function storeSession(session, config, storage = globalThis.localStorage) {
   const saved = {
     userId: String(session.user?.id || session.userId),
     email: String(session.user?.email || session.email || ""),
+    displayName: String(session.user?.user_metadata?.full_name || session.user?.user_metadata?.name || session.user?.user_metadata?.preferred_username || ""),
     accessToken: session.access_token,
     refreshToken: session.refresh_token,
     expiresAt: Date.now() + Math.max(30, Number(session.expires_in || 3600) - 60) * 1000
@@ -180,6 +181,35 @@ export async function requestEmailOtp({ url, key, email, createUser = false }) {
   } catch (error) {
     throw new Error(error?.message || "Couldn't send the email code. Check the service configuration and try again.");
   }
+}
+export function startGoogleOAuth({ url, key, redirectTo = globalThis.location?.href }) {
+  const config = requireConfig(url, key);
+  if (!redirectTo || !/^https?:|^tauri:|^linka:/i.test(String(redirectTo))) {
+    throw new Error("A valid Linka callback URL is required for Google sign-in.");
+  }
+  saveCloudConfig(config.url, config.key);
+  const target = new URL(redirectTo);
+  target.hash = "";
+  const authorizeUrl = new URL(`${config.url}/auth/v1/authorize`);
+  authorizeUrl.searchParams.set("provider", "google");
+  authorizeUrl.searchParams.set("redirect_to", target.toString());
+  globalThis.location.assign(authorizeUrl.toString());
+}
+export async function completeGoogleOAuthCallback({ url, key, location = globalThis.location, history = globalThis.history } = {}) {
+  if (!location?.hash || !/(^|[&#])access_token=/.test(location.hash)) return null;
+  const config = requireConfig(url || getCloudConfig().url, key || getCloudConfig().key);
+  const params = new URLSearchParams(location.hash.replace(/^#/, ""));
+  const accessToken = params.get("access_token") || "";
+  const refreshToken = params.get("refresh_token") || "";
+  const expiresIn = Number(params.get("expires_in") || 3600);
+  if (!accessToken || !refreshToken) throw new Error("Google returned an incomplete Linka session. Try signing in again.");
+  const response = await fetch(`${config.url}/auth/v1/user`, {
+    headers: { apikey: config.key, Authorization: `Bearer ${accessToken}`, Accept: "application/json" }
+  });
+  const user = await readResponse(response);
+  const session = storeSession({ access_token: accessToken, refresh_token: refreshToken, expires_in: expiresIn, user }, config);
+  try { history?.replaceState({}, globalThis.document?.title || "Linka", location.pathname + location.search); } catch {}
+  return session;
 }
 export async function verifyEmailOtp({ url, key, email, token }) {
   const config = requireConfig(url, key);
