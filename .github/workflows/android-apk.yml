@@ -6,9 +6,10 @@ on:
 permissions:
   contents: write
 
+# Give each run its own group so a stale runner cannot hold later Android builds.
 concurrency:
-  group: android-apk-${{ github.ref }}
-  cancel-in-progress: true
+  group: android-apk-${{ github.ref }}-${{ github.run_id }}
+  cancel-in-progress: false
 
 jobs:
   build:
