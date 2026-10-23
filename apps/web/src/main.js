@@ -320,7 +320,7 @@ function showCloudSyncНастройки() {
   const profileWrap = document.createElement("div"); profileWrap.className = "cloud-form";
   const displayName = field("Как тебя называть", "text", profile.displayName || "", "Имя или псевдоним", "nickname");
   const age = field("Возраст (необязательно)", "number", profile.age == null ? "" : String(profile.age), "Можно оставить пустым", "off");
-  age.min = "1"; age.max = "120";
+  age.min = "13"; age.max = "120";
   const profileFields = [displayName.parentElement, age.parentElement];
   profileFields.forEach(el => { if (el) profileWrap.append(el); });
   const advanced = document.createElement("details"); advanced.className = "linka-config";
