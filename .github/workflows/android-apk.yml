@@ -34,6 +34,36 @@ jobs:
           path: ~/.android/debug.keystore
           key: linka-android-debug-signing-v1
 
+      # The Android Gradle plugin does not necessarily create debug.keystore
+      # for a release build that reuses the debug signing config. Create it
+      # explicitly on the first cache miss so actions/cache can persist it.
+      - name: Ensure Linka signing key exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          key="$HOME/.android/debug.keystore"
+          mkdir -p "$(dirname "$key")"
+          if [[ ! -s "$key" ]]; then
+            echo "No cached Linka signing key found; generating the persistent CI key."
+            keytool -genkeypair -v \
+              -keystore "$key" \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+          keytool -list -keystore "$key" -storepass android -alias androiddebugkey >/dev/null
+          fingerprint="$(keytool -list -v -keystore "$key" -storepass android -alias androiddebugkey | awk -F ': ' '/SHA256:/{gsub(":", "", $2); print tolower($2); exit}')"
+          if [[ -z "$fingerprint" ]]; then
+            echo "Could not read Linka signing certificate fingerprint."
+            exit 1
+          fi
+          echo "SIGNING_CERT_SHA256=$fingerprint" >> "$GITHUB_ENV"
+          echo "Linka signing certificate SHA-256: $fingerprint"
+
       - name: Build Android APK
         working-directory: apps/android
         env:
@@ -44,6 +74,33 @@ jobs:
           gradle testDebugUnitTest assembleRelease -PlinkaVersionCode="$LINKA_VERSION_CODE" -PlinkaVersionName="$LINKA_VERSION_NAME"
           cp app/build/outputs/apk/release/app-release.apk "app/build/outputs/apk/release/Linka-Android-$LINKA_VERSION_NAME.apk"
 
+      - name: Verify APK signing certificate
+        shell: bash
+        working-directory: apps/android
+        run: |
+          set -euo pipefail
+          apk="app/build/outputs/apk/release/app-release.apk"
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          if [[ -z "$sdk" ]]; then
+            echo "Android SDK path is not configured."
+            exit 1
+          fi
+          apksigner="$(find "$sdk/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          if [[ -z "$apksigner" ]]; then
+            echo "apksigner was not found in the Android SDK build-tools."
+            exit 1
+          fi
+          report="$("$apksigner" verify --verbose --print-certs "$apk")"
+          printf '%s\\n' "$report"
+          actual="$(printf '%s\\n' "$report" | awk -F ': ' '/Signer #1 certificate SHA-256 digest:/{print tolower($2); exit}')"
+          if [[ -z "$actual" || "$actual" != "$SIGNING_CERT_SHA256" ]]; then
+            echo "APK signature does not match the preserved Linka signing key."
+            echo "Expected: $SIGNING_CERT_SHA256"
+            echo "Actual:   $actual"
+            exit 1
+          fi
+          echo "APK signature matches the persistent Linka signing key."
+          
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
