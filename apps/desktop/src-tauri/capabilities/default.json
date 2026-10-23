@@ -2,6 +2,15 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Minimal permissions for the Linka desktop webview",
-  "windows": ["main"],
-  "permissions": ["core:default", "updater:default", "process:allow-restart", "notification:default"]
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "updater:default",
+    "process:allow-restart",
+    "notification:default",
+    "core:event:default",
+    "deep-link:default"
+  ]
 }
