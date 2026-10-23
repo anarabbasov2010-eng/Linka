@@ -82,7 +82,13 @@ jobs:
               endpoints = @("https://github.com/anarabbasov2010-eng/Linka/releases/latest/download/latest.json")
               windows = @{ installMode = "passive" }
             }
-            $plugins = [ordered]@{ updater = $updater }
+            $plugins = [ordered]@{}
+            if ($config.plugins) {
+              foreach ($property in $config.plugins.PSObject.Properties) {
+                $plugins[$property.Name] = $property.Value
+              }
+            }
+            $plugins["updater"] = $updater
             $config | Add-Member -MemberType NoteProperty -Name plugins -Value ([pscustomobject]$plugins) -Force
             $config.bundle.createUpdaterArtifacts = $true
             "LINKA_UPDATER_ENABLED=true" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
