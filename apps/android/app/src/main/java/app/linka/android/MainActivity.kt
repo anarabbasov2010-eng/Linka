@@ -1407,7 +1407,7 @@ private fun LinkaApp(
                         if (resurfaced != null) {
                             SectionTitle(tr(lang, "rememberTitle"), main)
                             Text(tr(lang, "rememberBody"), color = muted, fontSize = 11.sp, lineHeight = 16.sp)
-                            CaptureCard(resurfaced, lang, panel, raised, border, main, muted, fontScale,
+                            CaptureCard(resurfaced, lang, panel, raised, border, main, muted, fontScale, density, animations,
                                 onPin = { item -> commit(captures.map { if (it.id == item.id) it.copy(pinned = !it.pinned, updatedAt = System.currentTimeMillis()) else it }) },
                                 onCopy = { copy(it.text); message = tr(lang, "copied") },
                                 onOpen = { open(it.text) },
@@ -1441,7 +1441,7 @@ private fun LinkaApp(
                         FilterRow(lang, filter, { filter = it })
                         Text("${visible.size} ${tr(lang, "items")}", color = muted, fontSize = 11.sp)
                         if (visible.isEmpty()) EmptyState(lang, panel, border, main, muted, if (page == 2 && query.isNotBlank()) "noResults" else "empty")
-                        else visible.take(visibleLimit).forEach { c -> CaptureCard(c, lang, panel, raised, border, main, muted, fontScale,
+                        else visible.take(visibleLimit).forEach { c -> CaptureCard(c, lang, panel, raised, border, main, muted, fontScale, density, animations,
                             onPin = { item -> commit(captures.map { if (it.id == item.id) it.copy(pinned = !it.pinned, updatedAt = System.currentTimeMillis()) else it }) },
                             onCopy = { copy(it.text); message = tr(lang, "copied") }, onOpen = { open(it.text) },
                             onEdit = { draft = it.text; editingId = it.id; tab = 0; message = tr(lang, "edit") },
