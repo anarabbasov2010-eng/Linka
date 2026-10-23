@@ -1100,7 +1100,9 @@ private fun LinkaApp(
                 Header(lang, main, muted, panel, border) { tab = 3 }
                 when (page) {
                     0 -> {
-                        Column(verticalArrangement = Arrangement.spacedBy(5.dp).let { it }, modifier = Modifier.padding(top = 5.dp, bottom = 3.dp)) {
+                        Text(tr(lang, "tagline"), color = muted, fontSize = 9.sp, letterSpacing = 1.8.sp,
+                            fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 5.dp, bottom = 1.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.padding(bottom = 3.dp)) {
                             Text(tr(lang, "hero"), color = main, fontSize = 31.sp * fontScale, lineHeight = 36.sp * fontScale,
                                 fontWeight = FontWeight.Medium, letterSpacing = (-1.5).sp)
                             Text(tr(lang, "heroBody"), color = muted, fontSize = 13.sp * fontScale, lineHeight = 19.sp * fontScale)
@@ -1112,7 +1114,8 @@ private fun LinkaApp(
                         }
                         SectionTitle(tr(lang, "quickCapture"), main)
                         Card(colors = CardDefaults.cardColors(containerColor = panel), shape = RoundedCornerShape(22.dp),
-                            border = BorderStroke(1.dp, border), modifier = Modifier.fillMaxWidth().animateContentSize(spring(dampingRatio = .82f, stiffness = 320f))) {
+                            border = BorderStroke(1.dp, border), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                            modifier = Modifier.fillMaxWidth().animateContentSize(spring(dampingRatio = .82f, stiffness = 320f))) {
                             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
                                 OutlinedTextField(value = draft, onValueChange = { draft = it.take(MAX_CAPTURE_CHARS) }, modifier = Modifier.fillMaxWidth(),
                                     placeholder = { Text(tr(lang, "placeholder"), color = muted, fontSize = 13.sp * fontScale) },
@@ -1540,6 +1543,7 @@ private fun CaptureCard(
         }
     }
     Card(colors = CardDefaults.cardColors(containerColor = if (capture.pinned) raised else panel), border = BorderStroke(1.dp, border),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (capture.pinned) 2.dp else 1.dp),
         shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth().animateContentSize(spring(dampingRatio = .82f, stiffness = 320f))) {
         Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
