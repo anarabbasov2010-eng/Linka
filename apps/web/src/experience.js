@@ -33,7 +33,7 @@ const COPY = {
     editProfile: "Edit profile", qrLogin: "Sign in on another device with QR", qrIntro: "Scan with a phone that already has Linka signed in. Code expires in two minutes.",
     waiting: "Waiting for approval…", pairingReady: "QR code ready", qrUnavailable: "QR pairing service isn't configured yet.",
     notification: "Desktop notifications", enableNotifications: "Enable notifications", notificationsOn: "Notifications enabled",
-    updateTitle: "Linka update", updateReady: "A newer release is available.", updateButton: "Get update",
+    updateTitle: "Linka update", updateReady: "A newer release is available.", updateButton: "Install update", updateDownloading: "Downloading update", updateInstalling: "Installing update", updateRestarting: "Restarting Linka…", updateInstalled: "Update installed. Restart Linka to finish."
     latest: "You're using the latest desktop build.", close: "Close", cancel: "Cancel",
     codeSent: "Code sent. Check your inbox and spam folder.", codeWait: "You can request another code in",
     profileSaved: "Profile saved.", connected: "Account connected.", offlineSaved: "Setup saved. Linka will work locally.",
@@ -59,7 +59,7 @@ const COPY = {
     editProfile: "Изменить профиль", qrLogin: "Войти на другом устройстве по QR", qrIntro: "Отсканируй код телефоном, где уже выполнен вход в Linka. Код действует две минуты.",
     waiting: "Ожидаем подтверждения…", pairingReady: "QR-код готов", qrUnavailable: "Сервис входа по QR ещё не настроен.",
     notification: "Уведомления на компьютере", enableNotifications: "Включить уведомления", notificationsOn: "Уведомления включены",
-    updateTitle: "Обновление Linka", updateReady: "Доступна новая версия.", updateButton: "Скачать обновление",
+    updateTitle: "Обновление Linka", updateReady: "Доступна новая версия.", updateButton: "Установить обновление", updateDownloading: "Загрузка обновления", updateInstalling: "Установка обновления", updateRestarting: "Перезапуск Linka…", updateInstalled: "Обновление установлено. Перезапусти Linka."
     latest: "Установлена последняя версия для компьютера.", close: "Закрыть", cancel: "Отмена",
     codeSent: "Код отправлен. Проверь почту и папку «Спам».", codeWait: "Повторный код можно запросить через",
     profileSaved: "Профиль сохранён.", connected: "Аккаунт подключён.", offlineSaved: "Настройки сохранены. Linka продолжит работать локально.",
@@ -85,7 +85,7 @@ const COPY = {
     editProfile: "Profili dəyiş", qrLogin: "QR ilə başqa cihazda daxil ol", qrIntro: "Artıq Linka-ya daxil olduğun telefonla skan et. Kod iki dəqiqəyə bitir.",
     waiting: "Təsdiq gözlənilir…", pairingReady: "QR kod hazırdır", qrUnavailable: "QR giriş xidməti hələ qurulmayıb.",
     notification: "Kompüter bildirişləri", enableNotifications: "Bildirişləri aktiv et", notificationsOn: "Bildirişlər aktivdir",
-    updateTitle: "Linka yeniləməsi", updateReady: "Yeni versiya mövcuddur.", updateButton: "Yeniləməni al",
+    updateTitle: "Linka yeniləməsi", updateReady: "Yeni versiya mövcuddur.", updateButton: "Yeniləməni quraşdır", updateDownloading: "Yeniləmə endirilir", updateInstalling: "Yeniləmə quraşdırılır", updateRestarting: "Linka yenidən başladılır…", updateInstalled: "Yeniləmə quraşdırıldı. Linka-nı yenidən aç."
     latest: "Ən son masaüstü versiyası quraşdırılıb.", close: "Bağla", cancel: "Ləğv et",
     codeSent: "Kod göndərildi. E-poçtu və spam qovluğunu yoxla.", codeWait: "Yeni kodu bu müddətdən sonra istəyə bilərsən:",
     profileSaved: "Profil yadda saxlanıldı.", connected: "Hesab qoşuldu.", offlineSaved: "Parametrlər saxlanıldı. Linka lokal işləyəcək.",
@@ -111,7 +111,7 @@ const COPY = {
     editProfile: "Profili düzenle", qrLogin: "QR ile başka cihazda giriş yap", qrIntro: "Linka'da zaten oturum açılmış bir telefonla tara. Kod iki dakika içinde sona erer.",
     waiting: "Onay bekleniyor…", pairingReady: "QR kod hazır", qrUnavailable: "QR giriş hizmeti henüz yapılandırılmadı.",
     notification: "Masaüstü bildirimleri", enableNotifications: "Bildirimleri etkinleştir", notificationsOn: "Bildirimler etkin",
-    updateTitle: "Linka güncellemesi", updateReady: "Yeni sürüm kullanıma hazır.", updateButton: "Güncellemeyi al",
+    updateTitle: "Linka güncellemesi", updateReady: "Yeni sürüm kullanıma hazır.", updateButton: "Güncellemeyi yükle", updateDownloading: "Güncelleme indiriliyor", updateInstalling: "Güncelleme yükleniyor", updateRestarting: "Linka yeniden başlatılıyor…", updateInstalled: "Güncelleme yüklendi. Uygulamayı yeniden aç."
     latest: "En güncel masaüstü sürümünü kullanıyorsun.", close: "Kapat", cancel: "Vazgeç",
     codeSent: "Kod gönderildi. Gelen kutunu ve spam klasörünü kontrol et.", codeWait: "Yeni kodu şu süre sonra isteyebilirsin:",
     profileSaved: "Profil kaydedildi.", connected: "Hesap bağlandı.", offlineSaved: "Ayarlar kaydedildi. Linka yerel çalışmaya devam edecek.",
@@ -121,6 +121,7 @@ const COPY = {
   }
 };
 let updateRecord = null;
+let pendingNativeUpdate = null;
 let lastUpdateNotice = "";
 let updateTimer = null;
 
@@ -289,40 +290,98 @@ function compareVersions(left, right) {
   }
   return 0;
 }
-function releaseButton(target, label, url) {
-  const link = button(label, "linka-button");
-  link.addEventListener("click", () => window.open(url, "_blank", "noopener,noreferrer"));
-  target.append(link);
+async function installNativeUpdate(targetButton, statusElement) {
+  if (!isDesktopShell()) return false;
+  let update = pendingNativeUpdate;
+  if (!update) {
+    try {
+      const { check } = await import("@tauri-apps/plugin-updater");
+      update = await check();
+      pendingNativeUpdate = update;
+    } catch { return false; }
+  }
+  if (!update) return false;
+  if (targetButton) targetButton.disabled = true;
+  try {
+    if (statusElement) statusElement.textContent = tr("updateDownloading");
+    await update.downloadAndInstall(event => {
+      if (!statusElement) return;
+      if (event.event === "Started") statusElement.textContent = tr("updateDownloading");
+      else if (event.event === "Progress") statusElement.textContent = tr("updateDownloading") + "…";
+      else if (event.event === "Finished") statusElement.textContent = tr("updateInstalling");
+    });
+    pendingNativeUpdate = null;
+    if (statusElement) statusElement.textContent = tr("updateRestarting");
+    try {
+      const { relaunch } = await import("@tauri-apps/plugin-process");
+      await relaunch();
+    } catch {
+      if (statusElement) statusElement.textContent = tr("updateInstalled");
+    }
+    return true;
+  } catch (error) {
+    if (statusElement) statusElement.textContent = error?.message || tr("errors");
+    return false;
+  } finally {
+    if (targetButton) targetButton.disabled = false;
+  }
+}
+function releaseButton(target, label, url, statusElement = null) {
+  const item = button(label, "linka-button");
+  item.addEventListener("click", async () => {
+    if (isDesktopShell() && pendingNativeUpdate) {
+      const installed = await installNativeUpdate(item, statusElement);
+      if (installed) return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+  });
+  target.append(item);
 }
 async function checkForRelease({ notify = false } = {}) {
+  let nativeUpdate = null;
+  if (isDesktopShell()) {
+    try {
+      const { check } = await import("@tauri-apps/plugin-updater");
+      nativeUpdate = await check();
+      pendingNativeUpdate = nativeUpdate;
+    } catch {
+      // Signed updater is optional until the release key is configured.
+      pendingNativeUpdate = null;
+    }
+  }
   try {
     const response = await fetch(RELEASES_URL, { headers: { Accept: "application/vnd.github+json" }, cache: "no-store" });
     if (!response.ok) throw new Error("Release metadata unavailable");
     const release = await response.json();
     if (!release?.tag_name || release.draft || release.prerelease) return;
     updateRecord = release;
-    const latest = String(release.tag_name).replace(/^v/i, "");
+    const latest = String(nativeUpdate?.version || release.tag_name).replace(/^v/i, "");
     const releaseUrl = release.html_url || "https://github.com/anarabbasov2010-eng/Linka/releases/latest";
-    const versionIsOlder = BUILD_VERSION && compareVersions(BUILD_VERSION, latest) < 0;
+    const versionIsOlder = Boolean(nativeUpdate) || Boolean(BUILD_VERSION && compareVersions(BUILD_VERSION, String(release.tag_name).replace(/^v/i, "")) < 0);
     let banner = document.querySelector("#linka-update-banner");
     if (!banner && versionIsOlder) {
       banner = make("aside", "linka-update-banner");
       banner.id = "linka-update-banner";
       const copy = make("div", "linka-update-copy");
       copy.append(make("strong", "", tr("updateTitle")), make("span", "", tr("updateReady") + " · " + latest));
-      banner.append(copy);
-      releaseButton(banner, tr("updateButton"), releaseUrl);
+      const status = make("p", "linka-status");
+      banner.append(copy, status);
+      releaseButton(banner, tr("updateButton"), releaseUrl, status);
       document.querySelector("#app")?.prepend(banner);
     } else if (banner) {
       const span = banner.querySelector("span");
       if (span) span.textContent = tr("updateReady") + " · " + latest;
+      const action = banner.querySelector("button");
+      if (action) action.textContent = tr("updateButton");
     }
     if (notify && versionIsOlder && lastUpdateNotice !== latest &&
       localStorage.getItem(NOTIFY_KEY) === "true" && "Notification" in window && Notification.permission === "granted") {
       new Notification("Linka update", { body: "Version " + latest + " is available.", tag: "linka-update-" + latest });
       lastUpdateNotice = latest;
     }
-  } catch { /* Updates never prevent using the local inbox. */ }
+  } catch {
+    // A release feed problem never prevents access to the local inbox.
+  }
 }
 function showUpdateSettings(panel) {
   const section = make("section", "linka-settings-block");
@@ -334,9 +393,11 @@ function showUpdateSettings(panel) {
     detail.textContent = "Checking…";
     await checkForRelease();
     const latest = updateRecord?.tag_name?.replace(/^v/i, "");
-    detail.textContent = latest && BUILD_VERSION && compareVersions(BUILD_VERSION, latest) < 0
-      ? tr("updateReady") + " " + latest : tr("latest");
-    if (updateRecord) releaseButton(section, tr("updateButton"), updateRecord.html_url || RELEASES_URL);
+    detail.textContent = pendingNativeUpdate
+      ? tr("updateReady") + " " + (pendingNativeUpdate.version || latest || "")
+      : latest && BUILD_VERSION && compareVersions(BUILD_VERSION, latest) < 0
+        ? tr("updateReady") + " " + latest : tr("latest");
+    if (updateRecord) releaseButton(section, tr("updateButton"), updateRecord.html_url || RELEASES_URL, detail);
     check.disabled = false;
   });
   section.append(detail, check);
