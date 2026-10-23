@@ -56,9 +56,13 @@ jobs:
           tag_name: v0.4.${{ github.run_number }}
           name: Linka Android v0.4.${{ github.run_number }}
           body: |
-            Automated Android build from main.
-
-            Install the APK on Android 8.0 or newer. Android may ask you to allow installs from the download app and to confirm the update.
+            What's new in this Android build:
+            - New versions are announced in-app on launch with a short changelog.
+            - Cleaner header with the redundant status badge removed.
+            - Update prompts are localized and include release notes.
+            - The app requests the display's highest supported refresh rate; actual FPS remains device-controlled.
+            - Motion remains native and can be disabled in Settings.
+            - Install the APK on Android 8.0 or newer. Android may ask you to confirm installation.
           files: apps/android/app/build/outputs/apk/debug/Linka-Android-*.apk
           draft: false
           prerelease: false
