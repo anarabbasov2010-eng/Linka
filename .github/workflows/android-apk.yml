@@ -39,14 +39,14 @@ jobs:
           LINKA_VERSION_NAME: 0.4.${{ github.run_number }}
         run: |
           mkdir -p ~/.android
-          gradle assembleDebug -PlinkaVersionCode="$LINKA_VERSION_CODE" -PlinkaVersionName="$LINKA_VERSION_NAME"
-          cp app/build/outputs/apk/debug/app-debug.apk "app/build/outputs/apk/debug/Linka-Android-$LINKA_VERSION_NAME.apk"
+          gradle assembleRelease -PlinkaVersionCode="$LINKA_VERSION_CODE" -PlinkaVersionName="$LINKA_VERSION_NAME"
+          cp app/build/outputs/apk/release/app-release.apk "app/build/outputs/apk/release/Linka-Android-$LINKA_VERSION_NAME.apk"
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: Linka-Android-${{ github.run_number }}
-          path: apps/android/app/build/outputs/apk/debug/Linka-Android-*.apk
+          path: apps/android/app/build/outputs/apk/release/Linka-Android-*.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -57,13 +57,13 @@ jobs:
           name: Linka Android v0.4.${{ github.run_number }}
           body: |
             What's new in this Android build:
-            - New versions are announced in-app on launch with a short changelog.
-            - Cleaner header with the redundant status badge removed.
+            - Optimized release build with R8 code shrinking and resource shrinking.
+            - Shorter, calmer page transitions designed to reduce visual jumping.
             - Update prompts are localized and include release notes.
             - The app requests the display's highest supported refresh rate; actual FPS remains device-controlled.
             - Motion remains native and can be disabled in Settings.
             - Install the APK on Android 8.0 or newer. Android may ask you to confirm installation.
-          files: apps/android/app/build/outputs/apk/debug/Linka-Android-*.apk
+          files: apps/android/app/build/outputs/apk/release/Linka-Android-*.apk
           draft: false
           prerelease: false
           make_latest: true
