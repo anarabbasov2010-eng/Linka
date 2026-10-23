@@ -147,25 +147,28 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import coil.compose.AsyncImage
 
-private val DB = Color(0xFF08090D)
-private val DS = Color(0xFF11141B)
-private val DR = Color(0xFF1B202B)
-private val DBR = Color(0xFF2B3342)
-private val DT = Color(0xFFF6F7FB)
-private val DM = Color(0xFF9AA5B7)
-private val LB = Color(0xFFF3F5F9)
-private val LS = Color(0xFFFCFDFF)
-private val LR = Color(0xFFEBEFF6)
-private val LBR = Color(0xFFDDE3EE)
-private val LT = Color(0xFF171B25)
-private val LM = Color(0xFF6D7789)
+private val DB = Color(0xFF09090B)
+private val DS = Color(0xFF111114)
+private val DR = Color(0xFF1B1B21)
+private val DBR = Color(0xFF303039)
+private val DT = Color(0xFFEDEDF2)
+private val DM = Color(0xFF9696A3)
+private val LB = Color(0xFFF5F4F1)
+private val LS = Color(0xFFFFFEFC)
+private val LR = Color(0xFFF0EEE9)
+private val LBR = Color(0xFFDFDDD8)
+private val LT = Color(0xFF1A191F)
+private val LM = Color(0xFF73717D)
 private const val PREFS = "linka_local_v3"
 private const val CAPTURES_KEY = "captures"
 private const val THEME_KEY = "theme"
+private const val ACCENT_KEY = "accent"
 private const val LANGUAGE_KEY = "language"
 private const val TERMS_KEY = "agreement_accepted"
 private const val TERMS_VERSION = "2026-10-23-v2"
 private const val ANIMATIONS_KEY = "animations"
+private const val DENSITY_KEY = "interface_density"
+private const val EFFECTS_KEY = "visual_effects"
 private const val FONT_SCALE_KEY = "font_scale"
 private const val UPDATE_ALERTS_KEY = "update_alerts"
 internal const val AUTO_DOWNLOAD_KEY = "auto_download_updates"
@@ -649,26 +652,42 @@ class MainActivity : ComponentActivity() {
         checkForUpdate(true)
         setContent {
             var theme by remember { mutableStateOf(prefs().getString(THEME_KEY, "dark") ?: "dark") }
+            var accent by remember { mutableStateOf(prefs().getString(ACCENT_KEY, "violet") ?: "violet") }
             var language by remember { mutableStateOf(prefs().getString(LANGUAGE_KEY, "") ?: "") }
             var accepted by remember { mutableStateOf(prefs().getString(TERMS_KEY, "") == TERMS_VERSION) }
-            var animations by remember { mutableStateOf(prefs().getBoolean(ANIMATIONS_KEY, true)) }
+            var animations by remember { mutableStateOf(prefs().getBoolean(ANIMATIONS_KEY, true) && !android.provider.Settings.Global.getFloat(contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f).equals(0f)) }
+            var density by remember { mutableStateOf(prefs().getString(DENSITY_KEY, "standard") ?: "standard") }
+            var effects by remember { mutableStateOf(prefs().getString(EFFECTS_KEY, "balanced") ?: "balanced") }
             var fontScale by remember { mutableFloatStateOf(prefs().getFloat(FONT_SCALE_KEY, 1f).coerceIn(.9f, 1.2f)) }
             var alerts by remember { mutableStateOf(prefs().getBoolean(UPDATE_ALERTS_KEY, true)) }
             var autoDownload by remember { mutableStateOf(prefs().getBoolean(AUTO_DOWNLOAD_KEY, false)) }
             val darkSystem = androidx.compose.foundation.isSystemInDarkTheme()
-            val dark = theme == "dark" || (theme == "system" && darkSystem)
+            val dark = theme == "dark" || theme == "oled" || (theme == "system" && darkSystem)
+            val accentColor = when (accent) {
+                "blue" -> if (dark) Color(0xFF9CC5FF) else Color(0xFF356BB4)
+                "mint" -> if (dark) Color(0xFF8FE3CF) else Color(0xFF237A68)
+                "rose" -> if (dark) Color(0xFFFFB6D2) else Color(0xFFB14E78)
+                else -> if (dark) Color(0xFFC9C0FF) else Color(0xFF6554A6)
+            }
+            val backgroundColor = if (theme == "oled") Color.Black else DB
+            val surfaceColor = if (theme == "oled") Color(0xFF050507) else DS
+            val raisedColor = if (theme == "oled") Color(0xFF111116) else DR
+            val outlineColor = if (theme == "oled") Color(0xFF26242D) else DBR
             MaterialTheme(colorScheme = if (dark) darkColorScheme(
-                background = DB, surface = DS, primary = DT, onPrimary = DB, onBackground = DT, onSurface = DT, surfaceVariant = DR, outline = DBR
+                background = backgroundColor, surface = surfaceColor, primary = accentColor, onPrimary = Color(0xFF171323), onBackground = DT, onSurface = DT, surfaceVariant = raisedColor, outline = outlineColor
             ) else lightColorScheme(
-                background = LB, surface = LS, primary = LT, onPrimary = LS, onBackground = LT, onSurface = LT, surfaceVariant = LR, outline = LBR
+                background = LB, surface = LS, primary = accentColor, onPrimary = Color(0xFFFFFFFF), onBackground = LT, onSurface = LT, surfaceVariant = LR, outline = LBR
             )) {
                 LinkaApp(
                     sharedText = incomingSharedText, sharedTrigger = incomingSharedToken, pairingTrigger = incomingPairingToken, oauthTrigger = incomingOAuthToken,
                     load = { loadCaptures() }, save = { saveCaptures(it) },
                     copy = { copyText(it) }, open = { openExternal(it) },
                     theme = theme, setTheme = { theme = it; prefs().edit().putString(THEME_KEY, it).apply() },
+                    accent = accent, setAccent = { accent = it; prefs().edit().putString(ACCENT_KEY, it).apply() },
                     language = language, setLanguage = { language = it; prefs().edit().putString(LANGUAGE_KEY, it).apply() },
                     animations = animations, setAnimations = { animations = it; prefs().edit().putBoolean(ANIMATIONS_KEY, it).apply() },
+                    density = density, setDensity = { density = it; prefs().edit().putString(DENSITY_KEY, it).apply() },
+                    effects = effects, setEffects = { effects = it; prefs().edit().putString(EFFECTS_KEY, it).apply() },
                     fontScale = fontScale, setFontScale = { fontScale = it; prefs().edit().putFloat(FONT_SCALE_KEY, it).apply() },
                     alerts = alerts, notificationPermissionGranted = notificationsAllowed, openNotificationSettings = { openNotificationSettings() }, sendTestNotification = { sendTestNotification() }, setAlerts = { enabled ->
                         if (enabled && Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -1009,8 +1028,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun LinkaApp(
     sharedText: String, sharedTrigger: Int, pairingTrigger: Int, oauthTrigger: Int, load: () -> List<Capture>, save: (List<Capture>) -> Unit, copy: (String) -> Unit, open: (String) -> Unit,
-    theme: String, setTheme: (String) -> Unit, language: String, setLanguage: (String) -> Unit,
-    animations: Boolean, setAnimations: (Boolean) -> Unit, fontScale: Float, setFontScale: (Float) -> Unit,
+    theme: String, setTheme: (String) -> Unit, accent: String, setAccent: (String) -> Unit, language: String, setLanguage: (String) -> Unit,
+    animations: Boolean, setAnimations: (Boolean) -> Unit, density: String, setDensity: (String) -> Unit, effects: String, setEffects: (String) -> Unit, fontScale: Float, setFontScale: (Float) -> Unit,
     alerts: Boolean, notificationPermissionGranted: Boolean, openNotificationSettings: () -> Unit, sendTestNotification: () -> Unit, setAlerts: (Boolean) -> Unit, updateInfo: UpdateInfo?, updateStatus: String, checking: Boolean,
     checkUpdates: () -> Unit, openUpdate: (UpdateInfo) -> Unit,
     autoDownload: Boolean, setAutoDownload: (Boolean) -> Unit, downloadProgress: Int, downloadingUpdate: Boolean,
@@ -1018,11 +1037,11 @@ private fun LinkaApp(
     version: String, accepted: Boolean, appInForeground: Boolean, agree: () -> Unit, decline: () -> Unit
 ) {
     val lang = language.ifBlank { "en" }
-    val dark = MaterialTheme.colorScheme.background == DB
-    val bg = if (dark) DB else LB
-    val panel = if (dark) DS else LS
-    val raised = if (dark) DR else LR
-    val border = if (dark) DBR else LBR
+    val dark = theme == "oled" || MaterialTheme.colorScheme.background == DB
+    val bg = if (theme == "oled") Color.Black else if (dark) DB else LB
+    val panel = if (theme == "oled") Color(0xFF050507) else if (dark) DS else LS
+    val raised = if (theme == "oled") Color(0xFF111116) else if (dark) DR else LR
+    val border = if (theme == "oled") Color(0xFF26242D) else if (dark) DBR else LBR
     val main = if (dark) DT else LT
     val muted = if (dark) DM else LM
     val context = LocalContext.current
@@ -1322,12 +1341,21 @@ private fun LinkaApp(
         ) { page ->
             Column(Modifier.fillMaxSize().background(
                 Brush.verticalGradient(
-                    if (dark) listOf(Color(0xFF111725), DB, Color(0xFF08090D))
-                    else listOf(Color(0xFFFFFFFF), LB, Color(0xFFEFF2F8))
+                    if (theme == "oled") listOf(Color.Black, Color.Black, Color.Black)
+                    else if (dark) when (effects) {
+                        "quiet" -> listOf(DB, DB, DB)
+                        "atmosphere" -> listOf(Color(0xFF1A1626), DB, Color(0xFF08080C))
+                        else -> listOf(Color(0xFF111016), DB, Color(0xFF08080C))
+                    }
+                    else when (effects) {
+                        "quiet" -> listOf(LB, LB, LB)
+                        "atmosphere" -> listOf(Color(0xFFF9F6FF), LB, Color(0xFFEEEAF6))
+                        else -> listOf(Color(0xFFFFFEFC), LB, Color(0xFFF1EFEB))
+                    }
                 )
             ).verticalScroll(rememberScrollState()).imePadding()
                 .padding(horizontal = 18.dp).padding(top = 14.dp, bottom = 28.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                verticalArrangement = Arrangement.spacedBy(when (density) { "compact" -> 10.dp; "spacious" -> 19.dp; else -> 14.dp })) {
                 Header(lang, main, muted, panel, border) { tab = 3 }
                 when (page) {
                     0 -> {
@@ -1379,7 +1407,7 @@ private fun LinkaApp(
                         if (resurfaced != null) {
                             SectionTitle(tr(lang, "rememberTitle"), main)
                             Text(tr(lang, "rememberBody"), color = muted, fontSize = 11.sp, lineHeight = 16.sp)
-                            CaptureCard(resurfaced, lang, panel, raised, border, main, muted, fontScale,
+                            CaptureCard(resurfaced, lang, panel, raised, border, main, muted, fontScale, density, animations,
                                 onPin = { item -> commit(captures.map { if (it.id == item.id) it.copy(pinned = !it.pinned, updatedAt = System.currentTimeMillis()) else it }) },
                                 onCopy = { copy(it.text); message = tr(lang, "copied") },
                                 onOpen = { open(it.text) },
@@ -1392,7 +1420,7 @@ private fun LinkaApp(
                             TextButton(onClick = { tab = 1 }) { Text(tr(lang, "seeAll"), color = muted, fontSize = 11.sp) }
                         }
                         if (captures.isEmpty()) EmptyState(lang, panel, border, main, muted)
-                        else captures.take(3).forEach { c -> CaptureCard(c, lang, panel, raised, border, main, muted, fontScale,
+                        else captures.take(3).forEach { c -> CaptureCard(c, lang, panel, raised, border, main, muted, fontScale, density, animations,
                             onPin = { item -> commit(captures.map { if (it.id == item.id) it.copy(pinned = !it.pinned, updatedAt = System.currentTimeMillis()) else it }) },
                             onCopy = { copy(it.text); message = tr(lang, "copied") }, onOpen = { open(it.text) },
                             onEdit = { draft = it.text; editingId = it.id; tab = 0; message = tr(lang, "edit") },
@@ -1413,7 +1441,7 @@ private fun LinkaApp(
                         FilterRow(lang, filter, { filter = it })
                         Text("${visible.size} ${tr(lang, "items")}", color = muted, fontSize = 11.sp)
                         if (visible.isEmpty()) EmptyState(lang, panel, border, main, muted, if (page == 2 && query.isNotBlank()) "noResults" else "empty")
-                        else visible.take(visibleLimit).forEach { c -> CaptureCard(c, lang, panel, raised, border, main, muted, fontScale,
+                        else visible.take(visibleLimit).forEach { c -> CaptureCard(c, lang, panel, raised, border, main, muted, fontScale, density, animations,
                             onPin = { item -> commit(captures.map { if (it.id == item.id) it.copy(pinned = !it.pinned, updatedAt = System.currentTimeMillis()) else it }) },
                             onCopy = { copy(it.text); message = tr(lang, "copied") }, onOpen = { open(it.text) },
                             onEdit = { draft = it.text; editingId = it.id; tab = 0; message = tr(lang, "edit") },
@@ -1432,12 +1460,30 @@ private fun LinkaApp(
                         SettingsGroup(tr(lang, "appearance"), panel, border, main) {
                             Text(tr(lang, "appearance"), color = main, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                             Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                                listOf("dark" to tr(lang, "themeDark"), "light" to tr(lang, "themeLight"), "system" to tr(lang, "themeSystem")).forEach { (v, label) ->
+                                listOf("dark" to tr(lang, "themeDark"), "oled" to "OLED Black", "light" to tr(lang, "themeLight"), "system" to tr(lang, "themeSystem")).forEach { (v, label) ->
                                     FilterChip(selected = theme == v, onClick = { setTheme(v) }, label = { Text(label, fontSize = 11.sp) })
+                                }
+                            }
+                            Text(if (lang == "ru") "Акцентный цвет" else if (lang == "az") "Vurğu rəngi" else if (lang == "tr") "Vurgu rengi" else "Accent color", color = muted, fontSize = 11.sp)
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                listOf("violet" to "Violet", "blue" to "Blue", "mint" to "Mint", "rose" to "Rose").forEach { (v, label) ->
+                                    FilterChip(selected = accent == v, onClick = { setAccent(v) }, label = { Text(label, fontSize = 10.sp) })
                                 }
                             }
                             SettingLine(Icons.Outlined.Language, tr(lang, "language"), languages.first { it.first == lang }.second, main, muted) { languageDialog = true }
                             SettingSwitch(tr(lang, "animations"), animations, setAnimations, main, muted)
+                            Text(if (lang == "ru") "Интенсивность эффектов" else if (lang == "az") "Effektlərin intensivliyi" else if (lang == "tr") "Efekt yoğunluğu" else "Visual effects", color = muted, fontSize = 11.sp)
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                listOf("quiet" to (if (lang == "ru") "Тихо" else if (lang == "az") "Sakit" else if (lang == "tr") "Sakin" else "Quiet"), "balanced" to (if (lang == "ru") "Баланс" else if (lang == "az") "Balans" else if (lang == "tr") "Dengeli" else "Balanced"), "atmosphere" to (if (lang == "ru") "Атмосфера" else if (lang == "az") "Atmosfer" else if (lang == "tr") "Atmosfer" else "Atmosphere")).forEach { (v, label) ->
+                                    FilterChip(selected = effects == v, onClick = { setEffects(v) }, label = { Text(label, fontSize = 10.sp) })
+                                }
+                            }
+                            Text(if (lang == "ru") "Плотность интерфейса" else if (lang == "az") "İnterfeys sıxlığı" else if (lang == "tr") "Arayüz yoğunluğu" else "Interface density", color = muted, fontSize = 11.sp)
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                listOf("compact" to (if (lang == "ru") "Компактно" else if (lang == "az") "Yığcam" else if (lang == "tr") "Kompakt" else "Compact"), "standard" to (if (lang == "ru") "Стандарт" else if (lang == "az") "Standart" else if (lang == "tr") "Standart" else "Standard"), "spacious" to (if (lang == "ru") "Свободно" else if (lang == "az") "Geniş" else if (lang == "tr") "Geniş" else "Spacious")).forEach { (v, label) ->
+                                    FilterChip(selected = density == v, onClick = { setDensity(v) }, label = { Text(label, fontSize = 10.sp) })
+                                }
+                            }
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(tr(lang, "fontSize"), color = main, fontSize = 12.sp, modifier = Modifier.weight(1f))
                                 Text("${(fontScale * 100).toInt()}%", color = muted, fontSize = 11.sp)
@@ -1886,7 +1932,7 @@ private fun FilterRow(lang: String, selected: String, onSelected: (String) -> Un
 
 @Composable
 private fun CaptureCard(
-    capture: Capture, lang: String, panel: Color, raised: Color, border: Color, main: Color, muted: Color, scale: Float,
+    capture: Capture, lang: String, panel: Color, raised: Color, border: Color, main: Color, muted: Color, scale: Float, density: String, animations: Boolean,
     onPin: (Capture) -> Unit, onCopy: (Capture) -> Unit, onOpen: (Capture) -> Unit, onEdit: (Capture) -> Unit, onDelete: (Capture) -> Unit,
     onPreviewLoaded: (Capture, LinkPreview) -> Unit
 ) {
@@ -1900,8 +1946,8 @@ private fun CaptureCard(
     }
     Card(colors = CardDefaults.cardColors(containerColor = if (capture.pinned) raised else panel), border = BorderStroke(1.dp, border),
         elevation = CardDefaults.cardElevation(defaultElevation = if (capture.pinned) 2.dp else 1.dp),
-        shape = RoundedCornerShape(23.dp), modifier = Modifier.fillMaxWidth().animateContentSize(spring(dampingRatio = .82f, stiffness = 320f))) {
-        Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        shape = RoundedCornerShape(23.dp), modifier = Modifier.fillMaxWidth().then(if (animations) Modifier.animateContentSize(spring(dampingRatio = .82f, stiffness = 320f)) else Modifier)) {
+        Column(Modifier.padding(when (density) { "compact" -> 12.dp; "spacious" -> 21.dp; else -> 15.dp }), verticalArrangement = Arrangement.spacedBy(when (density) { "compact" -> 6.dp; "spacious" -> 13.dp; else -> 9.dp })) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 Icon(if (link) Icons.Outlined.Link else Icons.Outlined.NoteAlt, null, tint = muted, modifier = Modifier.size(16.dp))
                 Text(if (capture.pinned) tr(lang, "pinned").uppercase() else tr(lang, captureTypeKey(capture)).uppercase(), color = muted, fontSize = 9.sp, letterSpacing = 1.sp)
