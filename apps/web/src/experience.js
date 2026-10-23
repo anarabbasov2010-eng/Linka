@@ -33,7 +33,7 @@ const COPY = {
     editProfile: "Edit profile", qrLogin: "Sign in on another device with QR", qrIntro: "Scan with a phone that already has Linka signed in. Code expires in two minutes.",
     waiting: "Waiting for approval…", pairingReady: "QR code ready", qrUnavailable: "QR pairing service isn't configured yet.",
     notification: "Desktop notifications", enableNotifications: "Enable notifications", notificationsOn: "Notifications enabled",
-    updateTitle: "Linka update", updateReady: "A newer release is available.", updateButton: "Install update", updateDownloading: "Downloading update", updateInstalling: "Installing update", updateRestarting: "Restarting Linka…", updateInstalled: "Update installed. Restart Linka to finish."
+    updateTitle: "Linka update", updateReady: "A newer release is available.", updateButton: "Install update", updateDownloading: "Downloading update", updateInstalling: "Installing update", updateRestarting: "Restarting Linka…", updateInstalled: "Update installed. Restart Linka to finish.",
     latest: "You're using the latest desktop build.", close: "Close", cancel: "Cancel",
     codeSent: "Code sent. Check your inbox and spam folder.", codeWait: "You can request another code in",
     profileSaved: "Profile saved.", connected: "Account connected.", offlineSaved: "Setup saved. Linka will work locally.",
@@ -59,7 +59,7 @@ const COPY = {
     editProfile: "Изменить профиль", qrLogin: "Войти на другом устройстве по QR", qrIntro: "Отсканируй код телефоном, где уже выполнен вход в Linka. Код действует две минуты.",
     waiting: "Ожидаем подтверждения…", pairingReady: "QR-код готов", qrUnavailable: "Сервис входа по QR ещё не настроен.",
     notification: "Уведомления на компьютере", enableNotifications: "Включить уведомления", notificationsOn: "Уведомления включены",
-    updateTitle: "Обновление Linka", updateReady: "Доступна новая версия.", updateButton: "Установить обновление", updateDownloading: "Загрузка обновления", updateInstalling: "Установка обновления", updateRestarting: "Перезапуск Linka…", updateInstalled: "Обновление установлено. Перезапусти Linka."
+    updateTitle: "Обновление Linka", updateReady: "Доступна новая версия.", updateButton: "Установить обновление", updateDownloading: "Загрузка обновления", updateInstalling: "Установка обновления", updateRestarting: "Перезапуск Linka…", updateInstalled: "Обновление установлено. Перезапусти Linka.",
     latest: "Установлена последняя версия для компьютера.", close: "Закрыть", cancel: "Отмена",
     codeSent: "Код отправлен. Проверь почту и папку «Спам».", codeWait: "Повторный код можно запросить через",
     profileSaved: "Профиль сохранён.", connected: "Аккаунт подключён.", offlineSaved: "Настройки сохранены. Linka продолжит работать локально.",
@@ -85,7 +85,7 @@ const COPY = {
     editProfile: "Profili dəyiş", qrLogin: "QR ilə başqa cihazda daxil ol", qrIntro: "Artıq Linka-ya daxil olduğun telefonla skan et. Kod iki dəqiqəyə bitir.",
     waiting: "Təsdiq gözlənilir…", pairingReady: "QR kod hazırdır", qrUnavailable: "QR giriş xidməti hələ qurulmayıb.",
     notification: "Kompüter bildirişləri", enableNotifications: "Bildirişləri aktiv et", notificationsOn: "Bildirişlər aktivdir",
-    updateTitle: "Linka yeniləməsi", updateReady: "Yeni versiya mövcuddur.", updateButton: "Yeniləməni quraşdır", updateDownloading: "Yeniləmə endirilir", updateInstalling: "Yeniləmə quraşdırılır", updateRestarting: "Linka yenidən başladılır…", updateInstalled: "Yeniləmə quraşdırıldı. Linka-nı yenidən aç."
+    updateTitle: "Linka yeniləməsi", updateReady: "Yeni versiya mövcuddur.", updateButton: "Yeniləməni quraşdır", updateDownloading: "Yeniləmə endirilir", updateInstalling: "Yeniləmə quraşdırılır", updateRestarting: "Linka yenidən başladılır…", updateInstalled: "Yeniləmə quraşdırıldı. Linka-nı yenidən aç.",
     latest: "Ən son masaüstü versiyası quraşdırılıb.", close: "Bağla", cancel: "Ləğv et",
     codeSent: "Kod göndərildi. E-poçtu və spam qovluğunu yoxla.", codeWait: "Yeni kodu bu müddətdən sonra istəyə bilərsən:",
     profileSaved: "Profil yadda saxlanıldı.", connected: "Hesab qoşuldu.", offlineSaved: "Parametrlər saxlanıldı. Linka lokal işləyəcək.",
@@ -111,7 +111,7 @@ const COPY = {
     editProfile: "Profili düzenle", qrLogin: "QR ile başka cihazda giriş yap", qrIntro: "Linka'da zaten oturum açılmış bir telefonla tara. Kod iki dakika içinde sona erer.",
     waiting: "Onay bekleniyor…", pairingReady: "QR kod hazır", qrUnavailable: "QR giriş hizmeti henüz yapılandırılmadı.",
     notification: "Masaüstü bildirimleri", enableNotifications: "Bildirimleri etkinleştir", notificationsOn: "Bildirimler etkin",
-    updateTitle: "Linka güncellemesi", updateReady: "Yeni sürüm kullanıma hazır.", updateButton: "Güncellemeyi yükle", updateDownloading: "Güncelleme indiriliyor", updateInstalling: "Güncelleme yükleniyor", updateRestarting: "Linka yeniden başlatılıyor…", updateInstalled: "Güncelleme yüklendi. Uygulamayı yeniden aç."
+    updateTitle: "Linka güncellemesi", updateReady: "Yeni sürüm kullanıma hazır.", updateButton: "Güncellemeyi yükle", updateDownloading: "Güncelleme indiriliyor", updateInstalling: "Güncelleme yükleniyor", updateRestarting: "Linka yeniden başlatılıyor…", updateInstalled: "Güncelleme yüklendi. Uygulamayı yeniden aç.",
     latest: "En güncel masaüstü sürümünü kullanıyorsun.", close: "Kapat", cancel: "Vazgeç",
     codeSent: "Kod gönderildi. Gelen kutunu ve spam klasörünü kontrol et.", codeWait: "Yeni kodu şu süre sonra isteyebilirsin:",
     profileSaved: "Profil kaydedildi.", connected: "Hesap bağlandı.", offlineSaved: "Ayarlar kaydedildi. Linka yerel çalışmaya devam edecek.",
