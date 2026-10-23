@@ -149,6 +149,7 @@ private const val TERMS_VERSION = "2026-10-23-v2"
 private const val ANIMATIONS_KEY = "animations"
 private const val FONT_SCALE_KEY = "font_scale"
 private const val UPDATE_ALERTS_KEY = "update_alerts"
+internal const val AUTO_DOWNLOAD_KEY = "auto_download_updates"
 private const val LAST_NOTIFIED_KEY = "last_notified_version"
 private const val MAX_CAPTURE_CHARS = 100_000
 private const val MAX_CAPTURES = 500
