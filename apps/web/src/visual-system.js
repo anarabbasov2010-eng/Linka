@@ -238,7 +238,13 @@ export function initVisualSystem() {
         shortcut.textContent = command.shortcut;
         button.append(shortcut);
       }
-      button.addEventListener("mouseenter", () => { activeIndex = index; renderCommands(); });
+      button.addEventListener("mouseenter", () => {
+        activeIndex = index;
+        commandResults.querySelectorAll(".linka-command-row").forEach((node, itemIndex) => {
+          node.classList.toggle("is-active", itemIndex === activeIndex);
+          node.setAttribute("aria-selected", String(itemIndex === activeIndex));
+        });
+      });
       button.addEventListener("click", () => runCommand(command));
       commandResults.append(button);
     });
