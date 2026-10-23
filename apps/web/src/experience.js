@@ -17,6 +17,7 @@ const LANGUAGES = [
 ];
 const COPY = {
   en: {
+    ambientSound: "Ambient sound", ambientSoundBody: "A quiet, slowly breathing synth pad. Off by default.", audioUnavailable: "Ambient audio is not available in this environment.",
     privacy: "Private by default · local-first", eyebrow: "Your personal library",
     hero: ["Keep", "what", "matters."], heroBody: "Links, notes, and useful ideas. Saved once. Easy to find again.",
     quick: "Quick capture", subtitle: "Keep the useful stuff.", placeholder: "Drop a link. Save a thought. Keep it for later…",
@@ -44,6 +45,7 @@ const COPY = {
     signOutInfo: "You have signed out. Your local library has not been deleted."
   },
   ru: {
+    ambientSound: "Атмосферный звук", ambientSoundBody: "Тихий синтезаторный фон с медленным дыханием. По умолчанию выключен.", audioUnavailable: "Атмосферный звук недоступен в этой среде.",
     privacy: "Приватность по умолчанию · сначала локально", eyebrow: "Твоя личная библиотека",
     hero: ["Сохраняй", "то,", "что важно."], heroBody: "Ссылки, заметки и идеи. Сохраняй один раз — находи снова.",
     quick: "Быстрое сохранение", subtitle: "Только то, что нужно.", placeholder: "Вставь ссылку или сохрани мысль…",
@@ -71,6 +73,7 @@ const COPY = {
     signOutInfo: "Вы вышли из аккаунта. Локальная библиотека не удалена."
   },
   az: {
+    ambientSound: "Atmosfer səsi", ambientSoundBody: "Yavaş nəfəs alan sakit sintezator fonu. Standart olaraq sönülüdür.", audioUnavailable: "Atmosfer səsi bu mühitdə mövcud deyil.",
     privacy: "Məxfilik standartdır · əvvəlcə cihazda", eyebrow: "Şəxsi kitabxanan",
     hero: ["Vacib", "olanı", "saxla."], heroBody: "Linklər, qeydlər və ideyalar. Bir dəfə saxla, sonra asan tap.",
     quick: "Tez yadda saxla", subtitle: "Yalnız lazım olanlar.", placeholder: "Link əlavə et və ya fikrini yaz…",
@@ -98,6 +101,7 @@ const COPY = {
     signOutInfo: "Hesabdan çıxdın. Lokal kitabxanan silinməyib."
   },
   tr: {
+    ambientSound: "Ortam sesi", ambientSoundBody: "Yavaşça nefes alan sakin bir synth tonu. Varsayılan olarak kapalı.", audioUnavailable: "Ortam sesi bu ortamda kullanılamıyor.",
     privacy: "Varsayılan gizlilik · önce cihazda", eyebrow: "Kişisel kitaplığın",
     hero: ["Önemli", "olanı", "sakla."], heroBody: "Bağlantılar, notlar ve fikirler. Bir kez kaydet, sonra kolayca bul.",
     quick: "Hızlı kayıt", subtitle: "Yalnızca gerekenler.", placeholder: "Bağlantı ekle veya bir düşünce yaz…",
@@ -129,7 +133,31 @@ let updateRecord = null;
 let pendingNativeUpdate = null;
 let lastUpdateNotice = "";
 let updateTimer = null;
+let ambientAudioContext = null;
+let ambientAudioNodes = [];
+let ambientAudioEnabled = false;
 
+function stopAmbientSound() {
+  ambientAudioNodes.forEach(node => { try { node.stop?.(); } catch {} try { node.disconnect?.(); } catch {} });
+  ambientAudioNodes = [];
+  if (ambientAudioContext) { const ctx = ambientAudioContext; ambientAudioContext = null; try { ctx.close(); } catch {} }
+  ambientAudioEnabled = false;
+}
+async function startAmbientSound() {
+  stopAmbientSound();
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) throw new Error("audio-unavailable");
+  const ctx = new AudioContextClass(); ambientAudioContext = ctx;
+  const master = ctx.createGain(); master.gain.value = 0.055; master.connect(ctx.destination);
+  [110, 164.81, 220, 329.63].forEach((frequency, index) => {
+    const oscillator = ctx.createOscillator(), voice = ctx.createGain();
+    oscillator.type = "sine"; oscillator.frequency.value = frequency; voice.gain.value = [0.22, 0.15, 0.10, 0.045][index];
+    oscillator.connect(voice); voice.connect(master); oscillator.start(); ambientAudioNodes.push(oscillator, voice);
+  });
+  const lfo = ctx.createOscillator(), depth = ctx.createGain(); lfo.frequency.value = 0.075; depth.gain.value = 0.012;
+  lfo.connect(depth); depth.connect(master.gain); lfo.start(); ambientAudioNodes.push(lfo, depth);
+  await ctx.resume(); ambientAudioEnabled = true;
+}
 function langCode() {
   const saved = localStorage.getItem(LANG_KEY);
   if (COPY[saved]) return saved;
@@ -724,6 +752,19 @@ function showSettings() {
   themeLabel.append(themeSelect);
   dialog.panel.append(themeLabel);
 
+  const soundSection = make("div", "linka-settings-block");
+  soundSection.append(make("h3", "", tr("ambientSound")), make("p", "linka-muted", tr("ambientSoundBody")));
+  const soundToggle = button("", "linka-button linka-button-secondary");
+  const refreshSoundLabel = () => { soundToggle.textContent = (ambientAudioEnabled ? "✓ " : "") + tr("ambientSound"); soundToggle.setAttribute("aria-pressed", String(ambientAudioEnabled)); };
+  refreshSoundLabel();
+  soundToggle.addEventListener("click", async () => {
+    soundToggle.disabled = true;
+    try { if (ambientAudioEnabled) stopAmbientSound(); else await startAmbientSound(); refreshSoundLabel(); }
+    catch { stopAmbientSound(); soundSection.append(make("p", "linka-muted", tr("audioUnavailable"))); }
+    finally { soundToggle.disabled = false; }
+  });
+  soundSection.append(soundToggle); dialog.panel.append(soundSection);
+
   const motionSection = make("div", "linka-settings-block");
   motionSection.append(make("h3", "", tr("reducedMotion")), make("p", "linka-muted", tr("reducedMotionBody")));
   const motionToggle = button("", "linka-button linka-button-secondary");
@@ -767,7 +808,7 @@ function addAccountButton() {
 
 function mountWebNavigation() {
   const shell = document.querySelector("#app");
-  if (!shell || window.__TAURI_INTERNALS__ || shell.querySelector(".web-sidebar")) return;
+  if (!shell || shell.querySelector(".web-sidebar")) return;
   const sidebar = make("aside", "web-sidebar");
   sidebar.setAttribute("aria-label", "Linka navigation");
   const brand = make("a", "web-side-brand");
@@ -777,18 +818,23 @@ function mountWebNavigation() {
   const nav = make("nav", "web-side-nav");
   nav.setAttribute("aria-label", "Library sections");
   const entries = [
-    ["all", "▦", "Inbox"], ["pinned", "⌖", "Pinned"],
-    ["links", "↗", "Links"], ["notes", "Aa", "Notes"],
-    ["search", "⌕", "Search"], ["capture", "+", "New capture"],
-    ["account", "○", "Account"], ["settings", "⚙", "Settings"]
+    ["all", "▦", tr("inbox")], ["pinned", "⌖", tr("pinned")],
+    ["links", "↗", tr("links")], ["notes", "Aa", tr("notes")],
+    ["search", "⌕", tr("search")], ["capture", "+", tr("quick")],
+    ["account", "○", tr("account")], ["settings", "⚙", tr("settings")]
   ];
   const itemButtons = new Map();
+  const activePill = make("span", "web-nav-active-pill");
+  activePill.setAttribute("aria-hidden", "true");
+  nav.append(activePill);
   const activate = key => {
     for (const [value, node] of itemButtons) {
       const active = value === key;
       node.classList.toggle("active", active);
       node.setAttribute("aria-current", active ? "page" : "false");
     }
+    const target = itemButtons.get(key);
+    if (target) { activePill.style.height = target.offsetHeight + "px"; activePill.style.transform = "translate3d(0," + target.offsetTop + "px,0)"; activePill.style.opacity = "1"; }
   };
   for (const [key, glyph, label] of entries) {
     const node = make("button", "web-nav-item");
