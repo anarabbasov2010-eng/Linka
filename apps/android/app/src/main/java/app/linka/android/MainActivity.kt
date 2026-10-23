@@ -176,6 +176,7 @@ private const val SYNC_ANON_KEY = "sync_anon_key"
 private const val SYNC_EMAIL_KEY = "sync_email"
 private const val SYNC_REFRESH_KEY = "sync_refresh_token_encrypted"
 private const val SYNC_STATUS_KEY = "sync_status"
+private const val PROFILE_JSON_KEY = "profile_json"
 internal const val MAX_CAPTURE_CHARS = 100_000
 internal const val MAX_CAPTURES = 500
 private const val RELEASES_API = "https://api.github.com/repos/anarabbasov2010-eng/Linka/releases/latest"
@@ -416,6 +417,8 @@ private val extraWords = mapOf(
         "syncQrApproved" to "Desktop sign-in approved.", "syncNeedSignInForQr" to "Sign in to approve the QR request.",
         "syncWait" to "Resend available in", "syncVerifyAndSync" to "Verify code and sync",
         "syncHelp" to "Enter the shared Linka project URL and public key. Request a one-time email code to create an account or sign in; passwords are not used or stored.",
+        "profileTitle" to "A quick intro", "profilePrompt" to "Choose a display name. A nickname is fine; age is optional.",
+        "profileName" to "Display name", "profileAge" to "Age (optional)", "profileSave" to "Save profile",
         "syncSetupSql" to "Copy database setup SQL", "syncForget" to "Forget this account", "syncClose" to "Close",
         "syncWorking" to "Syncing…", "syncCopied" to "SQL copied. Run it in Supabase → SQL Editor.",
         "syncRequired" to "Cloud sync needs your own Supabase project. Until connected, Linka continues to work locally.",
@@ -1011,8 +1014,23 @@ private fun LinkaApp(
     var deleting by remember { mutableStateOf<Capture?>(null) }
     var clearDialog by remember { mutableStateOf(false) }
     var cloudDialog by remember { mutableStateOf(false) }
+    var profileDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    val storedProfile = remember { runCatching { JSONObject(prefs.getString(PROFILE_JSON_KEY, "{}") ?: "{}") }.getOrDefault(JSONObject()) }
+    var profileName by remember { mutableStateOf(storedProfile.optString("displayName", "")) }
+    var profileAge by remember { mutableStateOf(if (storedProfile.isNull("age")) "" else storedProfile.optString("age", "")) }
+    fun localProfileJson(): JSONObject? = runCatching {
+        val raw = prefs.getString(PROFILE_JSON_KEY, "").orEmpty()
+        if (raw.isBlank()) null else JSONObject(raw)
+    }.getOrNull()
+    fun keepSyncedProfile(profile: JSONObject?) {
+        if (profile != null && profile.optString("displayName").isNotBlank()) {
+            prefs.edit().putString(PROFILE_JSON_KEY, profile.toString()).apply()
+            profileName = profile.optString("displayName")
+            profileAge = if (profile.isNull("age")) "" else profile.optString("age", "")
+        }
+    }
     var cloudUrl by remember { mutableStateOf(prefs.getString(SYNC_URL_KEY, "").takeIf { !it.isNullOrBlank() } ?: BuildConfig.LINKA_SUPABASE_URL) }
     var cloudAnonKey by remember { mutableStateOf(prefs.getString(SYNC_ANON_KEY, "").takeIf { !it.isNullOrBlank() } ?: BuildConfig.LINKA_SUPABASE_PUBLISHABLE_KEY) }
     var cloudEmail by remember { mutableStateOf(prefs.getString(SYNC_EMAIL_KEY, "") ?: "") }
@@ -1105,12 +1123,13 @@ private fun LinkaApp(
                 try {
                     val rawDeleted = JSONArray(prefs.getString(DELETED_IDS_KEY, "[]") ?: "[]")
                     val deleted = (0 until rawDeleted.length()).map { rawDeleted.optString(it) }.filter { it.isNotBlank() }.toSet()
-                    val result = syncWithSupabase(url, anon, email, "", false, captures, deleted, prefs.getString(SYNC_REFRESH_KEY, "").orEmpty())
+                    val result = syncWithSupabase(url, anon, email, "", false, captures, deleted, prefs.getString(SYNC_REFRESH_KEY, "").orEmpty(), localProfileJson())
                     prefs.edit().putString(SYNC_REFRESH_KEY, result.encryptedRefreshToken)
                         .putString(DELETED_IDS_KEY, JSONArray().apply { result.deletedIds.forEach { put(it) } }.toString())
                         .putString(SYNC_STATUS_KEY, result.message).apply()
                     captures = result.captures
                     save(result.captures)
+                    keepSyncedProfile(result.profile)
                     cloudStatus = result.message
                 } catch (e: Exception) {
                     cloudStatus = e.message ?: "Cloud sync failed"
@@ -1143,7 +1162,7 @@ private fun LinkaApp(
                 runCatching {
                     val rawDeleted = JSONArray(prefs.getString(DELETED_IDS_KEY, "[]") ?: "[]")
                     val deleted = (0 until rawDeleted.length()).map { rawDeleted.optString(it) }.filter { it.isNotBlank() }.toSet()
-                    val result = syncWithSupabase(url, anon, email, "", false, load(), deleted, token)
+                    val result = syncWithSupabase(url, anon, email, "", false, load(), deleted, token, localProfileJson())
                     prefs.edit().putString(SYNC_REFRESH_KEY, result.encryptedRefreshToken)
                         .putString(DELETED_IDS_KEY, JSONArray().apply { result.deletedIds.forEach { put(it) } }.toString())
                         .putString(SYNC_STATUS_KEY, result.message).apply()
@@ -1535,16 +1554,21 @@ private fun LinkaApp(
                                 prefs.edit().putString(SYNC_REFRESH_KEY, it).apply()
                             }
                         } else stored
-                        val result = syncWithSupabase(cloudUrl, cloudAnonKey, cloudEmail, "", false, captures, deletedIds, verifiedToken)
+                        val result = syncWithSupabase(cloudUrl, cloudAnonKey, cloudEmail, "", false, captures, deletedIds, verifiedToken, localProfileJson())
                         prefs.edit().putString(SYNC_REFRESH_KEY, result.encryptedRefreshToken)
                             .putString(DELETED_IDS_KEY, JSONArray().apply { result.deletedIds.forEach { put(it) } }.toString())
                             .putString(SYNC_STATUS_KEY, result.message).apply()
                         captures = result.captures
                         save(result.captures)
+                        keepSyncedProfile(result.profile)
                         cloudStatus = result.message
                         cloudPassword = ""
                         cloudOtp = ""
                         otpRequested = false
+                        if (stored.isBlank() && localProfileJson()?.optString("displayName").isNullOrBlank() && result.profile?.optString("displayName").isNullOrBlank()) {
+                            profileDialog = true
+                            cloudDialog = false
+                        }
                         if (pendingPairId.isNotBlank() && pendingPairSecret.isNotBlank()) {
                             val approvedToken = approveQrPairing(cloudUrl, cloudAnonKey, result.encryptedRefreshToken, pendingPairId, pendingPairSecret)
                             prefs.edit().putString(SYNC_REFRESH_KEY, approvedToken)
@@ -1570,6 +1594,69 @@ private fun LinkaApp(
                 }) { Text(tr(lang, "createAccount"), color = main, fontSize = 10.sp) }
                 TextButton(enabled = !cloudBusy, onClick = { cloudDialog = false }) { Text(tr(lang, "syncClose"), color = muted, fontSize = 10.sp) }
             }
+        }
+    )
+    if (profileDialog) AlertDialog(
+        onDismissRequest = { profileDialog = false },
+        containerColor = panel,
+        shape = RoundedCornerShape(22.dp),
+        title = { Text(tr(lang, "profileTitle"), color = main, fontWeight = FontWeight.SemiBold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(tr(lang, "profilePrompt"), color = muted, fontSize = 12.sp, lineHeight = 18.sp)
+                OutlinedTextField(value = profileName, onValueChange = { profileName = it.take(48) },
+                    label = { Text(tr(lang, "profileName")) }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+                    textStyle = TextStyle(color = main, fontSize = 13.sp), colors = fieldColors(bg, border, main, muted))
+                OutlinedTextField(value = profileAge, onValueChange = { profileAge = it.filter(Char::isDigit).take(3) },
+                    label = { Text(tr(lang, "profileAge")) }, singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+                    textStyle = TextStyle(color = main, fontSize = 13.sp), colors = fieldColors(bg, border, main, muted))
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                val name = profileName.trim().replace(Regex("\\s+"), " ").take(48)
+                val ageValue = profileAge.trim().takeIf { it.isNotBlank() }?.toIntOrNull()
+                if (name.isBlank()) {
+                    message = tr(lang, "profileName")
+                } else if (profileAge.isNotBlank() && (ageValue == null || ageValue !in 13..120)) {
+                    message = tr(lang, "profileAge")
+                } else {
+                    val profile = JSONObject().put("displayName", name)
+                        .put("age", ageValue ?: JSONObject.NULL)
+                        .put("updatedAt", System.currentTimeMillis())
+                    prefs.edit().putString(PROFILE_JSON_KEY, profile.toString()).apply()
+                    profileName = name
+                    profileDialog = false
+                    if (prefs.getString(SYNC_REFRESH_KEY, "").orEmpty().isNotBlank() && cloudUrl.isNotBlank() && cloudAnonKey.isNotBlank()) {
+                        scope.launch {
+                            runCatching {
+                                val rawDeleted = JSONArray(prefs.getString(DELETED_IDS_KEY, "[]") ?: "[]")
+                                val deleted = (0 until rawDeleted.length()).map { rawDeleted.optString(it) }.filter { it.isNotBlank() }.toSet()
+                                val result = syncWithSupabase(cloudUrl, cloudAnonKey, cloudEmail, "", false, captures, deleted,
+                                    prefs.getString(SYNC_REFRESH_KEY, "").orEmpty(), localProfileJson())
+                                prefs.edit().putString(SYNC_REFRESH_KEY, result.encryptedRefreshToken).apply()
+                                keepSyncedProfile(result.profile)
+                                captures = result.captures
+                                save(result.captures)
+                                message = result.message
+                            }.onFailure { message = it.message ?: tr(lang, "failed") }
+                        }
+                    }
+                }
+            }, shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = main, contentColor = bg)) {
+                Text(tr(lang, "profileSave"), fontSize = 11.sp)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = {
+                profileDialog = false
+                if (profileName.isBlank()) profileName = "Linka user"
+                val profile = JSONObject().put("displayName", profileName).put("age", JSONObject.NULL).put("updatedAt", System.currentTimeMillis())
+                prefs.edit().putString(PROFILE_JSON_KEY, profile.toString()).apply()
+            }) { Text(tr(lang, "syncClose"), color = muted, fontSize = 11.sp) }
         }
     )
     if (!accepted || agreementDialog) AgreementDialog(lang, panel, border, main, muted, !accepted,
