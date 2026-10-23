@@ -3,8 +3,9 @@ import { initLinkaExperience } from "./experience.js";
 import {
   addDeletedId, disconnectCloud, getCloudConfig, getCloudSession,
   getOtpCooldown, readDeletedIds, requestEmailOtp, saveCloudConfig, syncCloudCaptures,
-  verifyEmailOtp, readLinkaProfile, saveLinkaProfile
+  verifyEmailOtp, readLinkaProfile, saveLinkaProfile, beginQrPairing, claimQrPairing
 } from "./cloud-sync.js";
+import QRCode from "qrcode";
 
 const $ = selector => document.querySelector(selector);
 const form = $("#capture-form");
@@ -342,7 +343,8 @@ function showCloudSyncНастройки() {
   content.append(statusLine);
   const actions = document.createElement("div"); actions.className = "modal-actions";
   const close = document.createElement("button"); close.type = "button"; close.className = "ghost"; close.textContent = "Закрыть";
-  close.addEventListener("click", () => modalRoot.replaceChildren());
+  let pairingCancelled = false;
+  close.addEventListener("click", () => { pairingCancelled = true; if (cooldownTimer) clearInterval(cooldownTimer); modalRoot.replaceChildren(); });
   const makeButton = (label, cls, fn) => {
     const button = document.createElement("button"); button.type = "button"; button.className = cls; button.textContent = label;
     button.addEventListener("click", fn); actions.append(button); return button;
@@ -353,6 +355,7 @@ function showCloudSyncНастройки() {
   const requestButton = makeButton("Отправить код для входа", "ghost", () => void requestCode(false));
   const registerButton = makeButton("Создать аккаунт", "ghost", () => void requestCode(true));
   const verifyButton = makeButton("Подтвердить код и синхронизировать", "primary", () => void verifyCode());
+  const qrButton = makeButton("Войти по QR с телефона", "ghost", () => void startQrSignIn());
   const syncButton = makeButton("Синхронизировать", "primary", () => void runSync());
   const disconnectButton = makeButton("Выйти из аккаунта", "ghost", () => {
     disconnectCloud();
@@ -361,7 +364,7 @@ function showCloudSyncНастройки() {
   });
   if (session) {
     form.hidden = true; profileWrap.hidden = true; advanced.hidden = true;
-    requestButton.hidden = true; registerButton.hidden = true; verifyButton.hidden = true;
+    requestButton.hidden = true; registerButton.hidden = true; verifyButton.hidden = true; qrButton.hidden = true;
   } else {
     syncButton.hidden = true; disconnectButton.hidden = true;
   }
@@ -369,7 +372,7 @@ function showCloudSyncНастройки() {
   modalShell(content, { dismissable: true });
 
   function setBusy(value) {
-    [requestButton,registerButton,verifyButton,syncButton,disconnectButton].forEach(b => { b.disabled = value; });
+    [requestButton,registerButton,verifyButton,qrButton,syncButton,disconnectButton].forEach(b => { b.disabled = value; });
   }
   function setCooldown() {
     const remaining = Math.ceil(getOtpCooldown(email.value) / 1000);
@@ -402,7 +405,7 @@ function showCloudSyncНастройки() {
     } finally { setBusy(false); setCooldown(); }
   }
   async function verifyCode() {
-    if (!otpSent && getOtpCooldown(email.value) <= 0) {
+    if (!sessionVerified && !otpSent && getOtpCooldown(email.value) <= 0) {
       statusLine.textContent = "Сначала запроси код из письма.";
       return;
     }
@@ -427,11 +430,54 @@ function showCloudSyncНастройки() {
       const result = await syncNow({silent:true});
       statusLine.textContent = result?.message ? `Готово. ${result.message}` : "Вход выполнен.";
       form.hidden = true; profileWrap.hidden = true; advanced.hidden = true;
-      requestButton.hidden = true; registerButton.hidden = true; verifyButton.hidden = true;
+      requestButton.hidden = true; registerButton.hidden = true; verifyButton.hidden = true; qrButton.hidden = true;
       syncButton.hidden = false; disconnectButton.hidden = false;
       say("Linka синхронизирована");
     } catch (error) {
       statusLine.textContent = error?.message || "Не удалось подтвердить код.";
+    } finally { setBusy(false); }
+  }
+  async function startQrSignIn() {
+    let challenge;
+    try {
+      setBusy(true);
+      saveCloudConfig(url.value,key.value);
+      statusLine.textContent = "Создаём одноразовый QR-код…";
+      challenge = await beginQrPairing({url:url.value,key:key.value});
+      const uri = `linka://pair?id=${encodeURIComponent(challenge.id)}&secret=${encodeURIComponent(challenge.secret)}`;
+      const dataUrl = await QRCode.toDataURL(uri, {
+        width: 240, margin: 2, errorCorrectionLevel: "H",
+        color: { dark: "#09090b", light: "#ffffff" }
+      });
+      const img = document.createElement("img");
+      img.src = dataUrl; img.alt = "Одноразовый QR-код для входа в Linka";
+      img.width = 240; img.height = 240;
+      img.style.display = "block"; img.style.width = "min(240px, 100%)";
+      img.style.height = "auto"; img.style.margin = "16px auto";
+      img.style.borderRadius = "16px"; img.style.background = "#ffffff"; img.style.padding = "8px";
+      content.insertBefore(img, statusLine);
+      statusLine.textContent = "Открой Linka на телефоне, отсканируй QR-код и подтверди вход. Код действует 2 минуты.";
+      while (!pairingCancelled && Date.now() < Date.parse(challenge.expiresAt)) {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        if (pairingCancelled) return;
+        const result = await claimQrPairing({id:challenge.id,secret:challenge.secret,url:url.value,key:key.value});
+        if (result.pending) continue;
+        sessionVerified = true;
+        otpSent = true;
+        code.value = "";
+        statusLine.textContent = "Вход подтверждён. Заверши профиль, если это первый вход.";
+        img.remove();
+        if (!String(displayName.value || "").trim()) {
+          displayName.focus();
+          return;
+        }
+        await verifyCode();
+        return;
+      }
+      img.remove();
+      if (!pairingCancelled) statusLine.textContent = "QR-код истёк. Создай новый и попробуй ещё раз.";
+    } catch (error) {
+      statusLine.textContent = error?.message || "Не удалось выполнить вход по QR.";
     } finally { setBusy(false); }
   }
   async function runSync() {
