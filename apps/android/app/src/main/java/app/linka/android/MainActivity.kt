@@ -108,6 +108,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -311,6 +316,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        scheduleUpdateChecks()
         incomingSharedText = extractSharedText(intent)
         checkForUpdate(true)
         setContent {
@@ -383,6 +389,23 @@ class MainActivity : ComponentActivity() {
             val found = updateInfo
             if (found != null && notifyUpdate(found)) prefs().edit().putString(LAST_NOTIFIED_KEY, found.version).apply()
         }
+    }
+
+    private fun scheduleUpdateChecks() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+        val request = PeriodicWorkRequestBuilder<UpdateCheckWorker>(
+            6, java.util.concurrent.TimeUnit.HOURS, 30, java.util.concurrent.TimeUnit.MINUTES
+        )
+            .setConstraints(constraints)
+            .setInitialDelay(1, java.util.concurrent.TimeUnit.HOURS)
+            .build()
+        WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
+            "linka-update-checks",
+            ExistingPeriodicWorkPolicy.KEEP,
+            request
+        )
     }
 
     private fun checkForUpdate(quiet: Boolean) {
