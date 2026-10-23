@@ -216,7 +216,7 @@ internal suspend fun syncWithSupabase(
         captures = merged,
         deletedIds = deleted,
         encryptedRefreshToken = LinkaTokenVault.encrypt(refreshToken),
-        message = "Synced \${merged.size} items"
+        message = "Synced ${merged.size} items"
     )
 }
 
