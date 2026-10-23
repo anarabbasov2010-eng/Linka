@@ -26,10 +26,19 @@ android {
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
 
+    signingConfigs {
+        create("linkaCi") {
+            storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         getByName("release") {
-            // Reuse the CI debug key so consecutive APKs can update an existing install.
-            signingConfig = signingConfigs.getByName("debug")
+            // Explicitly use the keystore generated and persisted by the Android CI workflow.
+            signingConfig = signingConfigs.getByName("linkaCi")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

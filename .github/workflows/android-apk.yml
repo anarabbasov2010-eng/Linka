@@ -91,8 +91,8 @@ jobs:
             exit 1
           fi
           report="$("$apksigner" verify --verbose --print-certs "$apk")"
-          printf '%s\\n' "$report"
-          actual="$(printf '%s\\n' "$report" | awk -F ': ' '/Signer #1 certificate SHA-256 digest:/{print tolower($2); exit}')"
+          printf '%s\n' "$report"
+          actual="$(printf '%s\n' "$report" | awk -F ': ' '/certificate SHA-256 digest:/{print tolower($2); exit}')"
           if [[ -z "$actual" || "$actual" != "$SIGNING_CERT_SHA256" ]]; then
             echo "APK signature does not match the preserved Linka signing key."
             echo "Expected: $SIGNING_CERT_SHA256"
