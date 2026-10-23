@@ -404,7 +404,7 @@ private val words = mapOf(
 private val extraWords = mapOf(
     "en" to mapOf(
         "video" to "VIDEO", "article" to "ARTICLE", "website" to "WEBSITE",
-        "rememberTitle" to "A little throwback", "rememberBody" to "Something you saved a while ago.",
+        "rememberTitle" to "A little throwback", "rememberBody" to "Something you saved a while ago.", "readMore" to "Read more", "showLess" to "Show less",
         "cloudSync" to "Cloud sync", "cloudSyncBody" to "Keep this library in sync between devices using your own free Supabase project.",
         "syncNow" to "Connect and sync", "createAccount" to "Create account", "syncEndpoint" to "Supabase project URL",
         "syncAnonKey" to "Publishable / anon key", "syncEmail" to "Account email", "syncPassword" to "Password",
@@ -416,7 +416,7 @@ private val extraWords = mapOf(
     ),
     "ru" to mapOf(
         "video" to "ВИДЕО", "article" to "СТАТЬЯ", "website" to "САЙТ",
-        "rememberTitle" to "Из прошлого", "rememberBody" to "То, что ты сохранил некоторое время назад.",
+        "rememberTitle" to "Из прошлого", "rememberBody" to "То, что ты сохранил некоторое время назад.", "readMore" to "Развернуть", "showLess" to "Свернуть",
         "cloudSync" to "Облачная синхронизация", "cloudSyncBody" to "Синхронизируй библиотеку между устройствами через собственный бесплатный проект Supabase.",
         "syncNow" to "Подключить и синхронизировать", "createAccount" to "Создать аккаунт", "syncEndpoint" to "URL проекта Supabase",
         "syncAnonKey" to "Публичный / anon-ключ", "syncEmail" to "Электронная почта", "syncPassword" to "Пароль",
@@ -428,7 +428,7 @@ private val extraWords = mapOf(
     ),
     "az" to mapOf(
         "video" to "VİDEO", "article" to "MƏQALƏ", "website" to "SAYT",
-        "rememberTitle" to "Keçmişdən bir xatirə", "rememberBody" to "Bir müddət əvvəl saxladığın material.",
+        "rememberTitle" to "Keçmişdən bir xatirə", "rememberBody" to "Bir müddət əvvəl saxladığın material.", "readMore" to "Daha çox", "showLess" to "Yığcam et",
         "cloudSync" to "Bulud sinxronizasiyası", "cloudSyncBody" to "Öz pulsuz Supabase layihən vasitəsilə kitabxananı cihazlar arasında sinxronlaşdır.",
         "syncNow" to "Qoşul və sinxronlaşdır", "createAccount" to "Hesab yarat", "syncEndpoint" to "Supabase layihəsinin URL-i",
         "syncAnonKey" to "Açıq / anon açarı", "syncEmail" to "E-poçt", "syncPassword" to "Şifrə",
@@ -440,7 +440,7 @@ private val extraWords = mapOf(
     ),
     "tr" to mapOf(
         "video" to "VİDEO", "article" to "MAKALE", "website" to "WEB SİTESİ",
-        "rememberTitle" to "Geçmişten bir hatırlatma", "rememberBody" to "Bir süre önce kaydettiğin bir içerik.",
+        "rememberTitle" to "Geçmişten bir hatırlatma", "rememberBody" to "Bir süre önce kaydettiğin bir içerik.", "readMore" to "Daha fazla", "showLess" to "Daha az",
         "cloudSync" to "Bulut senkronizasyonu", "cloudSyncBody" to "Kendi ücretsiz Supabase projenle kitaplığını cihazlar arasında senkronize et.",
         "syncNow" to "Bağlan ve senkronize et", "createAccount" to "Hesap oluştur", "syncEndpoint" to "Supabase proje URL'si",
         "syncAnonKey" to "Yayınlanabilir / anon anahtarı", "syncEmail" to "E-posta", "syncPassword" to "Şifre",
@@ -1532,6 +1532,8 @@ private fun CaptureCard(
     onPreviewLoaded: (Capture, LinkPreview) -> Unit
 ) {
     val link = capture.text.startsWith("http://", true) || capture.text.startsWith("https://", true)
+    var expanded by remember(capture.id) { mutableStateOf(false) }
+    val hasExpandableContent = if (link) capture.previewDescription.length > 180 else capture.text.length > 220
     LaunchedEffect(capture.id, capture.text) {
         if (link && capture.previewTitle.isBlank() && capture.previewImageUrl.isBlank() && capture.previewDescription.isBlank()) {
             fetchLinkPreview(capture.text)?.let { onPreviewLoaded(capture, it) }
@@ -1561,10 +1563,16 @@ private fun CaptureCard(
                 Text(capture.previewTitle.ifBlank { host.ifBlank { capture.text } }, color = main,
                     fontSize = 14.sp * scale, lineHeight = 19.sp * scale, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 if (capture.previewDescription.isNotBlank()) Text(capture.previewDescription, color = muted,
-                    fontSize = 11.sp * scale, lineHeight = 16.sp * scale, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                    fontSize = 11.sp * scale, lineHeight = 16.sp * scale, maxLines = if (expanded) Int.MAX_VALUE else 3, overflow = TextOverflow.Ellipsis)
                 Text(capture.text, color = muted, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             } else {
-                Text(capture.text, color = main, fontSize = 13.sp * scale, lineHeight = 19.sp * scale, maxLines = 8, overflow = TextOverflow.Ellipsis)
+                Text(capture.text, color = main, fontSize = 13.sp * scale, lineHeight = 19.sp * scale,
+                    maxLines = if (expanded) Int.MAX_VALUE else 8, overflow = TextOverflow.Ellipsis)
+            }
+            if (hasExpandableContent) {
+                TextButton(onClick = { expanded = !expanded }, contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)) {
+                    Text(tr(lang, if (expanded) "showLess" else "readMore"), color = muted, fontSize = 10.sp)
+                }
             }
             Text(DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT, Locale.getDefault()).format(Date(capture.updatedAt)), color = muted, fontSize = 9.sp)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
