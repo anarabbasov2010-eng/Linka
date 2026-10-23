@@ -986,6 +986,17 @@ private fun LinkaApp(
                                 ) { InlineNotice(message, panel, border, main, muted, fontScale) }
                             }
                         }
+                        if (resurfaced != null) {
+                            SectionTitle(tr(lang, "rememberTitle"), main)
+                            Text(tr(lang, "rememberBody"), color = muted, fontSize = 11.sp, lineHeight = 16.sp)
+                            CaptureCard(resurfaced, lang, panel, raised, border, main, muted, fontScale,
+                                onPin = { item -> commit(captures.map { if (it.id == item.id) it.copy(pinned = !it.pinned, updatedAt = System.currentTimeMillis()) else it }) },
+                                onCopy = { copy(it.text); message = tr(lang, "copied") },
+                                onOpen = { open(it.text) },
+                                onEdit = { draft = it.text; editingId = it.id; tab = 0; message = tr(lang, "edit") },
+                                onDelete = { deleting = it },
+                                onPreviewLoaded = { item, preview -> commit(captures.map { c -> if (c.id == item.id) c.copy(previewTitle = preview.title, previewDescription = preview.description, previewImageUrl = preview.imageUrl) else c }) })
+                        }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             SectionTitle(tr(lang, "recent"), main, Modifier.weight(1f))
                             TextButton(onClick = { tab = 1 }) { Text(tr(lang, "seeAll"), color = muted, fontSize = 11.sp) }
@@ -995,7 +1006,8 @@ private fun LinkaApp(
                             onPin = { item -> commit(captures.map { if (it.id == item.id) it.copy(pinned = !it.pinned, updatedAt = System.currentTimeMillis()) else it }) },
                             onCopy = { copy(it.text); message = tr(lang, "copied") }, onOpen = { open(it.text) },
                             onEdit = { draft = it.text; editingId = it.id; tab = 0; message = tr(lang, "edit") },
-                            onDelete = { deleting = it })
+                            onDelete = { deleting = it },
+                            onPreviewLoaded = { item, preview -> commit(captures.map { c -> if (c.id == item.id) c.copy(previewTitle = preview.title, previewDescription = preview.description, previewImageUrl = preview.imageUrl) else c }) })
                         }
                         PrivacyCard(lang, panel, border, main, muted)
                     }
@@ -1015,7 +1027,8 @@ private fun LinkaApp(
                             onPin = { item -> commit(captures.map { if (it.id == item.id) it.copy(pinned = !it.pinned, updatedAt = System.currentTimeMillis()) else it }) },
                             onCopy = { copy(it.text); message = tr(lang, "copied") }, onOpen = { open(it.text) },
                             onEdit = { draft = it.text; editingId = it.id; tab = 0; message = tr(lang, "edit") },
-                            onDelete = { deleting = it })
+                            onDelete = { deleting = it },
+                            onPreviewLoaded = { item, preview -> commit(captures.map { c -> if (c.id == item.id) c.copy(previewTitle = preview.title, previewDescription = preview.description, previewImageUrl = preview.imageUrl) else c }) })
                         }
                         if (visible.size > visibleLimit) {
                             TextButton(onClick = { visibleLimit = (visibleLimit + 30).coerceAtMost(visible.size) }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
@@ -1250,21 +1263,44 @@ private fun FilterRow(lang: String, selected: String, onSelected: (String) -> Un
 @Composable
 private fun CaptureCard(
     capture: Capture, lang: String, panel: Color, raised: Color, border: Color, main: Color, muted: Color, scale: Float,
-    onPin: (Capture) -> Unit, onCopy: (Capture) -> Unit, onOpen: (Capture) -> Unit, onEdit: (Capture) -> Unit, onDelete: (Capture) -> Unit
+    onPin: (Capture) -> Unit, onCopy: (Capture) -> Unit, onOpen: (Capture) -> Unit, onEdit: (Capture) -> Unit, onDelete: (Capture) -> Unit,
+    onPreviewLoaded: (Capture, LinkPreview) -> Unit
 ) {
     val link = capture.text.startsWith("http://", true) || capture.text.startsWith("https://", true)
+    LaunchedEffect(capture.id, capture.text) {
+        if (link && capture.previewTitle.isBlank() && capture.previewImageUrl.isBlank() && capture.previewDescription.isBlank()) {
+            fetchLinkPreview(capture.text)?.let { onPreviewLoaded(capture, it) }
+        }
+    }
     Card(colors = CardDefaults.cardColors(containerColor = if (capture.pinned) raised else panel), border = BorderStroke(1.dp, border),
         shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth().animateContentSize(spring(dampingRatio = .82f, stiffness = 320f))) {
         Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 Icon(if (link) Icons.Outlined.Link else Icons.Outlined.NoteAlt, null, tint = muted, modifier = Modifier.size(16.dp))
-                Text(if (capture.pinned) tr(lang, "pinned").uppercase() else tr(lang, if (link) "links" else "notes").uppercase(), color = muted, fontSize = 9.sp, letterSpacing = 1.sp)
+                Text(if (capture.pinned) tr(lang, "pinned").uppercase() else tr(lang, captureTypeKey(capture)).uppercase(), color = muted, fontSize = 9.sp, letterSpacing = 1.sp)
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = { onPin(capture) }, modifier = Modifier.size(30.dp)) {
                     Icon(Icons.Outlined.PushPin, tr(lang, if (capture.pinned) "unpin" else "pin"), tint = if (capture.pinned) main else muted, modifier = Modifier.size(17.dp))
                 }
             }
-            Text(capture.text, color = main, fontSize = 13.sp * scale, lineHeight = 19.sp * scale, maxLines = 8, overflow = TextOverflow.Ellipsis)
+            if (link && capture.previewImageUrl.startsWith("https://", true)) {
+                AsyncImage(
+                    model = capture.previewImageUrl,
+                    contentDescription = capture.previewTitle.ifBlank { "Link preview" },
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 92.dp, max = 170.dp).clip(RoundedCornerShape(13.dp))
+                )
+            }
+            if (link) {
+                val host = Uri.parse(capture.text).host.orEmpty().removePrefix("www.")
+                Text(capture.previewTitle.ifBlank { host.ifBlank { capture.text } }, color = main,
+                    fontSize = 14.sp * scale, lineHeight = 19.sp * scale, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (capture.previewDescription.isNotBlank()) Text(capture.previewDescription, color = muted,
+                    fontSize = 11.sp * scale, lineHeight = 16.sp * scale, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                Text(capture.text, color = muted, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            } else {
+                Text(capture.text, color = main, fontSize = 13.sp * scale, lineHeight = 19.sp * scale, maxLines = 8, overflow = TextOverflow.Ellipsis)
+            }
             Text(DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT, Locale.getDefault()).format(Date(capture.updatedAt)), color = muted, fontSize = 9.sp)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
                 IconButton(onClick = { onCopy(capture) }, modifier = Modifier.size(32.dp)) { Icon(Icons.Outlined.ContentCopy, tr(lang, "copy"), tint = muted, modifier = Modifier.size(16.dp)) }
