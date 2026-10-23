@@ -1,8 +1,8 @@
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const projectUrl = String(process.env.LINKA_SUPABASE_URL || process.env.VITE_LINKA_SUPABASE_URL || "").trim().replace(/\/$/, "");
-const publishableKey = String(process.env.LINKA_SUPABASE_PUBLISHABLE_KEY || process.env.VITE_LINKA_SUPABASE_PUBLISHABLE_KEY || "").trim();
+const projectUrl = String(process.env.LINKA_SUPABASE_URL || process.env.VITE_LINKA_SUPABASE_URL || "https://imppocbirxwlvnfdfbll.supabase.co").trim().replace(/\/$/, "");
+const publishableKey = String(process.env.LINKA_SUPABASE_PUBLISHABLE_KEY || process.env.VITE_LINKA_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_MZT9UvH4uKukY3KpBQr3wQ_9HIP9xJB").trim();
 const config = {
   projectUrl: /^https:\/\//i.test(projectUrl) ? projectUrl : "",
   publishableKey: publishableKey.startsWith("sb_publishable_") || publishableKey.length > 40 ? publishableKey : ""
