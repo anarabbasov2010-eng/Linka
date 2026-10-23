@@ -408,7 +408,13 @@ private val extraWords = mapOf(
         "rememberTitle" to "A little throwback", "rememberBody" to "Something you saved a while ago.", "readMore" to "Read more", "showLess" to "Show less",
         "cloudSync" to "Cloud sync", "cloudSyncBody" to "Keep this library in sync between devices using your own free Supabase project.",
         "syncNow" to "Connect and sync", "createAccount" to "Create account", "syncEndpoint" to "Supabase project URL",
-        "syncAnonKey" to "Publishable / anon key", "syncEmail" to "Account email", "syncPassword" to "Password",
+        "syncAnonKey" to "Publishable / anon key", "syncEmail" to "Account email", "syncPassword" to "Six-digit email code",
+        "syncSendCode" to "Send sign-in code", "syncRegisterCode" to "Create account · send code",
+        "syncCodeSent" to "Code sent. Check your inbox and spam folder.",
+        "syncNeedCode" to "Request a fresh email code first.", "syncOtpExpired" to "Code expired. Request a new one.",
+        "syncQrApproved" to "Desktop sign-in approved.", "syncNeedSignInForQr" to "Sign in to approve the QR request.",
+        "syncWait" to "Resend available in", "syncVerifyAndSync" to "Verify code and sync",
+        "syncHelp" to "Enter the shared Linka project URL and public key. Request a one-time email code to create an account or sign in; passwords are not used or stored."
         "syncHelp" to "Create a free Supabase project, paste its Project URL and publishable key, then copy the SQL below into its SQL Editor. Your password is not saved; the refresh session is encrypted with Android Keystore.",
         "syncSetupSql" to "Copy database setup SQL", "syncForget" to "Forget this account", "syncClose" to "Close",
         "syncWorking" to "Syncing…", "syncCopied" to "SQL copied. Run it in Supabase → SQL Editor.",
@@ -420,7 +426,13 @@ private val extraWords = mapOf(
         "rememberTitle" to "Из прошлого", "rememberBody" to "То, что ты сохранил некоторое время назад.", "readMore" to "Развернуть", "showLess" to "Свернуть",
         "cloudSync" to "Облачная синхронизация", "cloudSyncBody" to "Синхронизируй библиотеку между устройствами через собственный бесплатный проект Supabase.",
         "syncNow" to "Подключить и синхронизировать", "createAccount" to "Создать аккаунт", "syncEndpoint" to "URL проекта Supabase",
-        "syncAnonKey" to "Публичный / anon-ключ", "syncEmail" to "Электронная почта", "syncPassword" to "Пароль",
+        "syncAnonKey" to "Публичный / anon-ключ", "syncEmail" to "Электронная почта", "syncPassword" to "Код из 6 цифр",
+        "syncSendCode" to "Получить код для входа", "syncRegisterCode" to "Создать аккаунт · получить код",
+        "syncCodeSent" to "Код отправлен. Проверь почту и папку «Спам».",
+        "syncNeedCode" to "Сначала запроси новый код из письма.", "syncOtpExpired" to "Срок действия кода истёк. Запроси новый.",
+        "syncQrApproved" to "Вход на компьютере подтверждён.", "syncNeedSignInForQr" to "Войди в аккаунт, чтобы подтвердить QR-вход.",
+        "syncWait" to "Повторный код через", "syncVerifyAndSync" to "Подтвердить код и синхронизировать",
+        "syncHelp" to "Укажи общий URL проекта Linka и публичный ключ. Запроси одноразовый код на почту для регистрации или входа; пароль не нужен и не сохраняется."
         "syncHelp" to "Создай бесплатный проект Supabase, вставь Project URL и публичный ключ, затем скопируй SQL ниже в SQL Editor проекта. Пароль не сохраняется; токен сессии шифруется Android Keystore.",
         "syncSetupSql" to "Скопировать SQL для базы", "syncForget" to "Отключить этот аккаунт", "syncClose" to "Закрыть",
         "syncWorking" to "Синхронизация…", "syncCopied" to "SQL скопирован. Выполни его в Supabase → SQL Editor.",
@@ -432,7 +444,13 @@ private val extraWords = mapOf(
         "rememberTitle" to "Keçmişdən bir xatirə", "rememberBody" to "Bir müddət əvvəl saxladığın material.", "readMore" to "Daha çox", "showLess" to "Yığcam et",
         "cloudSync" to "Bulud sinxronizasiyası", "cloudSyncBody" to "Öz pulsuz Supabase layihən vasitəsilə kitabxananı cihazlar arasında sinxronlaşdır.",
         "syncNow" to "Qoşul və sinxronlaşdır", "createAccount" to "Hesab yarat", "syncEndpoint" to "Supabase layihəsinin URL-i",
-        "syncAnonKey" to "Açıq / anon açarı", "syncEmail" to "E-poçt", "syncPassword" to "Şifrə",
+        "syncAnonKey" to "Açıq / anon açarı", "syncEmail" to "E-poçt", "syncPassword" to "6 rəqəmli e-poçt kodu",
+        "syncSendCode" to "Giriş kodu göndər", "syncRegisterCode" to "Hesab yarat · kod göndər",
+        "syncCodeSent" to "Kod göndərildi. E-poçtu və spam qovluğunu yoxla.",
+        "syncNeedCode" to "Əvvəlcə yeni e-poçt kodu istə.", "syncOtpExpired" to "Kodun vaxtı bitib. Yenidən istə.",
+        "syncQrApproved" to "Kompüter girişinə icazə verildi.", "syncNeedSignInForQr" to "QR girişini təsdiqləmək üçün hesabına daxil ol.",
+        "syncWait" to "Yeni kod üçün qalan vaxt", "syncVerifyAndSync" to "Təsdiqlə və sinxronlaşdır",
+        "syncHelp" to "Linka layihəsinin ümumi URL-ni və açıq açarını daxil et. Hesab yaratmaq və ya daxil olmaq üçün birdəfəlik e-poçt kodu istə; şifrə istifadə olunmur və saxlanılmır."
         "syncHelp" to "Pulsuz Supabase layihəsi yarat, Project URL və açıq açarı daxil et, sonra aşağıdakı SQL-i layihənin SQL Editor bölməsində icra et. Şifrə saxlanmır; sessiya Android Keystore ilə şifrələnir.",
         "syncSetupSql" to "Baza SQL-ini kopyala", "syncForget" to "Hesabı ayır", "syncClose" to "Bağla",
         "syncWorking" to "Sinxronizasiya…", "syncCopied" to "SQL kopyalandı. Supabase → SQL Editor bölməsində icra et.",
@@ -444,7 +462,13 @@ private val extraWords = mapOf(
         "rememberTitle" to "Geçmişten bir hatırlatma", "rememberBody" to "Bir süre önce kaydettiğin bir içerik.", "readMore" to "Daha fazla", "showLess" to "Daha az",
         "cloudSync" to "Bulut senkronizasyonu", "cloudSyncBody" to "Kendi ücretsiz Supabase projenle kitaplığını cihazlar arasında senkronize et.",
         "syncNow" to "Bağlan ve senkronize et", "createAccount" to "Hesap oluştur", "syncEndpoint" to "Supabase proje URL'si",
-        "syncAnonKey" to "Yayınlanabilir / anon anahtarı", "syncEmail" to "E-posta", "syncPassword" to "Şifre",
+        "syncAnonKey" to "Yayınlanabilir / anon anahtarı", "syncEmail" to "E-posta", "syncPassword" to "6 haneli e-posta kodu",
+        "syncSendCode" to "Giriş kodu gönder", "syncRegisterCode" to "Hesap oluştur · kod gönder",
+        "syncCodeSent" to "Kod gönderildi. Gelen kutunu ve spam klasörünü kontrol et.",
+        "syncNeedCode" to "Önce yeni bir e-posta kodu iste.", "syncOtpExpired" to "Kodun süresi doldu. Yeni bir kod iste.",
+        "syncQrApproved" to "Masaüstü girişine izin verildi.", "syncNeedSignInForQr" to "QR girişini onaylamak için hesabına giriş yap.",
+        "syncWait" to "Yeni kod için kalan süre", "syncVerifyAndSync" to "Kodu doğrula ve eşitle",
+        "syncHelp" to "Ortak Linka proje URL'sini ve herkese açık anahtarı gir. Hesap oluşturmak veya giriş yapmak için tek kullanımlık e-posta kodu iste; parola kullanılmaz veya saklanmaz."
         "syncHelp" to "Ücretsiz Supabase projesi oluştur, Project URL ve yayınlanabilir anahtarı gir, ardından aşağıdaki SQL'i SQL Editor'da çalıştır. Şifre kaydedilmez; oturum Android Keystore ile şifrelenir.",
         "syncSetupSql" to "Veritabanı SQL'ini kopyala", "syncForget" to "Bu hesabı unut", "syncClose" to "Kapat",
         "syncWorking" to "Senkronize ediliyor…", "syncCopied" to "SQL kopyalandı. Supabase → SQL Editor'da çalıştır.",
@@ -975,9 +999,52 @@ private fun LinkaApp(
     var cloudAnonKey by remember { mutableStateOf(prefs.getString(SYNC_ANON_KEY, "").takeIf { !it.isNullOrBlank() } ?: BuildConfig.LINKA_SUPABASE_PUBLISHABLE_KEY) }
     var cloudEmail by remember { mutableStateOf(prefs.getString(SYNC_EMAIL_KEY, "") ?: "") }
     var cloudPassword by remember { mutableStateOf("") }
+    var cloudOtp by remember { mutableStateOf("") }
+    var otpRequested by remember { mutableStateOf(false) }
+    var otpResendUntil by remember { mutableLongStateOf(0L) }
+    var otpExpiresAt by remember { mutableLongStateOf(0L) }
+    var otpRemainingSeconds by remember { mutableIntStateOf(0) }
+    var otpCooldownSeconds by remember { mutableIntStateOf(0) }
+    var pendingPairId by remember { mutableStateOf(prefs.getString("pending_pair_id", "") ?: "") }
+    var pendingPairSecret by remember { mutableStateOf(prefs.getString("pending_pair_secret", "") ?: "") }
     var cloudBusy by remember { mutableStateOf(false) }
     var cloudStatus by remember { mutableStateOf(prefs.getString(SYNC_STATUS_KEY, "") ?: "") }
     var pendingSyncJob by remember { mutableStateOf<Job?>(null) }
+    fun requestEmailCode(createAccount: Boolean) {
+        if (otpCooldownSeconds > 0) {
+            cloudStatus = "${tr(lang, "syncWait")} ${otpCooldownSeconds}s"
+            return
+        }
+        cloudBusy = true
+        scope.launch {
+            try {
+                prefs.edit().putString(SYNC_URL_KEY, cloudUrl.trim().trimEnd('/'))
+                    .putString(SYNC_ANON_KEY, cloudAnonKey.trim())
+                    .putString(SYNC_EMAIL_KEY, cloudEmail.trim()).apply()
+                requestEmailOtp(cloudUrl, cloudAnonKey, cloudEmail, createAccount)
+                otpRequested = true
+                cloudOtp = ""
+                otpResendUntil = System.currentTimeMillis() + 120_000L
+                otpExpiresAt = System.currentTimeMillis() + 120_000L
+                otpRemainingSeconds = 120
+                otpCooldownSeconds = 120
+                cloudStatus = tr(lang, "syncCodeSent")
+            } catch (e: Exception) {
+                cloudStatus = e.message ?: tr(lang, "failed")
+            } finally {
+                cloudBusy = false
+            }
+        }
+    }
+    LaunchedEffect(otpRequested, otpResendUntil, otpExpiresAt) {
+        while (otpRequested) {
+            val now = System.currentTimeMillis()
+            otpRemainingSeconds = ((otpExpiresAt - now).coerceAtLeast(0L) / 1000L).toInt()
+            otpCooldownSeconds = ((otpResendUntil - now).coerceAtLeast(0L) / 1000L).toInt()
+            if (otpRemainingSeconds == 0 && otpCooldownSeconds == 0) break
+            delay(1000L)
+        }
+    }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) runCatching {
             val raw = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: error("empty file")
@@ -1069,6 +1136,36 @@ private fun LinkaApp(
             }
             delay(60_000L)
         }
+    }
+    LaunchedEffect(pendingPairId, pendingPairSecret, cloudDialog) {
+        if (pendingPairId.isBlank() || pendingPairSecret.isBlank()) return@LaunchedEffect
+        val encrypted = prefs.getString(SYNC_REFRESH_KEY, "").orEmpty()
+        val url = cloudUrl
+        val key = cloudAnonKey
+        if (encrypted.isBlank()) {
+            cloudDialog = true
+            cloudStatus = tr(lang, "syncNeedSignInForQr")
+            return@LaunchedEffect
+        }
+        if (url.isBlank() || key.isBlank()) {
+            cloudDialog = true
+            cloudStatus = tr(lang, "syncNeedSignInForQr")
+            return@LaunchedEffect
+        }
+        cloudBusy = true
+        runCatching {
+            val updated = approveQrPairing(url, key, encrypted, pendingPairId, pendingPairSecret)
+            prefs.edit().putString(SYNC_REFRESH_KEY, updated)
+                .remove("pending_pair_id").remove("pending_pair_secret").apply()
+            pendingPairId = ""
+            pendingPairSecret = ""
+            cloudStatus = tr(lang, "syncQrApproved")
+            message = tr(lang, "syncQrApproved")
+        }.onFailure {
+            cloudStatus = it.message ?: tr(lang, "failed")
+            message = cloudStatus
+        }
+        cloudBusy = false
     }
     val visible = filterCaptures(captures, filter, if (tab == 2) query else "")
     val oldCaptures = captures.filter { it.updatedAt < System.currentTimeMillis() - 7L * 24L * 60L * 60L * 1000L }
@@ -1360,10 +1457,28 @@ private fun LinkaApp(
                 OutlinedTextField(value = cloudEmail, onValueChange = { cloudEmail = it }, label = { Text(tr(lang, "syncEmail")) },
                     singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
                     textStyle = TextStyle(color = main, fontSize = 12.sp), colors = fieldColors(bg, border, main, muted))
-                OutlinedTextField(value = cloudPassword, onValueChange = { cloudPassword = it }, label = { Text(tr(lang, "syncPassword")) },
-                    singleLine = true, visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
-                    textStyle = TextStyle(color = main, fontSize = 12.sp), colors = fieldColors(bg, border, main, muted))
+                if (otpRequested && prefs.getString(SYNC_REFRESH_KEY, "").orEmpty().isBlank()) {
+                    OutlinedTextField(value = cloudOtp, onValueChange = { cloudOtp = it.filter(Char::isDigit).take(6) },
+                        label = { Text(tr(lang, "syncPassword")) }, singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+                        textStyle = TextStyle(color = main, fontSize = 16.sp, letterSpacing = 4.sp),
+                        colors = fieldColors(bg, border, main, muted))
+                    Text(tr(lang, "syncWait") + " ${otpCooldownSeconds}s · " + tr(lang, "syncOtpExpired") + " ${otpRemainingSeconds}s",
+                        color = muted, fontSize = 10.sp, lineHeight = 15.sp)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.fillMaxWidth()) {
+                    TextButton(enabled = !cloudBusy && otpCooldownSeconds <= 0,
+                        onClick = { requestEmailCode(false) }, modifier = Modifier.weight(1f)) {
+                        Text(if (otpCooldownSeconds > 0) "${tr(lang, "syncSendCode")} · ${otpCooldownSeconds}s" else tr(lang, "syncSendCode"),
+                            color = main, fontSize = 10.sp)
+                    }
+                    TextButton(enabled = !cloudBusy && otpCooldownSeconds <= 0 && prefs.getString(SYNC_REFRESH_KEY, "").orEmpty().isBlank(),
+                        onClick = { requestEmailCode(true) }, modifier = Modifier.weight(1f)) {
+                        Text(if (otpCooldownSeconds > 0) "${tr(lang, "syncRegisterCode")} · ${otpCooldownSeconds}s" else tr(lang, "syncRegisterCode"),
+                            color = main, fontSize = 10.sp)
+                    }
+                }
                 TextButton(onClick = {
                     copy(CLOUD_SYNC_SETUP_SQL)
                     cloudStatus = tr(lang, "syncCopied")
@@ -1387,9 +1502,22 @@ private fun LinkaApp(
                 scope.launch {
                     try {
                         val stored = prefs.getString(SYNC_REFRESH_KEY, "").orEmpty()
+                        if (stored.isBlank() && !otpRequested) {
+                            cloudStatus = tr(lang, "syncNeedCode")
+                            return@launch
+                        }
+                        if (stored.isBlank() && otpRemainingSeconds <= 0) {
+                            cloudStatus = tr(lang, "syncOtpExpired")
+                            return@launch
+                        }
                         val rawDeleted = JSONArray(prefs.getString(DELETED_IDS_KEY, "[]") ?: "[]")
                         val deletedIds = (0 until rawDeleted.length()).map { rawDeleted.optString(it) }.filter { it.isNotBlank() }.toSet()
-                        val result = syncWithSupabase(cloudUrl, cloudAnonKey, cloudEmail, cloudPassword, false, captures, deletedIds, stored)
+                        val verifiedToken = if (stored.isBlank()) {
+                            verifyEmailOtp(cloudUrl, cloudAnonKey, cloudEmail, cloudOtp).also {
+                                prefs.edit().putString(SYNC_REFRESH_KEY, it).apply()
+                            }
+                        } else stored
+                        val result = syncWithSupabase(cloudUrl, cloudAnonKey, cloudEmail, "", false, captures, deletedIds, verifiedToken)
                         prefs.edit().putString(SYNC_REFRESH_KEY, result.encryptedRefreshToken)
                             .putString(DELETED_IDS_KEY, JSONArray().apply { result.deletedIds.forEach { put(it) } }.toString())
                             .putString(SYNC_STATUS_KEY, result.message).apply()
@@ -1397,6 +1525,16 @@ private fun LinkaApp(
                         save(result.captures)
                         cloudStatus = result.message
                         cloudPassword = ""
+                        cloudOtp = ""
+                        otpRequested = false
+                        if (pendingPairId.isNotBlank() && pendingPairSecret.isNotBlank()) {
+                            val approvedToken = approveQrPairing(cloudUrl, cloudAnonKey, result.encryptedRefreshToken, pendingPairId, pendingPairSecret)
+                            prefs.edit().putString(SYNC_REFRESH_KEY, approvedToken)
+                                .remove("pending_pair_id").remove("pending_pair_secret").apply()
+                            pendingPairId = ""
+                            pendingPairSecret = ""
+                            cloudStatus = tr(lang, "syncQrApproved")
+                        }
                     } catch (e: Exception) {
                         cloudStatus = e.message ?: "Cloud sync failed"
                     } finally {
@@ -1404,33 +1542,13 @@ private fun LinkaApp(
                     }
                 }
             }, shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = main, contentColor = bg)) {
-                Text(if (cloudBusy) tr(lang, "syncWorking") else tr(lang, "syncNow"), fontSize = 11.sp)
+                Text(if (cloudBusy) tr(lang, "syncWorking") else if (prefs.getString(SYNC_REFRESH_KEY, "").orEmpty().isBlank()) tr(lang, "syncVerifyAndSync") else tr(lang, "syncNow"), fontSize = 11.sp)
             }
         },
         dismissButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 if (prefs.getString(SYNC_REFRESH_KEY, "").orEmpty().isBlank()) TextButton(enabled = !cloudBusy, onClick = {
-                    cloudBusy = true
-                    prefs.edit().putString(SYNC_URL_KEY, cloudUrl.trim().trimEnd('/'))
-                        .putString(SYNC_ANON_KEY, cloudAnonKey.trim()).putString(SYNC_EMAIL_KEY, cloudEmail.trim()).apply()
-                    scope.launch {
-                        try {
-                            val rawDeleted = JSONArray(prefs.getString(DELETED_IDS_KEY, "[]") ?: "[]")
-                            val deletedIds = (0 until rawDeleted.length()).map { rawDeleted.optString(it) }.filter { it.isNotBlank() }.toSet()
-                            val result = syncWithSupabase(cloudUrl, cloudAnonKey, cloudEmail, cloudPassword, true, captures, deletedIds, "")
-                            prefs.edit().putString(SYNC_REFRESH_KEY, result.encryptedRefreshToken)
-                                .putString(DELETED_IDS_KEY, JSONArray().apply { result.deletedIds.forEach { put(it) } }.toString())
-                                .putString(SYNC_STATUS_KEY, result.message).apply()
-                            captures = result.captures
-                            save(result.captures)
-                            cloudStatus = result.message
-                            cloudPassword = ""
-                        } catch (e: Exception) {
-                            cloudStatus = e.message ?: "Cloud sync failed"
-                        } finally {
-                            cloudBusy = false
-                        }
-                    }
+                    requestEmailCode(true)
                 }) { Text(tr(lang, "createAccount"), color = main, fontSize = 10.sp) }
                 TextButton(enabled = !cloudBusy, onClick = { cloudDialog = false }) { Text(tr(lang, "syncClose"), color = muted, fontSize = 10.sp) }
             }
