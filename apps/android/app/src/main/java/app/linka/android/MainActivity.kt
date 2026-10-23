@@ -108,6 +108,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -145,18 +146,18 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import coil.compose.AsyncImage
 
-private val DB = Color(0xFF09090B)
-private val DS = Color(0xFF141417)
-private val DR = Color(0xFF1D1D22)
-private val DBR = Color(0xFF303036)
-private val DT = Color(0xFFF5F5F7)
-private val DM = Color(0xFF9898A2)
-private val LB = Color(0xFFF4F4F6)
-private val LS = Color(0xFFFFFFFF)
-private val LR = Color(0xFFF0F0F4)
-private val LBR = Color(0xFFE1E1E8)
-private val LT = Color(0xFF19191E)
-private val LM = Color(0xFF73737E)
+private val DB = Color(0xFF08090D)
+private val DS = Color(0xFF11141B)
+private val DR = Color(0xFF1B202B)
+private val DBR = Color(0xFF2B3342)
+private val DT = Color(0xFFF6F7FB)
+private val DM = Color(0xFF9AA5B7)
+private val LB = Color(0xFFF3F5F9)
+private val LS = Color(0xFFFCFDFF)
+private val LR = Color(0xFFEBEFF6)
+private val LBR = Color(0xFFDDE3EE)
+private val LT = Color(0xFF171B25)
+private val LM = Color(0xFF6D7789)
 private const val PREFS = "linka_local_v3"
 private const val CAPTURES_KEY = "captures"
 private const val THEME_KEY = "theme"
@@ -1083,7 +1084,7 @@ private fun LinkaApp(
         containerColor = bg,
         contentWindowInsets = WindowInsets.statusBars,
         bottomBar = {
-            NavigationBar(containerColor = panel, tonalElevation = 0.dp, windowInsets = WindowInsets.navigationBars) {
+            NavigationBar(containerColor = panel.copy(alpha = .96f), tonalElevation = 0.dp, windowInsets = WindowInsets.navigationBars) {
                 val items = listOf(
                     Triple(0, Icons.Outlined.Home, tr(lang, "home")),
                     Triple(1, Icons.Outlined.Inbox, tr(lang, "inbox")),
@@ -1106,17 +1107,22 @@ private fun LinkaApp(
                 else fadeIn(tween(durationMillis = 90)) togetherWith fadeOut(tween(durationMillis = 90))
             }, label = "linka-page"
         ) { page ->
-            Column(Modifier.fillMaxSize().background(bg).verticalScroll(rememberScrollState()).imePadding()
-                .padding(horizontal = 18.dp).padding(top = 12.dp, bottom = 24.dp),
+            Column(Modifier.fillMaxSize().background(
+                Brush.verticalGradient(
+                    if (dark) listOf(Color(0xFF111725), DB, Color(0xFF08090D))
+                    else listOf(Color(0xFFFFFFFF), LB, Color(0xFFEFF2F8))
+                )
+            ).verticalScroll(rememberScrollState()).imePadding()
+                .padding(horizontal = 18.dp).padding(top = 14.dp, bottom = 28.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Header(lang, main, muted, panel, border) { tab = 3 }
                 when (page) {
                     0 -> {
                         Text(tr(lang, "tagline"), color = muted, fontSize = 9.sp, letterSpacing = 1.8.sp,
                             fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 5.dp, bottom = 1.dp))
-                        Column(verticalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.padding(bottom = 3.dp)) {
-                            Text(tr(lang, "hero"), color = main, fontSize = 31.sp * fontScale, lineHeight = 36.sp * fontScale,
-                                fontWeight = FontWeight.Medium, letterSpacing = (-1.5).sp)
+                        Column(verticalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.padding(bottom = 5.dp)) {
+                            Text(tr(lang, "hero"), color = main, fontSize = 33.sp * fontScale, lineHeight = 38.sp * fontScale,
+                                fontWeight = FontWeight.SemiBold, letterSpacing = (-1.7).sp)
                             Text(tr(lang, "heroBody"), color = muted, fontSize = 13.sp * fontScale, lineHeight = 19.sp * fontScale)
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -1125,14 +1131,14 @@ private fun LinkaApp(
                             StatCard(captures.count { it.text.startsWith("http", true) }.toString(), tr(lang, "links"), panel, border, main, muted, Modifier.weight(1f))
                         }
                         SectionTitle(tr(lang, "quickCapture"), main)
-                        Card(colors = CardDefaults.cardColors(containerColor = panel), shape = RoundedCornerShape(22.dp),
-                            border = BorderStroke(1.dp, border), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                        Card(colors = CardDefaults.cardColors(containerColor = panel.copy(alpha = .94f)), shape = RoundedCornerShape(26.dp),
+                            border = BorderStroke(1.dp, border.copy(alpha = .82f)), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
                             modifier = Modifier.fillMaxWidth().animateContentSize(spring(dampingRatio = .82f, stiffness = 320f))) {
-                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
                                 OutlinedTextField(value = draft, onValueChange = { draft = it.take(MAX_CAPTURE_CHARS) }, modifier = Modifier.fillMaxWidth(),
                                     placeholder = { Text(tr(lang, "placeholder"), color = muted, fontSize = 13.sp * fontScale) },
                                     textStyle = TextStyle(color = main, fontSize = 14.sp * fontScale, lineHeight = 20.sp * fontScale),
-                                    minLines = 3, maxLines = 7, shape = RoundedCornerShape(15.dp), colors = fieldColors(bg, border, main, muted))
+                                    minLines = 3, maxLines = 7, shape = RoundedCornerShape(18.dp), colors = fieldColors(bg, border, main, muted))
                                 Button(onClick = {
                                     val text = draft.trim().take(MAX_CAPTURE_CHARS)
                                     if (text.isNotBlank()) {
@@ -1189,7 +1195,7 @@ private fun LinkaApp(
                         else OutlinedTextField(value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth(), singleLine = true,
                             leadingIcon = { Icon(Icons.Outlined.Search, null, tint = muted) },
                             placeholder = { Text(tr(lang, "searchHint"), color = muted, fontSize = 12.sp * fontScale) },
-                            textStyle = TextStyle(color = main, fontSize = 13.sp * fontScale), shape = RoundedCornerShape(15.dp),
+                            textStyle = TextStyle(color = main, fontSize = 13.sp * fontScale), shape = RoundedCornerShape(18.dp),
                             colors = fieldColors(panel, border, main, muted))
                         FilterRow(lang, filter, { filter = it })
                         Text("${visible.size} ${tr(lang, "items")}", color = muted, fontSize = 11.sp)
@@ -1485,8 +1491,8 @@ private fun LanguageWelcome(dark: Boolean, animations: Boolean, onContinue: (Str
 @Composable
 private fun Header(lang: String, main: Color, muted: Color, panel: Color, border: Color, onSettings: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Surface(shape = RoundedCornerShape(13.dp), color = panel, border = BorderStroke(1.dp, border)) {
-            androidx.compose.foundation.Image(painterResource(R.drawable.linka_mark), "Linka logo", Modifier.size(43.dp).padding(4.dp))
+        Surface(shape = RoundedCornerShape(16.dp), color = panel.copy(alpha = .96f), border = BorderStroke(1.dp, border)) {
+            androidx.compose.foundation.Image(painterResource(R.drawable.linka_mark), "Linka logo", Modifier.size(47.dp).padding(4.dp))
         }
         Column {
             Text("linka", color = main, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-1.4).sp)
@@ -1499,8 +1505,8 @@ private fun Header(lang: String, main: Color, muted: Color, panel: Color, border
 
 @Composable
 private fun StatCard(value: String, label: String, panel: Color, border: Color, main: Color, muted: Color, modifier: Modifier = Modifier) {
-    Card(modifier, shape = RoundedCornerShape(17.dp), colors = CardDefaults.cardColors(containerColor = panel), border = BorderStroke(1.dp, border)) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 13.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Card(modifier, shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = panel.copy(alpha = .96f)), border = BorderStroke(1.dp, border.copy(alpha = .82f)), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 15.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text(value, color = main, fontSize = 23.sp, fontWeight = FontWeight.Medium, letterSpacing = (-1).sp)
             Text(label, color = muted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
@@ -1556,8 +1562,8 @@ private fun CaptureCard(
     }
     Card(colors = CardDefaults.cardColors(containerColor = if (capture.pinned) raised else panel), border = BorderStroke(1.dp, border),
         elevation = CardDefaults.cardElevation(defaultElevation = if (capture.pinned) 2.dp else 1.dp),
-        shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth().animateContentSize(spring(dampingRatio = .82f, stiffness = 320f))) {
-        Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        shape = RoundedCornerShape(23.dp), modifier = Modifier.fillMaxWidth().animateContentSize(spring(dampingRatio = .82f, stiffness = 320f))) {
+        Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 Icon(if (link) Icons.Outlined.Link else Icons.Outlined.NoteAlt, null, tint = muted, modifier = Modifier.size(16.dp))
                 Text(if (capture.pinned) tr(lang, "pinned").uppercase() else tr(lang, captureTypeKey(capture)).uppercase(), color = muted, fontSize = 9.sp, letterSpacing = 1.sp)
@@ -1604,7 +1610,7 @@ private fun CaptureCard(
 private fun EmptyState(lang: String, panel: Color, border: Color, main: Color, muted: Color, titleKey: String = "empty") {
     Card(colors = CardDefaults.cardColors(containerColor = panel), border = BorderStroke(1.dp, border), shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().padding(23.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            Surface(color = if (MaterialTheme.colorScheme.background == DB) DR else LR, shape = CircleShape) {
+            Surface(color = if (MaterialTheme.colorScheme.background == DB) DR else LR, shape = RoundedCornerShape(17.dp)) {
                 Icon(Icons.Outlined.Inbox, null, tint = muted, modifier = Modifier.padding(12.dp).size(24.dp))
             }
             Text(tr(lang, titleKey), color = main, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
@@ -1628,8 +1634,8 @@ private fun PrivacyCard(lang: String, panel: Color, border: Color, main: Color, 
 }
 @Composable
 private fun SettingsGroup(title: String, panel: Color, border: Color, main: Color, content: @Composable () -> Unit) {
-    Card(colors = CardDefaults.cardColors(containerColor = panel), border = BorderStroke(1.dp, border), shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
+    Card(colors = CardDefaults.cardColors(containerColor = panel.copy(alpha = .96f)), border = BorderStroke(1.dp, border.copy(alpha = .82f)), shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
             Text(title, color = main, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
             content()
         }
