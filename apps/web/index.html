@@ -99,6 +99,48 @@ body{background:var(--bg);background-image:radial-gradient(ellipse at 8% 0%,rgba
     @media(max-width:620px){.shell{padding:17px 14px 36px}.topbar{margin-bottom:43px}.hero h1{font-size:clamp(42px,12vw,61px)}.hero p{font-size:13px}.capture{border-radius:22px;padding:12px}.compose{min-height:104px;padding:15px}.workspace{margin-top:38px}.toolbar{align-items:stretch;flex-direction:column}.grid{grid-template-columns:minmax(0,1fr);gap:12px}.filters{width:100%}.filter{flex:1;padding:9px 10px!important}.footer{margin-top:42px;flex-direction:column}.capture-card:hover,.card:hover{transform:none!important}}
     @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
 
+
+    .sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    .language-wrap{display:inline-flex;align-items:center}
+    .language-select{height:38px;min-width:54px;padding:0 10px;border:1px solid var(--line);border-radius:13px;background:var(--panel);color:var(--soft);font-size:11px;font-weight:650;letter-spacing:.04em;outline:none;cursor:pointer;transition:border-color .25s,background .25s,transform .25s}
+    .language-select:hover,.language-select:focus-visible{border-color:var(--line-strong);background:var(--panel-raised)}
+    .linka-enhanced .linka-reveal{opacity:0;transform:translate3d(0,16px,0) scale(.99);filter:blur(3px);transition:opacity .52s cubic-bezier(.2,.8,.2,1),transform .62s cubic-bezier(.2,.8,.2,1),filter .5s ease;transition-delay:calc(var(--linka-stagger,0)*48ms)}
+    .linka-enhanced .linka-reveal.linka-reveal-visible{opacity:1;transform:translate3d(0,0,0) scale(1);filter:blur(0)}
+    .linka-experience-panel{width:min(100%,510px)!important;max-height:min(88vh,860px);overflow:auto}
+    .linka-modal-copy{min-width:0}
+    .linka-modal-copy h2{margin:0 0 6px}
+    .linka-modal-copy p,.linka-muted{color:var(--muted);font-size:12px;line-height:1.7;margin:0}
+    .linka-field{display:flex;flex-direction:column;gap:7px;color:var(--soft);font-size:11px;font-weight:600;margin:7px 0}
+    .linka-input,.linka-select{width:100%;min-width:0;min-height:44px;border:1px solid var(--line);border-radius:12px;padding:11px 13px;background:color-mix(in srgb,var(--bg) 60%,transparent);color:var(--text);font-size:13px;outline:none;transition:border-color .25s,box-shadow .25s,background .25s}
+    .linka-input:focus,.linka-select:focus{border-color:var(--line-strong);box-shadow:0 0 0 3px color-mix(in srgb,var(--text) 5%,transparent)}
+    .linka-form-stack{display:grid;gap:12px;margin-top:12px}
+    .linka-button{display:inline-flex;justify-content:center;align-items:center;gap:8px;min-height:42px;padding:11px 15px;border:1px solid var(--text);border-radius:12px;background:var(--text);color:var(--bg);font-size:12px;font-weight:650;transition:transform .25s,opacity .2s,background .25s,border-color .25s;cursor:pointer}
+    .linka-button:hover{transform:translateY(-1px)}
+    .linka-button:disabled{opacity:.45;cursor:not-allowed;transform:none}
+    .linka-button-secondary{background:var(--panel-raised);border-color:var(--line);color:var(--text)}
+    .linka-button-danger{background:transparent;color:#e78686;border-color:color-mix(in srgb,#e78686 35%,var(--line))}
+    .linka-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px}
+    .linka-actions .linka-button{flex:1 1 145px}
+    .linka-status{min-height:18px;margin:4px 0 0;color:var(--muted);font-size:11px;line-height:1.55;overflow-wrap:anywhere}
+    .linka-status[data-state="error"]{color:#e78686}
+    .linka-config{margin:14px 0;border:1px solid var(--line);border-radius:13px;padding:11px 13px}
+    .linka-config summary{color:var(--muted);font-size:11px;cursor:pointer;user-select:none}
+    .linka-form-stack .linka-button{width:100%}
+    .linka-settings-block{margin:18px 0;padding:15px 0;border-top:1px solid var(--line)}
+    .linka-settings-block h3{font-size:13px;letter-spacing:-.02em;margin:0 0 8px}
+    .linka-settings-block .linka-muted{margin-bottom:12px}
+    .linka-qr-area{display:flex;flex-direction:column;align-items:center;gap:9px;margin-top:14px}
+    .linka-qr-image{width:220px;height:220px;max-width:100%;padding:8px;border-radius:15px;background:#fff;image-rendering:auto}
+    .linka-update-banner{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:0 0 24px;padding:14px 16px;border:1px solid var(--line-strong);border-radius:16px;background:var(--panel);animation:rise .45s cubic-bezier(.2,.8,.2,1) both}
+    .linka-update-copy{display:flex;flex-direction:column;gap:4px;min-width:0}
+    .linka-update-copy strong{font-size:12px}.linka-update-copy span{font-size:11px;color:var(--muted)}
+    .linka-update-banner .linka-button{flex:0 0 auto}
+    .linka-onboarding-layer{align-items:center}
+    .linka-onboarding-layer .modal{box-shadow:0 32px 110px rgba(0,0,0,.48)}
+    .linka-onboarding-layer .modal-head{margin-bottom:20px}
+    @media(max-width:640px){.privacy{display:none}.top-actions{gap:7px}.language-select{min-width:48px;padding:0 7px}.linka-update-banner{align-items:flex-start;flex-direction:column}.linka-update-banner .linka-button{width:100%}.linka-actions{flex-direction:column}.linka-experience-panel{padding:19px}}
+    @media(prefers-reduced-motion:reduce){.linka-enhanced .linka-reveal{opacity:1!important;transform:none!important;filter:none!important;transition:none!important}}
+
   </style>
 </head>
 <body>
@@ -106,7 +148,7 @@ body{background:var(--bg);background-image:radial-gradient(ellipse at 8% 0%,rgba
   <main class="shell" id="app">
     <header class="topbar">
       <a class="brand" href="#" aria-label="Linka home"><img src="/linka-mark.svg" alt=""><span class="brand-name">linka</span></a>
-      <div class="top-actions"><div class="privacy"><span class="dot"></span>Private by default · local-first</div><button class="icon-btn search-open" id="search-space-button" type="button" aria-label="Search your library" title="Search your library (Ctrl/⌘ K)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.8" cy="10.8" r="6.5"/><path d="m16 16 4 4"/></svg></button><button class="icon-btn" id="settings-button" type="button" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.7 2.95-.08-.02a1.7 1.7 0 0 0-1.82.4l-.06.06h-3.4l-.04-.08a1.7 1.7 0 0 0-1.55-1.03 1.7 1.7 0 0 0-1.2.49l-.07.06-2.95-1.7.02-.08a1.7 1.7 0 0 0-.4-1.82l-.06-.06v-3.4l.08-.04a1.7 1.7 0 0 0 1.03-1.55 1.7 1.7 0 0 0-.49-1.2l-.06-.07 1.7-2.95.08.02a1.7 1.7 0 0 0 1.82-.4l.06-.06h3.4l.04.08a1.7 1.7 0 0 0 1.55 1.03 1.7 1.7 0 0 0 1.2-.49l.07-.06 2.95 1.7-.02.08a1.7 1.7 0 0 0 .4 1.82l.06.06v3.4z" transform="translate(-.5 -.5) scale(1.04)"/></svg></button></div>
+      <div class="top-actions"><div class="privacy"><span class="dot"></span>Private by default · local-first</div><label class="language-wrap" aria-label="Application language"><span class="sr-only">Language</span><select id="linka-language" class="language-select" aria-label="Application language"><option value="en">EN</option><option value="ru">RU</option><option value="az">AZ</option><option value="tr">TR</option></select></label><button class="icon-btn search-open" id="search-space-button" type="button" aria-label="Search your library" title="Search your library (Ctrl/⌘ K)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.8" cy="10.8" r="6.5"/><path d="m16 16 4 4"/></svg></button><button class="icon-btn" id="settings-button" type="button" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.7 2.95-.08-.02a1.7 1.7 0 0 0-1.82.4l-.06.06h-3.4l-.04-.08a1.7 1.7 0 0 0-1.55-1.03 1.7 1.7 0 0 0-1.2.49l-.07.06-2.95-1.7.02-.08a1.7 1.7 0 0 0-.4-1.82l-.06-.06v-3.4l.08-.04a1.7 1.7 0 0 0 1.03-1.55 1.7 1.7 0 0 0-.49-1.2l-.06-.07 1.7-2.95.08.02a1.7 1.7 0 0 0 1.82-.4l.06-.06h3.4l.04.08a1.7 1.7 0 0 0 1.55 1.03 1.7 1.7 0 0 0 1.2-.49l.07-.06 2.95 1.7-.02.08a1.7 1.7 0 0 0 .4 1.82l.06.06v3.4z" transform="translate(-.5 -.5) scale(1.04)"/></svg></button></div>
     </header>
     <section class="hero">
       <div class="eyebrow">Your personal library</div>
