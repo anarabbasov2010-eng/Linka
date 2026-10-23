@@ -18,9 +18,11 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.Locale
 
 private const val LINKA_PREFS = "linka_local_v3"
 private const val UPDATE_ALERTS_KEY = "update_alerts"
+private const val LANGUAGE_KEY = "language"
 private const val LAST_NOTIFIED_KEY = "last_notified_version"
 private const val CHANNEL_ID = "linka_updates"
 private const val RELEASE_URL = "https://api.github.com/repos/anarabbasov2010-eng/Linka/releases/latest"
@@ -46,13 +48,19 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters) : Worker(con
                 val latestVersion = release.optString("tag_name", "").removePrefix("v")
                 val assets = release.optJSONArray("assets") ?: JSONArray()
                 var apkUrl = ""
+                var fallbackApkUrl = ""
                 for (i in 0 until assets.length()) {
                     val asset = assets.optJSONObject(i) ?: continue
-                    if (asset.optString("name", "").endsWith(".apk", ignoreCase = true)) {
-                        apkUrl = asset.optString("browser_download_url", "")
-                        if (asset.optString("name", "").contains("release", ignoreCase = true)) break
+                    val name = asset.optString("name", "")
+                    if (name.endsWith(".apk", ignoreCase = true)) {
+                        if (fallbackApkUrl.isBlank()) fallbackApkUrl = asset.optString("browser_download_url", "")
+                        if (name.startsWith("Linka-Android-", ignoreCase = true)) {
+                            apkUrl = asset.optString("browser_download_url", "")
+                            break
+                        }
                     }
                 }
+                if (apkUrl.isBlank()) apkUrl = fallbackApkUrl
                 if (latestVersion.isBlank() || apkUrl.isBlank()) return Result.success()
 
                 val currentVersion = applicationContext.packageManager
@@ -83,6 +91,19 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters) : Worker(con
                         ?: Intent(applicationContext, MainActivity::class.java),
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
+                val language = (prefs.getString(LANGUAGE_KEY, "") ?: "").ifBlank { Locale.getDefault().language }.lowercase(Locale.ROOT)
+                val title = when (language) {
+                    "ru" -> "Доступна Linka $latestVersion"
+                    "az" -> "Linka $latestVersion mövcuddur"
+                    "tr" -> "Linka $latestVersion hazır"
+                    else -> "Linka $latestVersion is available"
+                }
+                val text = when (language) {
+                    "ru" -> if (downloadedFile != null) "Обновление скачано. Открой Linka, чтобы установить его." else "Открой Linka, чтобы скачать обновление."
+                    "az" -> if (downloadedFile != null) "Yeniləmə endirildi. Quraşdırmaq üçün Linka-nı aç." else "Yeniləməni endirmək üçün Linka-nı aç."
+                    "tr" -> if (downloadedFile != null) "Güncelleme indirildi. Kurmak için Linka'yı aç." else "Güncellemeyi indirmek için Linka'yı aç."
+                    else -> if (downloadedFile != null) "Update downloaded. Open Linka to install it." else "Open Linka to download the update."
+                }
                 val notification = if (Build.VERSION.SDK_INT >= 26) {
                     android.app.Notification.Builder(applicationContext, CHANNEL_ID)
                 } else {
@@ -91,10 +112,11 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters) : Worker(con
                 }
                 manager.notify(4107, notification
                     .setSmallIcon(android.R.drawable.stat_sys_download_done)
-                    .setContentTitle("Linka $latestVersion is available")
-                    .setContentText(if (downloadedFile != null) "Update downloaded. Open Linka to apply it." else "A new version is available. Open Linka to download it.")
+                    .setContentTitle(title)
+                    .setContentText(text)
                     .setContentIntent(pending)
                     .setAutoCancel(true)
+                    .setPriority(android.app.Notification.PRIORITY_DEFAULT)
                     .build())
                 prefs.edit().putString(LAST_NOTIFIED_KEY, latestVersion).apply()
                 Result.success()
@@ -111,7 +133,10 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters) : Worker(con
         val folder = File(applicationContext.cacheDir, "updates").apply { mkdirs() }
         val safeVersion = version.replace(Regex("[^A-Za-z0-9._-]"), "_")
         val target = File(folder, "linka-update-$safeVersion.apk")
-        if (target.isFile && target.length() > 1024L) return target
+        if (target.isFile && target.length() > 1024L) {
+            if (validateLinkaUpdateApk(applicationContext, target) == null) return target
+            target.delete()
+        }
         val temp = File(folder, "linka-update-$safeVersion.apk.part")
         return try {
             val connection = (URL(url).openConnection() as HttpURLConnection).apply {
@@ -140,6 +165,7 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters) : Worker(con
                 if (temp.length() < 1024L) return null
                 val magic = temp.inputStream().use { input -> ByteArray(4).also { input.read(it) } }
                 if (magic[0] != 0x50.toByte() || magic[1] != 0x4b.toByte()) return null
+                if (validateLinkaUpdateApk(applicationContext, temp) != null) return null
                 if (target.exists()) target.delete()
                 if (!temp.renameTo(target)) return null
                 target
