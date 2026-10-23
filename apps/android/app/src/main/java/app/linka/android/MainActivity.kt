@@ -277,6 +277,7 @@ private val words = mapOf(
 private fun tr(lang: String, key: String) = words[lang]?.get(key) ?: words["en"]?.get(key) ?: key
 
 class MainActivity : ComponentActivity() {
+    private var incomingSharedText by mutableStateOf("")
     private var updateInfo by mutableStateOf<UpdateInfo?>(null)
     private var updateStatus by mutableStateOf("")
     private var checkingUpdates by mutableStateOf(false)
@@ -310,11 +311,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val shared = when (intent?.action) {
-            Intent.ACTION_SEND -> intent?.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString().orEmpty().take(MAX_CAPTURE_CHARS)
-            Intent.ACTION_PROCESS_TEXT -> intent?.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString().orEmpty().take(MAX_CAPTURE_CHARS)
-            else -> ""
-        }
+        incomingSharedText = extractSharedText(intent)
         checkForUpdate(true)
         setContent {
             var theme by remember { mutableStateOf(prefs().getString(THEME_KEY, "dark") ?: "dark") }
@@ -331,7 +328,7 @@ class MainActivity : ComponentActivity() {
                 background = LB, surface = LS, primary = LT, onPrimary = LS, onBackground = LT, onSurface = LT, surfaceVariant = LR, outline = LBR
             )) {
                 LinkaApp(
-                    sharedText = shared, load = { loadCaptures() }, save = { saveCaptures(it) },
+                    sharedText = incomingSharedText, load = { loadCaptures() }, save = { saveCaptures(it) },
                     copy = { copyText(it) }, open = { openExternal(it) },
                     theme = theme, setTheme = { theme = it; prefs().edit().putString(THEME_KEY, it).apply() },
                     language = language, setLanguage = { language = it; prefs().edit().putString(LANGUAGE_KEY, it).apply() },
@@ -348,7 +345,16 @@ class MainActivity : ComponentActivity() {
                     updateInfo = updateInfo, updateStatus = updateStatus, checking = checkingUpdates,
                     checkUpdates = { checkForUpdate(false) }, openUpdate = { openExternal(it) },
                     version = appVersion(), accepted = accepted,
-                    agree = { prefs().edit().putString(TERMS_KEY, TERMS_VERSION).apply(); accepted = true },
+                    agree = {
+                        prefs().edit().putString(TERMS_KEY, TERMS_VERSION).apply()
+                        accepted = true
+                        if (Build.VERSION.SDK_INT >= 33 && alerts &&
+                            !prefs().getBoolean("notification_permission_asked", false) &&
+                            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                            prefs().edit().putBoolean("notification_permission_asked", true).apply()
+                            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 7402)
+                        }
+                    },
                     decline = { finish() }
                 )
             }
@@ -356,7 +362,27 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent); setIntent(intent)
+        super.onNewIntent(intent)
+        setIntent(intent)
+        incomingSharedText = extractSharedText(intent)
+    }
+
+    private fun extractSharedText(intent: Intent?): String {
+        if (intent == null) return ""
+        return when (intent.action) {
+            Intent.ACTION_SEND -> intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString().orEmpty().take(MAX_CAPTURE_CHARS)
+            Intent.ACTION_PROCESS_TEXT -> intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString().orEmpty().take(MAX_CAPTURE_CHARS)
+            else -> ""
+        }
+    }
+
+    @Deprecated("Deprecated in Android API 33")
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 7402 && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+            val found = updateInfo
+            if (found != null && notifyUpdate(found)) prefs().edit().putString(LAST_NOTIFIED_KEY, found.version).apply()
+        }
     }
 
     private fun checkForUpdate(quiet: Boolean) {
@@ -396,9 +422,8 @@ class MainActivity : ComponentActivity() {
                 updateStatus = status
                 if (newer != null && prefs().getBoolean(UPDATE_ALERTS_KEY, true)) {
                     val last = prefs().getString(LAST_NOTIFIED_KEY, "") ?: ""
-                    if (last != newer!!.version) {
+                    if (last != newer!!.version && notifyUpdate(newer!!)) {
                         prefs().edit().putString(LAST_NOTIFIED_KEY, newer!!.version).apply()
-                        notifyUpdate(newer!!)
                     }
                 }
             }
@@ -415,8 +440,8 @@ class MainActivity : ComponentActivity() {
         return 0
     }
 
-    private fun notifyUpdate(info: UpdateInfo) {
-        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
+    private fun notifyUpdate(info: UpdateInfo): Boolean {
+        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return false
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= 26) manager.createNotificationChannel(NotificationChannel(NOTIFICATION_CHANNEL, "Linka updates", NotificationManager.IMPORTANCE_DEFAULT))
         val pending = PendingIntent.getActivity(this, 42, Intent(Intent.ACTION_VIEW, Uri.parse(info.downloadUrl)),
@@ -428,6 +453,7 @@ class MainActivity : ComponentActivity() {
             .setContentTitle("Linka ${info.version} is available")
             .setContentText("Tap to download the latest Android version.")
             .setContentIntent(pending).setAutoCancel(true).build())
+        return true
     }
 }
 
@@ -450,6 +476,7 @@ private fun LinkaApp(
     val context = LocalContext.current
     var captures by remember { mutableStateOf(load()) }
     var draft by remember { mutableStateOf(sharedText) }
+    var editingId by remember { mutableStateOf<String?>(null) }
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf("all") }
     var tab by remember { mutableStateOf(0) }
@@ -477,6 +504,13 @@ private fun LinkaApp(
     fun commit(list: List<Capture>) {
         captures = list.sortedWith(compareByDescending<Capture> { it.pinned }.thenByDescending { it.updatedAt }).take(MAX_CAPTURES)
         save(captures)
+    }
+    LaunchedEffect(sharedText) {
+        if (sharedText.isNotBlank()) {
+            draft = sharedText
+            editingId = null
+            tab = 0
+        }
     }
     val visible = captures.filter { c ->
         val isLink = c.text.startsWith("http://", true) || c.text.startsWith("https://", true)
@@ -544,13 +578,18 @@ private fun LinkaApp(
                                     val text = draft.trim().take(MAX_CAPTURE_CHARS)
                                     if (text.isNotBlank()) {
                                         val now = System.currentTimeMillis()
-                                        commit(listOf(Capture(UUID.randomUUID().toString(), text, now, now)) + captures)
-                                        draft = ""; message = tr(lang, "saved")
+                                        val editing = editingId
+                                        if (editing == null) commit(listOf(Capture(UUID.randomUUID().toString(), text, now, now)) + captures)
+                                        else commit(captures.map { if (it.id == editing) it.copy(text = text, updatedAt = now) else it })
+                                        draft = ""; editingId = null; message = tr(lang, "saved")
                                     }
                                 }, enabled = draft.isNotBlank(), modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(14.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = main, contentColor = bg)) {
                                     Icon(Icons.Outlined.Add, null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
                                     Text(tr(lang, "save"), fontSize = 13.sp * fontScale, fontWeight = FontWeight.SemiBold)
+                                }
+                                if (editingId != null) TextButton(onClick = { draft = ""; editingId = null; message = "" }, modifier = Modifier.align(Alignment.End)) {
+                                    Text(tr(lang, "cancel"), color = muted, fontSize = 11.sp)
                                 }
                                 AnimatedVisibility(message.isNotBlank(), enter = fadeIn() + slideInVertically { it / 4 }, exit = fadeOut()) {
                                     Text(message, color = muted, fontSize = 11.sp * fontScale)
@@ -565,7 +604,7 @@ private fun LinkaApp(
                         else captures.take(3).forEach { c -> CaptureCard(c, lang, panel, raised, border, main, muted, fontScale,
                             onPin = { item -> commit(captures.map { if (it.id == item.id) it.copy(pinned = !it.pinned, updatedAt = System.currentTimeMillis()) else it }) },
                             onCopy = { copy(it.text); message = tr(lang, "copied") }, onOpen = { open(it.text) },
-                            onEdit = { draft = it.text; commit(captures.filterNot { x -> x.id == it.id }); tab = 0 },
+                            onEdit = { draft = it.text; editingId = it.id; tab = 0; message = tr(lang, "edit") },
                             onDelete = { deleting = it })
                         }
                         PrivacyCard(lang, panel, border, main, muted)
