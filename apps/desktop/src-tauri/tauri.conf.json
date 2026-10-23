@@ -10,24 +10,31 @@
     "frontendDist": "../../web/dist"
   },
   "app": {
-    "windows": [{
-      "title": "Linka",
-      "width": 1120,
-      "height": 780,
-      "minWidth": 760,
-      "minHeight": 560,
-      "center": true
-    }],
+    "windows": [
+      {
+        "title": "Linka",
+        "width": 1120,
+        "height": 780,
+        "minWidth": 760,
+        "minHeight": 560,
+        "center": true
+      }
+    ],
     "security": {
       "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data: blob: https:; connect-src 'self' https://api.github.com https://*.supabase.co"
     }
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
-    "icon": ["icons/icon.ico"],
+    "targets": [
+      "nsis"
+    ],
+    "icon": [
+      "icons/icon.ico"
+    ],
     "category": "Productivity",
     "shortDescription": "A private local-first inbox",
-    "longDescription": "Save, search and organise links, thoughts and text locally."
+    "longDescription": "Save, search and organise links, thoughts and text locally.",
+    "createUpdaterArtifacts": false
   }
 }
