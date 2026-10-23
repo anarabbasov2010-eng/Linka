@@ -1409,7 +1409,7 @@ private fun LinkaApp(
                             TextButton(onClick = { tab = 1 }) { Text(tr(lang, "seeAll"), color = muted, fontSize = 11.sp) }
                         }
                         if (captures.isEmpty()) EmptyState(lang, panel, border, main, muted)
-                        else captures.take(3).forEach { c -> CaptureCard(c, lang, panel, raised, border, main, muted, fontScale, density,
+                        else captures.take(3).forEach { c -> CaptureCard(c, lang, panel, raised, border, main, muted, fontScale, density, animations,
                             onPin = { item -> commit(captures.map { if (it.id == item.id) it.copy(pinned = !it.pinned, updatedAt = System.currentTimeMillis()) else it }) },
                             onCopy = { copy(it.text); message = tr(lang, "copied") }, onOpen = { open(it.text) },
                             onEdit = { draft = it.text; editingId = it.id; tab = 0; message = tr(lang, "edit") },
@@ -1915,7 +1915,7 @@ private fun FilterRow(lang: String, selected: String, onSelected: (String) -> Un
 
 @Composable
 private fun CaptureCard(
-    capture: Capture, lang: String, panel: Color, raised: Color, border: Color, main: Color, muted: Color, scale: Float, density: String,
+    capture: Capture, lang: String, panel: Color, raised: Color, border: Color, main: Color, muted: Color, scale: Float, density: String, animations: Boolean,
     onPin: (Capture) -> Unit, onCopy: (Capture) -> Unit, onOpen: (Capture) -> Unit, onEdit: (Capture) -> Unit, onDelete: (Capture) -> Unit,
     onPreviewLoaded: (Capture, LinkPreview) -> Unit
 ) {
@@ -1929,7 +1929,7 @@ private fun CaptureCard(
     }
     Card(colors = CardDefaults.cardColors(containerColor = if (capture.pinned) raised else panel), border = BorderStroke(1.dp, border),
         elevation = CardDefaults.cardElevation(defaultElevation = if (capture.pinned) 2.dp else 1.dp),
-        shape = RoundedCornerShape(23.dp), modifier = Modifier.fillMaxWidth().animateContentSize(spring(dampingRatio = .82f, stiffness = 320f))) {
+        shape = RoundedCornerShape(23.dp), modifier = Modifier.fillMaxWidth().then(if (animations) Modifier.animateContentSize(spring(dampingRatio = .82f, stiffness = 320f)) else Modifier)) {
         Column(Modifier.padding(when (density) { "compact" -> 12.dp; "spacious" -> 21.dp; else -> 15.dp }), verticalArrangement = Arrangement.spacedBy(when (density) { "compact" -> 6.dp; "spacious" -> 13.dp; else -> 9.dp })) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 Icon(if (link) Icons.Outlined.Link else Icons.Outlined.NoteAlt, null, tint = muted, modifier = Modifier.size(16.dp))
