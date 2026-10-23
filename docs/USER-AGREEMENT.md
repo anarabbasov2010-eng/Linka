@@ -1,6 +1,6 @@
 # Linka — In-app User Agreement
 
-**Version:** 2026-10-23-v1
+**Version:** 2026-10-23-v2
 
 This notice describes the behaviour of the current Linka preview. It is displayed on first launch and the acknowledgement is stored locally on the device/browser profile.
 
@@ -8,9 +8,9 @@ This notice describes the behaviour of the current Linka preview. It is displaye
 
 Linka saves captures in local application storage or browser-local storage, depending on the platform. Clearing app/browser data, uninstalling, resetting the device, a storage failure, or device loss can permanently delete captures. Users are responsible for exporting and protecting backup copies.
 
-## 2. No automatic cross-device synchronization
+## 2. Optional cloud synchronization
 
-This preview does not provide a shared account, cloud database or automatic cross-device synchronization. Transfers between platforms are manual through supported export, import, or share-sheet functions.
+Linka supports optional cross-device sync when you configure the same Supabase project and sign in to the same Linka account on each device. Cloud sync is not preconfigured and requires a project URL, a public publishable/anon key and an RLS-protected `linka_sync` table. Local storage and manual JSON export/import remain available. Keep independent backups of important information; cloud sync is not a guaranteed backup.
 
 ## 3. User responsibility and lawful use
 
@@ -26,6 +26,6 @@ Linka is an early-stage utility. Features may change and software may contain de
 
 ## 6. Acknowledgement
 
-Selecting “I agree” confirms that the user has read and understood this notice, including the local-storage limitations and the absence of automatic synchronization.
+Selecting “I agree” confirms that the user has read and understood this notice, including the local-storage limitations and the optional nature of cloud synchronization.
 
 This product agreement is a practical in-app notice, not professional legal advice. Before public commercial distribution, have the terms reviewed for the applicable jurisdictions and decide what support, privacy and liability provisions are appropriate.
