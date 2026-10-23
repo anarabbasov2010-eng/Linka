@@ -136,6 +136,8 @@ import java.util.Locale
 import java.util.UUID
 import java.time.LocalDate
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import coil.compose.AsyncImage
 
@@ -841,6 +843,7 @@ private fun LinkaApp(
     var cloudPassword by remember { mutableStateOf("") }
     var cloudBusy by remember { mutableStateOf(false) }
     var cloudStatus by remember { mutableStateOf(prefs.getString(SYNC_STATUS_KEY, "") ?: "") }
+    var pendingSyncJob by remember { mutableStateOf<Job?>(null) }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) runCatching {
             val raw = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: error("empty file")
@@ -871,6 +874,29 @@ private fun LinkaApp(
         }
         captures = normalized
         save(captures)
+        val token = prefs.getString(SYNC_REFRESH_KEY, "").orEmpty()
+        val url = prefs.getString(SYNC_URL_KEY, "").orEmpty()
+        val anon = prefs.getString(SYNC_ANON_KEY, "").orEmpty()
+        val email = prefs.getString(SYNC_EMAIL_KEY, "").orEmpty()
+        if (token.isNotBlank() && url.isNotBlank() && anon.isNotBlank() && email.isNotBlank()) {
+            pendingSyncJob?.cancel()
+            pendingSyncJob = scope.launch {
+                delay(1200L)
+                try {
+                    val rawDeleted = JSONArray(prefs.getString(DELETED_IDS_KEY, "[]") ?: "[]")
+                    val deleted = (0 until rawDeleted.length()).map { rawDeleted.optString(it) }.filter { it.isNotBlank() }.toSet()
+                    val result = syncWithSupabase(url, anon, email, "", false, captures, deleted, prefs.getString(SYNC_REFRESH_KEY, "").orEmpty())
+                    prefs.edit().putString(SYNC_REFRESH_KEY, result.encryptedRefreshToken)
+                        .putString(DELETED_IDS_KEY, JSONArray().apply { result.deletedIds.forEach { put(it) } }.toString())
+                        .putString(SYNC_STATUS_KEY, result.message).apply()
+                    captures = result.captures
+                    save(result.captures)
+                    cloudStatus = result.message
+                } catch (e: Exception) {
+                    cloudStatus = e.message ?: "Cloud sync failed"
+                }
+            }
+        }
     }
     LaunchedEffect(sharedText, sharedTrigger) {
         val incoming = sharedText.trim().take(MAX_CAPTURE_CHARS)
