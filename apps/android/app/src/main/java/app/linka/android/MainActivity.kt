@@ -286,6 +286,7 @@ class MainActivity : ComponentActivity() {
     private var updateInfo by mutableStateOf<UpdateInfo?>(null)
     private var updateStatus by mutableStateOf("")
     private var checkingUpdates by mutableStateOf(false)
+    private var permissionDialogPending = false
     private fun prefs() = getSharedPreferences(PREFS, MODE_PRIVATE)
     private fun appVersion() = runCatching { packageManager.getPackageInfo(packageName, 0).versionName ?: "0.4.0" }.getOrDefault("0.4.0")
     private fun loadCaptures(): List<Capture> = try {
@@ -342,6 +343,7 @@ class MainActivity : ComponentActivity() {
                     fontScale = fontScale, setFontScale = { fontScale = it; prefs().edit().putFloat(FONT_SCALE_KEY, it).apply() },
                     alerts = alerts, setAlerts = { enabled ->
                         if (enabled && Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                            permissionDialogPending = true
                             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 7402)
                         }
                         alerts = enabled
@@ -358,6 +360,7 @@ class MainActivity : ComponentActivity() {
                             !prefs().getBoolean("notification_permission_asked", false) &&
                             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                             prefs().edit().putBoolean("notification_permission_asked", true).apply()
+                            permissionDialogPending = true
                             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 7402)
                         }
                     },
@@ -373,21 +376,26 @@ class MainActivity : ComponentActivity() {
         incomingSharedText = extractSharedText(intent)
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (permissionDialogPending) {
+            permissionDialogPending = false
+            if (Build.VERSION.SDK_INT >= 33 &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
+                val found = updateInfo
+                if (found != null) {
+                    if (notifyUpdate(found)) prefs().edit().putString(LAST_NOTIFIED_KEY, found.version).apply()
+                } else checkForUpdate(true)
+            }
+        }
+    }
+
     private fun extractSharedText(intent: Intent?): String {
         if (intent == null) return ""
         return when (intent.action) {
             Intent.ACTION_SEND -> intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString().orEmpty().take(MAX_CAPTURE_CHARS)
             Intent.ACTION_PROCESS_TEXT -> intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString().orEmpty().take(MAX_CAPTURE_CHARS)
             else -> ""
-        }
-    }
-
-    @Deprecated("Deprecated in Android API 33")
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 7402 && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
-            val found = updateInfo
-            if (found != null && notifyUpdate(found)) prefs().edit().putString(LAST_NOTIFIED_KEY, found.version).apply()
         }
     }
 
