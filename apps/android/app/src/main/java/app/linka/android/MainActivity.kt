@@ -1038,11 +1038,11 @@ private fun LinkaApp(
     var cloudEmail by remember { mutableStateOf(prefs.getString(SYNC_EMAIL_KEY, "") ?: "") }
     var cloudPassword by remember { mutableStateOf("") }
     var cloudOtp by remember { mutableStateOf("") }
-    var otpRequested by remember { mutableStateOf(false) }
-    var otpResendUntil by remember { mutableLongStateOf(0L) }
-    var otpExpiresAt by remember { mutableLongStateOf(0L) }
-    var otpRemainingSeconds by remember { mutableIntStateOf(0) }
-    var otpCooldownSeconds by remember { mutableIntStateOf(0) }
+    var otpRequested by remember { mutableStateOf(prefs.getLong("otp_expires_at", 0L) > System.currentTimeMillis()) }
+    var otpResendUntil by remember { mutableLongStateOf(prefs.getLong("otp_resend_until", 0L)) }
+    var otpExpiresAt by remember { mutableLongStateOf(prefs.getLong("otp_expires_at", 0L)) }
+    var otpRemainingSeconds by remember { mutableIntStateOf(((prefs.getLong("otp_expires_at", 0L) - System.currentTimeMillis()).coerceAtLeast(0L) / 1000L).toInt()) }
+    var otpCooldownSeconds by remember { mutableIntStateOf(((prefs.getLong("otp_resend_until", 0L) - System.currentTimeMillis()).coerceAtLeast(0L) / 1000L).toInt()) }
     var pendingPairId by remember { mutableStateOf(prefs.getString("pending_pair_id", "") ?: "") }
     var pendingPairSecret by remember { mutableStateOf(prefs.getString("pending_pair_secret", "") ?: "") }
     var cloudBusy by remember { mutableStateOf(false) }
@@ -1064,6 +1064,8 @@ private fun LinkaApp(
                 cloudOtp = ""
                 otpResendUntil = System.currentTimeMillis() + 120_000L
                 otpExpiresAt = System.currentTimeMillis() + 120_000L
+                prefs.edit().putLong("otp_resend_until", otpResendUntil)
+                    .putLong("otp_expires_at", otpExpiresAt).apply()
                 otpRemainingSeconds = 120
                 otpCooldownSeconds = 120
                 cloudStatus = tr(lang, "syncCodeSent")
@@ -1075,11 +1077,11 @@ private fun LinkaApp(
         }
     }
     LaunchedEffect(otpRequested, otpResendUntil, otpExpiresAt) {
-        while (otpRequested) {
+        while (true) {
             val now = System.currentTimeMillis()
-            otpRemainingSeconds = ((otpExpiresAt - now).coerceAtLeast(0L) / 1000L).toInt()
+            otpRemainingSeconds = if (otpRequested) ((otpExpiresAt - now).coerceAtLeast(0L) / 1000L).toInt() else 0
             otpCooldownSeconds = ((otpResendUntil - now).coerceAtLeast(0L) / 1000L).toInt()
-            if (otpRemainingSeconds == 0 && otpCooldownSeconds == 0) break
+            if (otpCooldownSeconds == 0 && (!otpRequested || otpRemainingSeconds == 0)) break
             delay(1000L)
         }
     }
@@ -1139,6 +1141,15 @@ private fun LinkaApp(
             }
         }
     }
+    LaunchedEffect(accepted, language) {
+        if (!accepted || language.isBlank()) return@LaunchedEffect
+        val configured = cloudUrl.startsWith("https://") && cloudAnonKey.isNotBlank()
+        if (configured && prefs.getString(SYNC_REFRESH_KEY, "").orEmpty().isBlank() &&
+            !prefs.getBoolean("account_intro_shown", false) && pendingPairId.isBlank()) {
+            prefs.edit().putBoolean("account_intro_shown", true).apply()
+            cloudDialog = true
+        }
+    }
     LaunchedEffect(sharedText, sharedTrigger) {
         val incoming = sharedText.trim().take(MAX_CAPTURE_CHARS)
         if (incoming.isNotBlank()) {
@@ -1170,6 +1181,7 @@ private fun LinkaApp(
                         .putString(SYNC_STATUS_KEY, result.message).apply()
                     captures = result.captures
                     save(result.captures)
+                    keepSyncedProfile(result.profile)
                     cloudStatus = result.message
                 }.onFailure { cloudStatus = it.message ?: "Cloud sync failed" }
             }
@@ -1573,6 +1585,8 @@ private fun LinkaApp(
                         cloudPassword = ""
                         cloudOtp = ""
                         otpRequested = false
+                        if (stored.isBlank()) cloudDialog = false
+                        prefs.edit().remove("otp_expires_at").apply()
                         if (stored.isBlank() && localProfileJson()?.optString("displayName").isNullOrBlank() && result.profile?.optString("displayName").isNullOrBlank()) {
                             profileDialog = true
                             cloudDialog = false
@@ -1591,7 +1605,7 @@ private fun LinkaApp(
             Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 if (prefs.getString(SYNC_REFRESH_KEY, "").orEmpty().isBlank()) TextButton(enabled = !cloudBusy, onClick = {
                     requestEmailCode(true)
-                }) { Text(tr(lang, "createAccount"), color = main, fontSize = 10.sp) }
+                }) { Text(tr(lang, "syncRegisterCode"), color = main, fontSize = 10.sp) }
                 TextButton(enabled = !cloudBusy, onClick = { cloudDialog = false }) { Text(tr(lang, "syncClose"), color = muted, fontSize = 10.sp) }
             }
         }
