@@ -101,7 +101,11 @@ async function currentSession(config, session) {
   if (session?.accessToken && session?.refreshToken && Number(session.expiresAt || 0) > Date.now() + 30_000) return session;
   if (!session?.refreshToken) throw new Error("Sign in to Linka Cloud Sync again.");
   const renewed = await authRequest(config, "token?grant_type=refresh_token", { refresh_token: session.refreshToken });
-  return storeSession(renewed, config);
+  return storeSession({
+    ...renewed,
+    userId: renewed.user?.id || session.userId,
+    email: renewed.user?.email || session.email
+  }, config);
 }
 export function readDeletedIds(storage = globalThis.localStorage) {
   try {
