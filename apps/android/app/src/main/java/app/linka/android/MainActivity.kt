@@ -1041,6 +1041,7 @@ private fun LinkaApp(
     var clearDialog by remember { mutableStateOf(false) }
     var cloudDialog by remember { mutableStateOf(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(SYNC_REFRESH_KEY, "").isNullOrBlank()) }
     var cloudConfigExpanded by remember { mutableStateOf(false) }
+    var emailSignInExpanded by remember { mutableStateOf(false) }
     var profileDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -1600,30 +1601,42 @@ private fun LinkaApp(
                         colors = ButtonDefaults.buttonColors(containerColor = main, contentColor = bg)
                     ) { Text("Continue with Google", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
                 }
-                OutlinedTextField(value = cloudEmail, onValueChange = { cloudEmail = it }, label = { Text(tr(lang, "syncEmail")) },
-                    singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
-                    textStyle = TextStyle(color = main, fontSize = 12.sp), colors = fieldColors(bg, border, main, muted))
-                if (otpRequested && prefs.getString(SYNC_REFRESH_KEY, "").orEmpty().isBlank()) {
-                    OutlinedTextField(value = cloudOtp, onValueChange = { cloudOtp = it.filter(Char::isDigit).take(6) },
-                        label = { Text(tr(lang, "syncPassword")) }, singleLine = true,
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
-                        textStyle = TextStyle(color = main, fontSize = 16.sp, letterSpacing = 4.sp),
-                        colors = fieldColors(bg, border, main, muted))
-                    Text(tr(lang, "syncWait") + " ${otpCooldownSeconds}s · " + tr(lang, "syncOtpExpired") + " ${otpRemainingSeconds}s",
-                        color = muted, fontSize = 10.sp, lineHeight = 15.sp)
-                }
                 if (prefs.getString(SYNC_REFRESH_KEY, "").orEmpty().isBlank()) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.fillMaxWidth()) {
-                        TextButton(enabled = !cloudBusy && otpCooldownSeconds <= 0,
-                            onClick = { requestEmailCode(false) }, modifier = Modifier.weight(1f)) {
-                            Text(if (otpCooldownSeconds > 0) "${tr(lang, "syncSendCode")} · ${otpCooldownSeconds}s" else tr(lang, "syncSendCode"),
-                                color = main, fontSize = 10.sp)
+                    val emailSignInLabel = when (lang) {
+                        "ru" -> if (emailSignInExpanded) "Скрыть вход по почте" else "Другой способ: код из почты"
+                        "az" -> if (emailSignInExpanded) "E-poçt girişini gizlət" else "E-poçt kodu ilə giriş"
+                        "tr" -> if (emailSignInExpanded) "E-posta girişini gizle" else "E-posta koduyla giriş"
+                        else -> if (emailSignInExpanded) "Hide email sign-in" else "Use email code instead"
+                    }
+                    TextButton(onClick = { emailSignInExpanded = !emailSignInExpanded },
+                        modifier = Modifier.fillMaxWidth()) {
+                        Text(emailSignInLabel, color = muted, fontSize = 11.sp)
+                    }
+                    if (emailSignInExpanded) {
+                        OutlinedTextField(value = cloudEmail, onValueChange = { cloudEmail = it }, label = { Text(tr(lang, "syncEmail")) },
+                            singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+                            textStyle = TextStyle(color = main, fontSize = 12.sp), colors = fieldColors(bg, border, main, muted))
+                        if (otpRequested) {
+                            OutlinedTextField(value = cloudOtp, onValueChange = { cloudOtp = it.filter(Char::isDigit).take(6) },
+                                label = { Text(tr(lang, "syncPassword")) }, singleLine = true,
+                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                                modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+                                textStyle = TextStyle(color = main, fontSize = 16.sp, letterSpacing = 4.sp),
+                                colors = fieldColors(bg, border, main, muted))
+                            Text(tr(lang, "syncWait") + " ${otpCooldownSeconds}s · " + tr(lang, "syncOtpExpired") + " ${otpRemainingSeconds}s",
+                                color = muted, fontSize = 10.sp, lineHeight = 15.sp)
                         }
-                        TextButton(enabled = !cloudBusy && otpCooldownSeconds <= 0,
-                            onClick = { requestEmailCode(true) }, modifier = Modifier.weight(1f)) {
-                            Text(if (otpCooldownSeconds > 0) "${tr(lang, "syncRegisterCode")} · ${otpCooldownSeconds}s" else tr(lang, "syncRegisterCode"),
-                                color = main, fontSize = 10.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.fillMaxWidth()) {
+                            TextButton(enabled = !cloudBusy && otpCooldownSeconds <= 0,
+                                onClick = { requestEmailCode(false) }, modifier = Modifier.weight(1f)) {
+                                Text(if (otpCooldownSeconds > 0) "${tr(lang, "syncSendCode")} · ${otpCooldownSeconds}s" else tr(lang, "syncSendCode"),
+                                    color = main, fontSize = 10.sp)
+                            }
+                            TextButton(enabled = !cloudBusy && otpCooldownSeconds <= 0,
+                                onClick = { requestEmailCode(true) }, modifier = Modifier.weight(1f)) {
+                                Text(if (otpCooldownSeconds > 0) "${tr(lang, "syncRegisterCode")} · ${otpCooldownSeconds}s" else tr(lang, "syncRegisterCode"),
+                                    color = main, fontSize = 10.sp)
+                            }
                         }
                     }
                 }

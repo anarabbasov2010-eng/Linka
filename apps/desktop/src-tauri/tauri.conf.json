@@ -36,5 +36,14 @@
     "shortDescription": "A private local-first inbox",
     "longDescription": "Save, search and organise links, thoughts and text locally.",
     "createUpdaterArtifacts": false
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": [
+          "linka"
+        ]
+      }
+    }
   }
 }

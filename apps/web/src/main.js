@@ -658,13 +658,6 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) refr
 window.addEventListener("focus", refreshCloudIfDue);
 setInterval(refreshCloudIfDue, 60000);
 if(localStorage.getItem("linka.termsAccepted")!==TERMS_VERSION)showAgreement({mustAccept:true});
-function openFirstRunAccountSetup() {
-  if (getCloudSession() || localStorage.getItem("linka.accountOnboardingSeen") === "true") return;
-  localStorage.setItem("linka.accountOnboardingSeen", "true");
-  showCloudSyncНастройки();
-}
-window.addEventListener("linka:agreement-accepted", openFirstRunAccountSetup);
-if (localStorage.getItem("linka.termsAccepted") === TERMS_VERSION) openFirstRunAccountSetup();
 window.addEventListener("linka:authenticated", () => {
   if (getCloudSession()) void syncNow({ silent: true }).catch(error => say(error?.message || "Sync unavailable"));
 });
@@ -673,8 +666,7 @@ window.addEventListener("linka:profile-saved", () => {
 });
 void completeGoogleOAuthCallback().then(session => {
   if (!session) return;
-  window.dispatchEvent(new Event("linka:authenticated"));
-  showCloudSyncНастройки();
+  window.dispatchEvent(new CustomEvent("linka:oauth-complete", { detail: session }));
 }).catch(error => {
   say(error?.message || "Google sign-in could not be completed.");
 });

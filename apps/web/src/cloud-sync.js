@@ -57,7 +57,7 @@ async function readResponse(response) {
   try { data = raw ? JSON.parse(raw) : {}; } catch {}
   if (!response.ok) {
     const detail = data.msg || data.message || data.error_description || data.error || "";
-    if (response.status === 401 || response.status === 403) throw new Error("Email sign-in failed. Check the address, one-time code and public project key.");
+    if (response.status === 401 || response.status === 403) throw new Error("Linka sign-in failed. Check the Google OAuth configuration and try again.");
     if (response.status === 404 || (response.status === 400 && /linka_sync/i.test(raw))) {
       throw new Error("The Linka sync table is missing. Set up the shared sync database first.");
     }
@@ -196,10 +196,14 @@ export function startGoogleOAuth({ url, key, redirectTo = globalThis.location?.h
   globalThis.location.assign(authorizeUrl.toString());
 }
 export async function completeGoogleOAuthCallback({ url, key, location = globalThis.location, history = globalThis.history } = {}) {
-  if (!location?.hash || !/(^|[&#])access_token=/.test(location.hash)) return null;
+  if (!location?.hash) return null;
+  const params = new URLSearchParams(String(location.hash).replace(/^#/, ""));
+  const callbackError = params.get("error_description") || params.get("error");
+  if (callbackError) throw new Error(String(callbackError).slice(0, 220));
+  const accessTokenCandidate = params.get("access_token") || "";
+  if (!accessTokenCandidate) return null;
   const config = requireConfig(url || getCloudConfig().url, key || getCloudConfig().key);
-  const params = new URLSearchParams(location.hash.replace(/^#/, ""));
-  const accessToken = params.get("access_token") || "";
+  const accessToken = accessTokenCandidate;
   const refreshToken = params.get("refresh_token") || "";
   const expiresIn = Number(params.get("expires_in") || 3600);
   if (!accessToken || !refreshToken) throw new Error("Google returned an incomplete Linka session. Try signing in again.");

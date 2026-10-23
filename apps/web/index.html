@@ -141,6 +141,93 @@ body{background:var(--bg);background-image:radial-gradient(ellipse at 8% 0%,rgba
     @media(max-width:640px){.privacy{display:none}.top-actions{gap:7px}.language-select{min-width:48px;padding:0 7px}.linka-update-banner{align-items:flex-start;flex-direction:column}.linka-update-banner .linka-button{width:100%}.linka-actions{flex-direction:column}.linka-experience-panel{padding:19px}}
     @media(prefers-reduced-motion:reduce){.linka-enhanced .linka-reveal{opacity:1!important;transform:none!important;filter:none!important;transition:none!important}}
 
+
+    /* Web gets a navigation-led workspace; the installed Windows client keeps its compact desktop shell. */
+    html[data-platform="web"] .shell {
+      width:min(1680px,100%); max-width:1680px; margin:0 auto;
+      padding:28px clamp(18px,3vw,44px) 54px 0;
+      grid-template-columns:232px minmax(0,1fr);
+      grid-template-areas:"web-sidebar topbar" "web-sidebar hero" "web-sidebar capture" "web-sidebar workspace" "web-sidebar footer";
+      column-gap:clamp(22px,3vw,44px); row-gap:16px; align-items:start;
+    }
+    html[data-platform="web"] .web-sidebar {
+      grid-area:web-sidebar; grid-row:1 / 6; align-self:stretch; position:sticky; top:0;
+      height:calc(100vh - 16px); min-height:520px; display:flex; flex-direction:column; gap:24px;
+      padding:24px 15px 18px; border-right:1px solid var(--line); border-radius:0;
+      background:color-mix(in srgb,var(--bg) 92%,transparent); z-index:15;
+    }
+    html[data-platform="web"] .web-side-brand {display:flex;align-items:center;gap:11px;color:var(--text);text-decoration:none;padding:4px 10px 12px;font-size:24px;font-weight:720;letter-spacing:-.08em}
+    html[data-platform="web"] .web-side-brand img {width:35px;height:35px;border-radius:12px}
+    html[data-platform="web"] .web-side-caption {padding:0 12px;color:var(--muted);font-size:9px;letter-spacing:.16em;font-weight:750}
+    html[data-platform="web"] .web-side-nav {display:flex;flex-direction:column;gap:5px}
+    html[data-platform="web"] .web-nav-item {width:100%;display:flex;align-items:center;gap:12px;text-align:left;min-height:43px;padding:10px 12px;border:1px solid transparent;border-radius:13px;background:transparent;color:var(--muted);font-size:12px;font-weight:550;transition:background .2s,border-color .2s,color .2s,transform .2s;cursor:pointer}
+    html[data-platform="web"] .web-nav-item:hover {background:var(--panel);color:var(--text);border-color:var(--line);transform:translateX(2px)}
+    html[data-platform="web"] .web-nav-item.active {background:var(--panel-raised);border-color:var(--line);color:var(--text);box-shadow:inset 0 1px rgba(255,255,255,.025)}
+    html[data-platform="web"] .web-nav-glyph {display:grid;place-items:center;width:23px;min-width:23px;height:23px;border-radius:8px;color:var(--soft);font-size:16px;line-height:1}
+    html[data-platform="web"] .web-nav-item[data-nav="capture"] {margin-top:12px;background:var(--text);color:var(--bg);font-weight:700;border-color:var(--text)}
+    html[data-platform="web"] .web-nav-item[data-nav="capture"] .web-nav-glyph {background:color-mix(in srgb,var(--bg) 11%,transparent);color:var(--bg)}
+    html[data-platform="web"] .web-nav-item[data-nav="account"] {margin-top:auto}
+    html[data-platform="web"] .web-side-foot {display:flex;align-items:flex-start;gap:10px;margin-top:auto;padding:14px 10px;border-top:1px solid var(--line);color:var(--soft);font-size:10px;line-height:1.5}
+    html[data-platform="web"] .web-side-foot strong,html[data-platform="web"] .web-side-foot small {display:block}
+    html[data-platform="web"] .web-side-foot strong {font-size:11px;font-weight:650}
+    html[data-platform="web"] .web-side-foot small {margin-top:3px;color:var(--muted);font-size:9px}
+    html[data-platform="web"] .web-side-status-dot {width:7px;height:7px;min-width:7px;margin-top:4px;border-radius:50%;background:#8aa899;box-shadow:0 0 0 4px color-mix(in srgb,#8aa899 12%,transparent)}
+    html[data-platform="web"] .topbar {grid-area:topbar;margin:0 0 12px;justify-content:flex-end;padding:0 0 16px;border-bottom:1px solid var(--line)}
+    html[data-platform="web"] .topbar > .brand {display:none}
+    html[data-platform="web"] .hero {grid-area:hero;max-width:none;text-align:left;margin:0;padding:2px 0 0}
+    html[data-platform="web"] .hero h1 {font-size:clamp(42px,4.4vw,66px);line-height:1;letter-spacing:-.085em;margin:14px 0 13px}
+    html[data-platform="web"] .hero > p {margin-left:0;margin-right:0;text-align:left;max-width:620px;font-size:13px}
+    html[data-platform="web"] .hero-sub {justify-content:flex-start}
+    html[data-platform="web"] .capture {grid-area:capture;max-width:none;width:100%;margin:0;padding:18px 20px;border-radius:23px}
+    html[data-platform="web"] .compose {min-height:100px}
+    html[data-platform="web"] .workspace {grid-area:workspace;max-width:none;width:100%;margin:10px 0 0;padding-top:0}
+    html[data-platform="web"] .toolbar {align-items:center}
+    html[data-platform="web"] .grid {grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
+    html[data-platform="web"] .footer {grid-area:footer;max-width:none;width:100%;margin:24px 0 0}
+    html[data-platform="web"] #modal-root {position:relative;z-index:20}
+    html[data-platform="web"] .modal-layer {z-index:30}
+    @media (min-width:1500px) { html[data-platform="web"] .grid {grid-template-columns:repeat(4,minmax(0,1fr))} }
+    @media (max-width:1120px) and (min-width:761px) {
+      html[data-platform="web"] .shell {grid-template-columns:82px minmax(0,1fr);column-gap:20px;padding-right:20px}
+      html[data-platform="web"] .web-sidebar {align-items:center;padding:20px 9px 14px}
+      html[data-platform="web"] .web-side-brand {padding:0;justify-content:center}
+      html[data-platform="web"] .web-side-brand span,html[data-platform="web"] .web-side-caption,html[data-platform="web"] .web-nav-label,html[data-platform="web"] .web-side-foot span:last-child {display:none}
+      html[data-platform="web"] .web-side-nav {width:100%;align-items:center}
+      html[data-platform="web"] .web-nav-item {width:48px;height:46px;min-height:46px;justify-content:center;padding:8px}
+      html[data-platform="web"] .web-nav-item[data-nav="capture"] {margin-top:8px}
+      html[data-platform="web"] .web-side-foot {padding:14px 0;justify-content:center}
+      html[data-platform="web"] .web-side-status-dot {margin:0}
+      html[data-platform="web"] .grid {grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media (max-width:760px) {
+      html[data-platform="web"] .shell {display:grid;grid-template-columns:minmax(0,1fr);grid-template-areas:"topbar" "hero" "capture" "workspace" "footer";padding:17px 14px 108px;row-gap:7px}
+      html[data-platform="web"] .web-sidebar {position:fixed;left:12px;right:12px;bottom:max(10px,env(safe-area-inset-bottom));top:auto;width:auto;height:66px;min-height:0;padding:6px 8px;border:1px solid var(--line-strong);border-radius:20px;background:color-mix(in srgb,var(--panel-solid) 92%,transparent);box-shadow:0 14px 42px rgba(0,0,0,.25);backdrop-filter:blur(24px);z-index:15}
+      html[data-platform="web"] .web-side-brand,html[data-platform="web"] .web-side-caption,html[data-platform="web"] .web-side-foot {display:none}
+      html[data-platform="web"] .web-side-nav {width:100%;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:3px}
+      html[data-platform="web"] .web-nav-item {display:flex;flex-direction:column;justify-content:center;align-items:center;gap:3px;width:auto;height:52px;min-height:52px;padding:3px 1px;border-radius:12px;font-size:9px;text-align:center}
+      html[data-platform="web"] .web-nav-glyph {width:19px;min-width:19px;height:19px;font-size:15px}
+      html[data-platform="web"] .web-nav-item[data-nav="pinned"],html[data-platform="web"] .web-nav-item[data-nav="links"],html[data-platform="web"] .web-nav-item[data-nav="notes"] {display:none}
+      html[data-platform="web"] .web-nav-item[data-nav="capture"] {margin:0;order:3}
+      html[data-platform="web"] .web-nav-item[data-nav="all"] {order:1}
+      html[data-platform="web"] .web-nav-item[data-nav="search"] {order:2}
+      html[data-platform="web"] .web-nav-item[data-nav="account"] {order:4;margin:0}
+      html[data-platform="web"] .web-nav-item[data-nav="settings"] {order:5}
+      html[data-platform="web"] .topbar {margin:0 0 18px;padding-bottom:12px}
+      html[data-platform="web"] .hero {text-align:left;margin:0 0 16px;padding-top:8px}
+      html[data-platform="web"] .hero h1 {font-size:clamp(44px,11vw,62px)}
+      html[data-platform="web"] .hero > p {font-size:12px}
+      html[data-platform="web"] .capture {padding:13px;border-radius:21px}
+      html[data-platform="web"] .workspace {margin-top:18px}
+      html[data-platform="web"] .toolbar {flex-direction:column;align-items:stretch}
+      html[data-platform="web"] .grid {grid-template-columns:minmax(0,1fr)}
+      html[data-platform="web"] .footer {margin-top:36px}
+      html[data-platform="web"] .search-space-layer .modal {height:min(84vh,760px)}
+    }
+    @media (prefers-reduced-motion:reduce) {
+      html[data-platform="web"] .web-nav-item {transition:none}
+      html[data-platform="web"] .web-nav-item:hover {transform:none}
+    }
+
   </style>
 </head>
 <body>

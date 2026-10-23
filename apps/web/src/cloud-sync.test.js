@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getOtpCooldown, mergeCloudCaptures, readLinkaProfile, saveLinkaProfile } from "./cloud-sync.js";
+import { completeGoogleOAuthCallback, getOtpCooldown, mergeCloudCaptures, readLinkaProfile, saveLinkaProfile } from "./cloud-sync.js";
 
 test("cloud merge picks the newest copy, keeps pins, and orders newest first", () => {
   const remote = [
@@ -69,4 +69,12 @@ test("email OTP resend helper honors a per-email two-minute cooldown", () => {
   assert.ok(remaining > 0 && remaining <= 120_000);
   storage.setItem("linka.otp.cooldown.linka.user@example.com", String(Date.now() - 1));
   assert.equal(getOtpCooldown(email, storage), 0);
+});
+
+test("Google OAuth callback ignores normal routes and reports provider errors", async () => {
+  assert.equal(await completeGoogleOAuthCallback({ location: { hash: "", pathname: "/", search: "" } }), null);
+  await assert.rejects(
+    completeGoogleOAuthCallback({ location: { hash: "#error=access_denied&error_description=Sign-in%20was%20cancelled" } }),
+    /Sign-in was cancelled/i
+  );
 });
