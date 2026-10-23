@@ -11,4 +11,4 @@ npm run build
 npm test
 ```
 
-Cross-device synchronization and accounts are not implemented in this version.
+Optional cross-device Cloud Sync is available after configuring the same Supabase project URL, public publishable/anon key and Linka account on each client. To set up the RLS-protected table, use Settings → Cloud Sync → Copy database setup SQL. See [the shared Cloud Sync guide](../../docs/CLOUD-SYNC.md). Local storage and manual JSON backup/import continue to work without a cloud project.
