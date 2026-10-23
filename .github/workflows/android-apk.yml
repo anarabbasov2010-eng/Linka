@@ -1,14 +1,15 @@
-name: Android APK
+name: Android APK and releases
 on:
   push:
     branches: [main]
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: android-apk-${{ github.ref }}
   cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -21,12 +22,44 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
-      - name: Build debug APK
-        working-directory: apps/android
-        run: gradle assembleDebug
-      - uses: actions/upload-artifact@v4
+
+      # Reuse one debug signing key so APKs from consecutive CI runs can update
+      # an existing CI-installed app. This is a hobby-project convenience, not
+      # production-grade signing; a Play Store release needs a protected key.
+      - name: Restore Linka update signing key
+        uses: actions/cache@v4
         with:
-          name: Linka-Android-debug-apk
-          path: apps/android/app/build/outputs/apk/debug/app-debug.apk
+          path: ~/.android/debug.keystore
+          key: linka-android-debug-signing-v1
+
+      - name: Build Android APK
+        working-directory: apps/android
+        env:
+          LINKA_VERSION_CODE: ${{ github.run_number }}
+          LINKA_VERSION_NAME: 0.4.${{ github.run_number }}
+        run: |
+          mkdir -p ~/.android
+          gradle assembleDebug -PlinkaVersionCode="$LINKA_VERSION_CODE" -PlinkaVersionName="$LINKA_VERSION_NAME"
+          cp app/build/outputs/apk/debug/app-debug.apk "app/build/outputs/apk/debug/Linka-Android-$LINKA_VERSION_NAME.apk"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Linka-Android-${{ github.run_number }}
+          path: apps/android/app/build/outputs/apk/debug/Linka-Android-*.apk
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
+
+      - name: Publish versioned Android release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.4.${{ github.run_number }}
+          name: Linka Android v0.4.${{ github.run_number }}
+          body: |
+            Automated Android build from main.
+
+            Install the APK on Android 8.0 or newer. Android may ask you to allow installs from the download app and to confirm the update.
+          files: apps/android/app/build/outputs/apk/debug/Linka-Android-*.apk
+          draft: false
+          prerelease: false
+          make_latest: true
