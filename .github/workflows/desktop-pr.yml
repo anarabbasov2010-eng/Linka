@@ -1,0 +1,48 @@
+name: Windows desktop PR validation
+on:
+  pull_request:
+    paths:
+      - "apps/web/**"
+      - "apps/desktop/**"
+      - ".github/workflows/desktop-pr.yml"
+      - ".github/workflows/windows-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-pr-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install web dependencies
+        working-directory: apps/web
+        run: npm install --no-audit --no-fund
+      - name: Install desktop tooling
+        working-directory: apps/desktop
+        run: npm install --no-audit --no-fund
+      - name: Generate Windows icons from the Linka SVG
+        working-directory: apps/desktop
+        run: npx tauri icon ../web/public/linka-mark.svg --output src-tauri/icons
+      - name: Run web tests
+        working-directory: apps/web
+        run: npm test
+      - name: Build Windows installer
+        working-directory: apps/desktop
+        run: npm run build
+      - name: Save preview installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Linka-Windows-PR-preview
+          path: apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
+          if-no-files-found: error
+          retention-days: 5
