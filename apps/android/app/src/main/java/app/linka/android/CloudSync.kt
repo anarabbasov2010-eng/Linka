@@ -104,6 +104,80 @@ private fun requestJson(
     }
 }
 
+
+internal suspend fun requestEmailOtp(
+    projectUrl: String,
+    anonKey: String,
+    email: String,
+    createAccount: Boolean
+) = withContext(Dispatchers.IO) {
+    val base = projectUrl.trim().trimEnd('/')
+    require(base.startsWith("https://", ignoreCase = true)) { "Use the HTTPS URL of your Supabase project." }
+    require(anonKey.trim().isNotBlank()) { "Enter the public publishable key." }
+    require(Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$").matches(email.trim())) { "Enter a valid email address." }
+    requestJson(
+        "$base/auth/v1/otp", "POST", anonKey.trim(),
+        body = JSONObject().put("email", email.trim().lowercase()).put("create_user", createAccount).toString()
+    )
+}
+
+internal suspend fun verifyEmailOtp(
+    projectUrl: String,
+    anonKey: String,
+    email: String,
+    code: String
+): String = withContext(Dispatchers.IO) {
+    val base = projectUrl.trim().trimEnd('/')
+    require(base.startsWith("https://", ignoreCase = true)) { "Use the HTTPS URL of your Supabase project." }
+    require(anonKey.trim().isNotBlank()) { "Enter the public publishable key." }
+    require(Regex("^[0-9]{6}$").matches(code.trim())) { "Enter the six-digit code from your email." }
+    val raw = requestJson(
+        "$base/auth/v1/verify", "POST", anonKey.trim(),
+        body = JSONObject()
+            .put("email", email.trim().lowercase())
+            .put("token", code.trim())
+            .put("type", "email")
+            .toString()
+    )
+    val session = JSONObject(raw)
+    val refresh = session.optString("refresh_token")
+    val access = session.optString("access_token")
+    val user = session.optJSONObject("user")
+    if (refresh.isBlank() || access.isBlank() || user?.optString("id").isNullOrBlank()) {
+        throw IllegalStateException("Email confirmed, but no active session was returned. Request a fresh code and try again.")
+    }
+    LinkaTokenVault.encrypt(refresh)
+}
+
+internal suspend fun approveQrPairing(
+    projectUrl: String,
+    anonKey: String,
+    encryptedRefreshToken: String,
+    pairingId: String,
+    pairingSecret: String
+): String = withContext(Dispatchers.IO) {
+    val base = projectUrl.trim().trimEnd('/')
+    require(base.startsWith("https://", ignoreCase = true)) { "Use the HTTPS URL of your Supabase project." }
+    require(anonKey.trim().isNotBlank()) { "Enter the public publishable key." }
+    require(pairingId.isNotBlank() && pairingSecret.length >= 32) { "The QR sign-in request is invalid." }
+    val oldRefresh = runCatching { LinkaTokenVault.decrypt(encryptedRefreshToken) }
+        .getOrElse { throw IllegalStateException("Sign in to Linka again before approving QR login.") }
+    val session = JSONObject(requestJson(
+        "$base/auth/v1/token?grant_type=refresh_token", "POST", anonKey.trim(),
+        body = JSONObject().put("refresh_token", oldRefresh).toString()
+    ))
+    val access = session.optString("access_token")
+    val refreshed = session.optString("refresh_token")
+    if (access.isBlank() || refreshed.isBlank()) throw IllegalStateException("The Linka session expired. Sign in again.")
+    requestJson(
+        "$base/functions/v1/linka-pairing", "POST", anonKey.trim(), access,
+        JSONObject().put("action", "approve").put("id", pairingId)
+            .put("secret", pairingSecret).put("refreshToken", refreshed).toString()
+    )
+    LinkaTokenVault.encrypt(refreshed)
+}
+
+
 private fun captureArray(captures: List<Capture>): JSONArray = JSONArray().also { array ->
     captures.forEach { c ->
         array.put(JSONObject()
