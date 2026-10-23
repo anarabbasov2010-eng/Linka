@@ -30,3 +30,21 @@ A QR challenge contains a random 256-bit secret, has a two-minute lifetime and c
 4. Apply both database schemas and deploy `linka-pairing`.
 5. Verify OTP signup, sign-in after sign-out, cooldown, expiration, account isolation/RLS, QR approve/claim/expiry/replay, and cross-device conflict handling using two real accounts before calling the release production-ready.
 6. Export a JSON backup before first sync. Linka's local inbox remains usable offline even when the cloud is unavailable.
+
+
+## Email template for Linka
+
+Paste the complete HTML from [`docs/templates/linka-email-otp.html`](templates/linka-email-otp.html) into **Authentication → Email Templates → Magic Link**. It uses Supabase's `{{ .Token }}` variable to display the six-digit OTP in the center of the email and warns recipients never to share it. Customize the sender name to `Linka`; do not log or expose the OTP in the app or server logs.
+
+The template does not change the OTP's real lifetime. Set **Email OTP Expiration** to `120` seconds in the Supabase Auth configuration. Supabase Auth is the authority for actual expiry and server-side rate limits; the two-minute countdown in Linka is only a client-side guard.
+
+## Configure the Windows in-app updater
+
+Linka's Tauri updater is designed to verify signed update archives before installation; it does not accept unsigned updates.
+
+1. On a trusted local computer, run `cd apps/desktop && npm install && npx tauri signer generate -w ~/.tauri/linka-updater.key`. Keep the private key file backed up offline. Never commit it.
+2. Add the **contents** of `linka-updater.key` as GitHub Actions secret `TAURI_SIGNING_PRIVATE_KEY`. If the key has a password, add `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` as another secret.
+3. Add the contents of `linka-updater.key.pub` as repository Actions variable `LINKA_UPDATER_PUBLIC_KEY`. This public key is embedded into the application and is not secret.
+4. The Windows release workflow detects both values, generates the signed NSIS updater archive, and publishes it with `latest.json`. Without both values, it builds the normal installer and leaves the in-app updater disabled; the application continues to offer the release page instead.
+
+**Do not rotate or lose the private signing key after distributing a build.** An updater signature mismatch is deliberately rejected. The Windows installer continues to support installing over the existing Linka installation while preserving the same app identifier.
