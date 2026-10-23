@@ -213,16 +213,17 @@ private suspend fun fetchLinkPreview(value: String): LinkPreview? = withContext(
     try {
         val url = URL(raw)
         if (url.host.isBlank() || url.host.equals("localhost", true) || url.host.endsWith(".local", true)) return@withContext null
-        connection = (url.openConnection() as HttpURLConnection).apply {
+        val conn = (url.openConnection() as HttpURLConnection).apply {
             connectTimeout = 3500
             readTimeout = 4500
             instanceFollowRedirects = true
             setRequestProperty("User-Agent", "LinkaAndroid/0.5 (link preview)")
             setRequestProperty("Accept", "text/html,application/xhtml+xml")
         }
-        if (connection.responseCode !in 200..299 || !connection.url.protocol.equals("https", true)) return@withContext null
-        if (!connection.contentType.orEmpty().contains("html", true) || connection.contentLengthLong > 2_000_000L) return@withContext null
-        val html = connection.inputStream.use { input ->
+        connection = conn
+        if (conn.responseCode !in 200..299 || !conn.url.protocol.equals("https", true)) return@withContext null
+        if (!conn.contentType.orEmpty().contains("html", true) || conn.contentLengthLong > 2_000_000L) return@withContext null
+        val html = conn.inputStream.use { input ->
             val out = ByteArrayOutputStream()
             val buffer = ByteArray(8192)
             var total = 0
@@ -256,10 +257,10 @@ private suspend fun fetchLinkPreview(value: String): LinkPreview? = withContext(
         if (title.isBlank()) title = Regex("""<title\b[^>]*>(.*?)</title>""", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
             .find(html)?.groupValues?.getOrNull(1)?.let(::clean).orEmpty()
         if (image.isNotBlank()) {
-            image = runCatching { URL(connection.url, image).toString() }.getOrDefault("")
+            image = runCatching { URL(conn.url, image).toString() }.getOrDefault("")
             if (!image.startsWith("https://", true)) image = ""
         }
-        LinkPreview(title.ifBlank { connection.url.host.removePrefix("www.") }.take(180), description.take(320), image)
+        LinkPreview(title.ifBlank { conn.url.host.removePrefix("www.") }.take(180), description.take(320), image)
     } catch (_: Exception) {
         null
     } finally {
