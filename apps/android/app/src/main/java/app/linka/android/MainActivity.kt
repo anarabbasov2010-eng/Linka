@@ -1027,6 +1027,7 @@ private fun LinkaApp(
     var deleting by remember { mutableStateOf<Capture?>(null) }
     var clearDialog by remember { mutableStateOf(false) }
     var cloudDialog by remember { mutableStateOf(false) }
+    var cloudConfigExpanded by remember { mutableStateOf(false) }
     var profileDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -1515,12 +1516,24 @@ private fun LinkaApp(
         text = {
             Column(Modifier.heightIn(max = 470.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(tr(lang, "syncHelp"), color = muted, fontSize = 12.sp, lineHeight = 18.sp)
-                OutlinedTextField(value = cloudUrl, onValueChange = { cloudUrl = it }, label = { Text(tr(lang, "syncEndpoint")) },
-                    singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
-                    textStyle = TextStyle(color = main, fontSize = 12.sp), colors = fieldColors(bg, border, main, muted))
-                OutlinedTextField(value = cloudAnonKey, onValueChange = { cloudAnonKey = it }, label = { Text(tr(lang, "syncAnonKey")) },
-                    singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
-                    textStyle = TextStyle(color = main, fontSize = 12.sp), colors = fieldColors(bg, border, main, muted))
+                TextButton(onClick = { cloudConfigExpanded = !cloudConfigExpanded }) {
+                    Text(tr(lang, "syncConfig"), color = muted, fontSize = 10.sp)
+                }
+                if (cloudConfigExpanded || cloudUrl.isBlank() || cloudAnonKey.isBlank()) {
+                    Text(tr(lang, "syncSetupHint"), color = muted, fontSize = 10.sp, lineHeight = 15.sp)
+                    OutlinedTextField(value = cloudUrl, onValueChange = { cloudUrl = it }, label = { Text(tr(lang, "syncEndpoint")) },
+                        singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+                        textStyle = TextStyle(color = main, fontSize = 12.sp), colors = fieldColors(bg, border, main, muted))
+                    OutlinedTextField(value = cloudAnonKey, onValueChange = { cloudAnonKey = it }, label = { Text(tr(lang, "syncAnonKey")) },
+                        singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+                        textStyle = TextStyle(color = main, fontSize = 12.sp), colors = fieldColors(bg, border, main, muted))
+                    TextButton(onClick = {
+                        copy(CLOUD_SYNC_SETUP_SQL)
+                        cloudStatus = tr(lang, "syncCopied")
+                    }, modifier = Modifier.align(Alignment.Start)) {
+                        Text(tr(lang, "syncSetupSql"), color = muted, fontSize = 10.sp)
+                    }
+                }
                 OutlinedTextField(value = cloudEmail, onValueChange = { cloudEmail = it }, label = { Text(tr(lang, "syncEmail")) },
                     singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
                     textStyle = TextStyle(color = main, fontSize = 12.sp), colors = fieldColors(bg, border, main, muted))
@@ -1546,10 +1559,6 @@ private fun LinkaApp(
                             color = main, fontSize = 10.sp)
                     }
                 }
-                TextButton(onClick = {
-                    copy(CLOUD_SYNC_SETUP_SQL)
-                    cloudStatus = tr(lang, "syncCopied")
-                }, modifier = Modifier.align(Alignment.Start)) { Text(tr(lang, "syncSetupSql"), color = main, fontSize = 11.sp) }
                 if (cloudStatus.isNotBlank()) Text(cloudStatus, color = main, fontSize = 11.sp, lineHeight = 16.sp)
                 if (prefs.getString(SYNC_REFRESH_KEY, "").orEmpty().isNotBlank()) {
                     TextButton(onClick = {
