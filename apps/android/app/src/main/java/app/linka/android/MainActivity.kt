@@ -189,7 +189,7 @@ private data class UpdateInfo(val version: String, val downloadUrl: String, val 
 internal fun filterCaptures(captures: List<Capture>, filter: String, query: String): List<Capture> = captures.filter { c ->
     val isLink = c.text.startsWith("http://", true) || c.text.startsWith("https://", true)
     val kind = when (filter) { "pinned" -> c.pinned; "links" -> isLink; "notes" -> !isLink; else -> true }
-    val host = if (isLink) Uri.parse(c.text.trim()).host.orEmpty() else ""
+    val host = if (isLink) runCatching { java.net.URI(c.text.trim()).host.orEmpty() }.getOrDefault("") else ""
     val q = query.trim()
     val matches = q.isBlank() || listOf(c.text, c.previewTitle, c.previewDescription, host)
         .any { it.contains(q, ignoreCase = true) }
@@ -290,13 +290,13 @@ private val words = mapOf(
         "readAgreement" to "Read user agreement", "beforeBegin" to "Before we begin", "termsIntro" to "A quick note about how Linka handles your data.",
         "agree" to "I agree and continue", "decline" to "Decline and close", "localStorage" to "1. Data on this device",
         "localStorageBody" to "Captures are stored locally on this phone. Clearing app storage, uninstalling the app or losing the device may erase them. Export backups that matter.",
-        "noSync" to "2. No cloud sync yet", "noSyncBody" to "Accounts and automatic cross-device synchronization are not available in this version. Transfer data using manual export and import.",
+        "noSync" to "2. Optional cloud sync", "noSyncBody" to "Cloud sync is optional and requires a Supabase project you configure. Local storage and manual export/import remain available.",
         "responsibility" to "3. Your responsibility", "responsibilityBody" to "You are responsible for content you save, device security and backups. Do not use Linka as the only copy of critical information.",
         "external" to "4. External services and early access", "externalBody" to "External links open outside Linka. This early version may contain defects and is not guaranteed to be error-free.",
         "lawful" to "5. Lawful use", "lawfulBody" to "Use the app lawfully and respect other people's rights. Avoid saving sensitive information on a device other people can access.",
         "legalNote" to "This notice is not professional legal advice.", "noResults" to "No results", "searchHint" to "Search saved links and notes…",
         "copied" to "Copied to clipboard", "deleted" to "Capture deleted", "edit" to "Edit", "open" to "Open", "copy" to "Copy",
-        "delete" to "Delete", "pin" to "Pin", "unpin" to "Unpin", "localOnly" to "Data stays on this phone. Automatic sync and accounts are not implemented yet.",
+        "delete" to "Delete", "pin" to "Pin", "unpin" to "Unpin", "localOnly" to "Data is stored locally by default. Optional Supabase sync can be configured in Settings.",
         "languageIntro" to "Choose your language", "languageBody" to "You can change this later in Settings.", "continue" to "Continue",
         "importSuccess" to "Backup imported", "importFailed" to "Couldn't read this backup file.", "emptySearch" to "Try another search or filter.",
         "version" to "Version", "manage" to "Personalize your Linka experience", "local" to "ON THIS DEVICE", "loadMore" to "Load more"
@@ -321,13 +321,13 @@ private val words = mapOf(
         "readAgreement" to "Прочитать соглашение", "beforeBegin" to "Перед началом", "termsIntro" to "Кратко о том, как Linka обращается с твоими данными.",
         "agree" to "Принимаю и продолжаю", "decline" to "Отказаться и закрыть", "localStorage" to "1. Данные на устройстве",
         "localStorageBody" to "Записи хранятся на этом телефоне. Очистка данных приложения, его удаление или потеря устройства могут привести к потере записей. Сохраняй резервные копии.",
-        "noSync" to "2. Пока без облачной синхронизации", "noSyncBody" to "В этой версии нет аккаунтов и автоматической синхронизации между устройствами. Перенос данных доступен вручную через экспорт и импорт.",
+        "noSync" to "2. Облачная синхронизация по желанию", "noSyncBody" to "Синхронизация настраивается через собственный проект Supabase. Локальное хранение и ручной экспорт/импорт остаются доступны.",
         "responsibility" to "3. Твоя ответственность", "responsibilityBody" to "Ты отвечаешь за содержимое записей, безопасность устройства и резервные копии. Не храни здесь единственную копию важных данных.",
         "external" to "4. Внешние сервисы и ранняя версия", "externalBody" to "Внешние ссылки открываются вне Linka. В ранней версии возможны ошибки; бесперебойная работа не гарантируется.",
         "lawful" to "5. Законное использование", "lawfulBody" to "Используй приложение законно и уважай права других людей. Не сохраняй чувствительные данные на устройстве, к которому есть чужой доступ.",
         "legalNote" to "Этот текст не является профессиональной юридической консультацией.", "noResults" to "Ничего не найдено", "searchHint" to "Поиск по ссылкам и заметкам…",
         "copied" to "Скопировано", "deleted" to "Запись удалена", "edit" to "Изменить", "open" to "Открыть", "copy" to "Копировать",
-        "delete" to "Удалить", "pin" to "Закрепить", "unpin" to "Открепить", "localOnly" to "Данные пока хранятся локально. Автосинхронизация и аккаунты ещё не реализованы.",
+        "delete" to "Удалить", "pin" to "Закрепить", "unpin" to "Открепить", "localOnly" to "По умолчанию данные хранятся локально. Облачную синхронизацию Supabase можно настроить в параметрах.",
         "languageIntro" to "Выбери язык", "languageBody" to "Его можно изменить позже в настройках.", "continue" to "Продолжить",
         "importSuccess" to "Резервная копия импортирована", "importFailed" to "Не удалось прочитать файл резервной копии.", "emptySearch" to "Попробуй другой запрос или фильтр.",
         "version" to "Версия", "manage" to "Настрой Linka под себя", "local" to "НА ЭТОМ УСТРОЙСТВЕ"
@@ -352,13 +352,13 @@ private val words = mapOf(
         "readAgreement" to "İstifadəçi razılaşmasını oxu", "beforeBegin" to "Başlamazdan əvvəl", "termsIntro" to "Linka-nın məlumatlarını necə saxladığı barədə qısa məlumat.",
         "agree" to "Razıyam və davam et", "decline" to "İmtina et və bağla", "localStorage" to "1. Məlumat cihazda saxlanılır",
         "localStorageBody" to "Qeydlər bu telefonda saxlanılır. Tətbiqin məlumatlarını təmizləmək, onu silmək və ya cihazı itirmək qeydləri itirə bilər. Vacib məlumatların ehtiyat nüsxəsini yarat.",
-        "noSync" to "2. Bulud sinxronizasiyası hələ yoxdur", "noSyncBody" to "Bu versiyada hesab və cihazlararası avtomatik sinxronizasiya mövcud deyil. Məlumatı əl ilə ixrac və idxal edə bilərsən.",
+        "noSync" to "2. İstəyə bağlı bulud sinxronizasiyası", "noSyncBody" to "Sinxronizasiya öz Supabase layihənlə qurulur. Yerli yaddaş və əl ilə ixrac/idxal da mövcuddur.",
         "responsibility" to "3. Sənin məsuliyyətin", "responsibilityBody" to "Saxladığın məzmuna, cihazın təhlükəsizliyinə və ehtiyat nüsxələrə görə sən cavabdehsən. Vacib məlumatın yeganə nüsxəsi kimi Linka-ya güvənmə.",
         "external" to "4. Xarici keçidlər və ilkin versiya", "externalBody" to "Linklər Linka-dan kənarda açılır. İlkin versiyada xətalar ola bilər və fasiləsiz işə zəmanət verilmir.",
         "lawful" to "5. Qanuni istifadə", "lawfulBody" to "Tətbiqdən qanuni istifadə et və başqalarının hüquqlarına hörmət et. Başqalarının daxil ola bildiyi cihazda həssas məlumat saxlama.",
         "legalNote" to "Bu məlumat hüquqi məsləhət deyil.", "noResults" to "Nəticə tapılmadı", "searchHint" to "Link və qeydlərdə axtar…",
         "copied" to "Buferə köçürüldü", "deleted" to "Qeyd silindi", "edit" to "Dəyiş", "open" to "Aç", "copy" to "Köçür",
-        "delete" to "Sil", "pin" to "Bərkid", "unpin" to "Aç", "localOnly" to "Məlumat bu cihazda saxlanılır. Avtomatik sinxronizasiya və hesablar hələ hazırlanmayıb.",
+        "delete" to "Sil", "pin" to "Bərkid", "unpin" to "Aç", "localOnly" to "Məlumat standart olaraq cihazda saxlanılır. Supabase sinxronizasiyasını Parametrlərdən qura bilərsən.",
         "languageIntro" to "Dilini seç", "languageBody" to "Dili sonra tənzimləmələrdən dəyişə bilərsən.", "continue" to "Davam et",
         "importSuccess" to "Ehtiyat nüsxə idxal edildi", "importFailed" to "Ehtiyat nüsxə faylını oxumaq mümkün olmadı.", "emptySearch" to "Başqa axtarış və ya filtr yoxla.",
         "version" to "Versiya", "manage" to "Linka-nı özünə uyğunlaşdır", "local" to "BU CİHAZDA"
@@ -383,13 +383,13 @@ private val words = mapOf(
         "readAgreement" to "Kullanıcı sözleşmesini oku", "beforeBegin" to "Başlamadan önce", "termsIntro" to "Linka'nın verilerini nasıl tuttuğuna dair kısa bilgi.",
         "agree" to "Kabul et ve devam et", "decline" to "Reddet ve kapat", "localStorage" to "1. Cihazda depolama",
         "localStorageBody" to "Kayıtlar bu telefonda tutulur. Uygulama verilerini temizlemek, uygulamayı kaldırmak veya cihazı kaybetmek kayıtları silebilir. Önemli verileri yedekle.",
-        "noSync" to "2. Henüz bulut senkronizasyonu yok", "noSyncBody" to "Bu sürümde hesaplar ve otomatik cihazlar arası senkronizasyon yoktur. Verileri dışa/içe aktarma ile taşı.",
+        "noSync" to "2. İsteğe bağlı bulut senkronizasyonu", "noSyncBody" to "Senkronizasyon kendi Supabase projenle yapılandırılır. Yerel depolama ve manuel dışa/içe aktarma kullanılabilir.",
         "responsibility" to "3. Sorumluluk", "responsibilityBody" to "Kaydettiğin içerik, cihaz güvenliği ve yedeklerden sen sorumlusun. Kritik verilerin tek kopyası olarak Linka'ya güvenme.",
         "external" to "4. Harici hizmetler ve erken erişim", "externalBody" to "Harici bağlantılar Linka dışında açılır. Bu erken sürüm hata içerebilir; kesintisiz çalışma garantisi yoktur.",
         "lawful" to "5. Yasal kullanım", "lawfulBody" to "Uygulamayı yasalara uygun kullan ve başkalarının haklarına saygı göster. Başkalarının erişebildiği cihazlarda hassas bilgi tutma.",
         "legalNote" to "Bu metin profesyonel hukuki tavsiye değildir.", "noResults" to "Sonuç bulunamadı", "searchHint" to "Bağlantı ve notlarda ara…",
         "copied" to "Panoya kopyalandı", "deleted" to "Kayıt silindi", "edit" to "Düzenle", "open" to "Aç", "copy" to "Kopyala",
-        "delete" to "Sil", "pin" to "Sabitle", "unpin" to "Sabitlemeyi kaldır", "localOnly" to "Veriler cihazda tutulur. Otomatik senkronizasyon ve hesaplar henüz uygulanmadı.",
+        "delete" to "Sil", "pin" to "Sabitle", "unpin" to "Sabitlemeyi kaldır", "localOnly" to "Veriler varsayılan olarak cihazda tutulur. Supabase senkronizasyonu Ayarlar bölümünden kurulabilir.",
         "languageIntro" to "Dilini seç", "languageBody" to "Bunu daha sonra Ayarlar'dan değiştirebilirsin.", "continue" to "Devam",
         "importSuccess" to "Yedek içe aktarıldı", "importFailed" to "Yedek dosyası okunamadı.", "emptySearch" to "Başka bir arama veya filtre dene.",
         "version" to "Sürüm", "manage" to "Linka deneyimini kişiselleştir", "local" to "BU CİHAZDA"
