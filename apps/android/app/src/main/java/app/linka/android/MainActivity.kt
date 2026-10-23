@@ -1547,16 +1547,18 @@ private fun LinkaApp(
                     Text(tr(lang, "syncWait") + " ${otpCooldownSeconds}s · " + tr(lang, "syncOtpExpired") + " ${otpRemainingSeconds}s",
                         color = muted, fontSize = 10.sp, lineHeight = 15.sp)
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.fillMaxWidth()) {
-                    TextButton(enabled = !cloudBusy && otpCooldownSeconds <= 0,
-                        onClick = { requestEmailCode(false) }, modifier = Modifier.weight(1f)) {
-                        Text(if (otpCooldownSeconds > 0) "${tr(lang, "syncSendCode")} · ${otpCooldownSeconds}s" else tr(lang, "syncSendCode"),
-                            color = main, fontSize = 10.sp)
-                    }
-                    TextButton(enabled = !cloudBusy && otpCooldownSeconds <= 0 && prefs.getString(SYNC_REFRESH_KEY, "").orEmpty().isBlank(),
-                        onClick = { requestEmailCode(true) }, modifier = Modifier.weight(1f)) {
-                        Text(if (otpCooldownSeconds > 0) "${tr(lang, "syncRegisterCode")} · ${otpCooldownSeconds}s" else tr(lang, "syncRegisterCode"),
-                            color = main, fontSize = 10.sp)
+                if (prefs.getString(SYNC_REFRESH_KEY, "").orEmpty().isBlank()) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.fillMaxWidth()) {
+                        TextButton(enabled = !cloudBusy && otpCooldownSeconds <= 0,
+                            onClick = { requestEmailCode(false) }, modifier = Modifier.weight(1f)) {
+                            Text(if (otpCooldownSeconds > 0) "${tr(lang, "syncSendCode")} · ${otpCooldownSeconds}s" else tr(lang, "syncSendCode"),
+                                color = main, fontSize = 10.sp)
+                        }
+                        TextButton(enabled = !cloudBusy && otpCooldownSeconds <= 0,
+                            onClick = { requestEmailCode(true) }, modifier = Modifier.weight(1f)) {
+                            Text(if (otpCooldownSeconds > 0) "${tr(lang, "syncRegisterCode")} · ${otpCooldownSeconds}s" else tr(lang, "syncRegisterCode"),
+                                color = main, fontSize = 10.sp)
+                        }
                     }
                 }
                 if (cloudStatus.isNotBlank()) Text(cloudStatus, color = main, fontSize = 11.sp, lineHeight = 16.sp)
