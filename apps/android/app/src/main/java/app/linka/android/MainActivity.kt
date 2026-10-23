@@ -836,7 +836,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun notifyUpdate(info: UpdateInfo): Boolean {
-        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return false
+        if (!canPostNotifications()) return false
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= 26) manager.createNotificationChannel(NotificationChannel(NOTIFICATION_CHANNEL, "Linka updates", NotificationManager.IMPORTANCE_DEFAULT))
         val pending = PendingIntent.getActivity(this, 42, packageManager.getLaunchIntentForPackage(packageName) ?: Intent(this, MainActivity::class.java),
