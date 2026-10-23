@@ -21,7 +21,8 @@ internal data class CloudSyncResult(
     val captures: List<Capture>,
     val deletedIds: Set<String>,
     val encryptedRefreshToken: String,
-    val message: String
+    val message: String,
+    val profile: JSONObject? = null
 )
 
 private object LinkaTokenVault {
@@ -216,7 +217,8 @@ internal suspend fun syncWithSupabase(
     createAccount: Boolean,
     localCaptures: List<Capture>,
     localDeletedIds: Set<String>,
-    encryptedRefreshToken: String
+    encryptedRefreshToken: String,
+    localProfile: JSONObject? = null
 ): CloudSyncResult = withContext(Dispatchers.IO) {
     val base = projectUrl.trim().trimEnd('/')
     require(base.startsWith("https://", ignoreCase = true)) {
@@ -271,6 +273,14 @@ internal suspend fun syncWithSupabase(
             for (i in 0 until array.length()) array.optString(i).takeIf { it.isNotBlank() }?.let(::add)
         }
     }.toList().takeLast(5000).toSet()
+    val remoteProfile = remoteData?.optJSONObject("profile")
+    val validLocalProfile = localProfile?.takeIf { it.optString("displayName").isNotBlank() }
+    val syncedProfile = when {
+        validLocalProfile == null -> remoteProfile
+        remoteProfile == null -> validLocalProfile
+        validLocalProfile.optLong("updatedAt", 0L) >= remoteProfile.optLong("updatedAt", 0L) -> validLocalProfile
+        else -> remoteProfile
+    }
 
     val merged = (remoteCaptures + localCaptures)
         .filterNot { it.id in deleted }
@@ -280,6 +290,7 @@ internal suspend fun syncWithSupabase(
         .take(MAX_CAPTURES)
 
     val data = JSONObject().put("captures", captureArray(merged)).put("deletedIds", JSONArray(deleted))
+    if (syncedProfile != null) data.put("profile", syncedProfile)
     val upsert = JSONObject().put("user_id", userId).put("data", data).put("updated_at", Instant.now().toString())
     requestJson(
         "$base/rest/v1/linka_sync?on_conflict=user_id",
@@ -290,7 +301,8 @@ internal suspend fun syncWithSupabase(
         captures = merged,
         deletedIds = deleted,
         encryptedRefreshToken = LinkaTokenVault.encrypt(refreshToken),
-        message = "Synced ${merged.size} items"
+        message = "Synced ${merged.size} items",
+        profile = syncedProfile
     )
 }
 
