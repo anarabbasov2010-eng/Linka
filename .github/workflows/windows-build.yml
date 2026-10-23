@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: windows-installers-${{ github.event.workflow_run.head_sha || github.sha }}
+  group: windows-installers
   cancel-in-progress: false
 
 jobs:
@@ -19,12 +19,25 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - uses: dtolnay/rust-toolchain@stable
+      - name: Resolve latest Linka release version
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = (gh api "repos/$env:GITHUB_REPOSITORY/releases/latest" --jq .tag_name).Trim()
+          if (-not $tag) { throw "No published Linka Android release was found." }
+          $version = $tag.TrimStart("v")
+          if ($version -notmatch "^\\d+\\.\\d+\\.\\d+$") { throw "Unexpected release tag: $tag" }
+          "LINKA_RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "VITE_LINKA_DESKTOP_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $configPath = Join-Path $env:GITHUB_WORKSPACE "apps/desktop/src-tauri/tauri.conf.json"
+          $config = Get-Content -Raw $configPath | ConvertFrom-Json
+          $config.version = $version
+          $config | ConvertTo-Json -Depth 100 | Set-Content -Encoding utf8 $configPath
       - name: Install web dependencies
         working-directory: apps/web
         run: npm install --no-audit --no-fund
@@ -52,6 +65,7 @@ jobs:
             echo "::error::No Windows NSIS installer was produced."
             exit 1
           fi
-          tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq .tag_name)"
+          cp "${files[0]}" Linka-Windows-x64-setup.exe
+          tag="${LINKA_RELEASE_TAG:-$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq .tag_name)}"
           echo "Uploading Windows installer to release $tag"
-          gh release upload "$tag" "${files[0]}" --clobber --repo "$GITHUB_REPOSITORY"
+          gh release upload "$tag" Linka-Windows-x64-setup.exe --clobber --repo "$GITHUB_REPOSITORY"
