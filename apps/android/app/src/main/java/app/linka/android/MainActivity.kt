@@ -150,12 +150,12 @@ private const val RELEASES_API = "https://api.github.com/repos/anarabbasov2010-e
 private const val NOTIFICATION_CHANNEL = "linka_updates"
 
 private data class Capture(val id: String, val text: String, val createdAt: Long, val updatedAt: Long = createdAt, val pinned: Boolean = false)
-private data class UpdateInfo(val version: String, val downloadUrl: String, val releaseUrl: String)
+private data class UpdateInfo(val version: String, val downloadUrl: String, val releaseUrl: String, val changes: String)
 
 private val languages = listOf("az" to "Azərbaycan dili", "en" to "English", "ru" to "Русский", "tr" to "Türkçe")
 private val words = mapOf(
     "en" to mapOf(
-        "tagline" to "YOUR PERSONAL SPACE", "home" to "Home", "inbox" to "Inbox", "search" to "Search", "settings" to "Settings",
+        "tagline" to "LINKS · NOTES · IDEAS", "home" to "Home", "inbox" to "Inbox", "search" to "Search", "settings" to "Settings",
         "hero" to "Keep what matters.", "heroBody" to "Links, thoughts and text. All in one calm place.",
         "quickCapture" to "Quick capture", "placeholder" to "Write a thought or paste a link…", "save" to "Save to inbox",
         "saved" to "Saved on this phone", "recent" to "Recently saved", "seeAll" to "See all", "yourInbox" to "Your inbox",
@@ -167,7 +167,7 @@ private val words = mapOf(
         "updates" to "App updates", "checkUpdates" to "Check for updates", "checking" to "Checking…", "latest" to "You're up to date",
         "failed" to "Couldn't check for updates. Check your connection and try again.", "available" to "A newer Linka is ready",
         "updateBody" to "A new version is available. Download the APK and confirm installation when Android asks.",
-        "updateNow" to "Download update", "later" to "Not now", "themeDark" to "Dark", "themeLight" to "Light", "themeSystem" to "System",
+        "updateNow" to "Download update", "later" to "Not now", "updateChanges" to "What's new", "themeDark" to "Dark", "themeLight" to "Light", "themeSystem" to "System",
         "data" to "Your data", "export" to "Export backup", "import" to "Import backup", "clearData" to "Delete all captures",
         "clearConfirm" to "This permanently deletes all captures saved on this device. Export a backup first if you need one.",
         "deleteAll" to "Delete all", "cancel" to "Cancel", "done" to "Done", "agreement" to "User agreement",
@@ -186,7 +186,7 @@ private val words = mapOf(
         "version" to "Version", "manage" to "Personalize your Linka experience", "local" to "ON THIS DEVICE"
     ),
     "ru" to mapOf(
-        "tagline" to "ТВОЁ ЛИЧНОЕ ПРОСТРАНСТВО", "home" to "Главная", "inbox" to "Сохранённое", "search" to "Поиск", "settings" to "Настройки",
+        "tagline" to "ССЫЛКИ · ЗАМЕТКИ · МЫСЛИ", "home" to "Главная", "inbox" to "Сохранённое", "search" to "Поиск", "settings" to "Настройки",
         "hero" to "Сохраняй важное.", "heroBody" to "Ссылки, мысли и текст — в одном спокойном месте.",
         "quickCapture" to "Быстрое сохранение", "placeholder" to "Напиши мысль или вставь ссылку…", "save" to "Сохранить",
         "saved" to "Сохранено на устройстве", "recent" to "Недавно сохранено", "seeAll" to "Все", "yourInbox" to "Твои материалы",
@@ -198,7 +198,7 @@ private val words = mapOf(
         "updates" to "Обновления приложения", "checkUpdates" to "Проверить обновления", "checking" to "Проверяем…", "latest" to "У тебя актуальная версия",
         "failed" to "Не удалось проверить обновления. Проверь подключение и повтори попытку.", "available" to "Доступна новая версия Linka",
         "updateBody" to "Вышла новая версия. Скачай APK и подтверди установку, когда Android попросит.",
-        "updateNow" to "Скачать обновление", "later" to "Позже", "themeDark" to "Тёмная", "themeLight" to "Светлая", "themeSystem" to "Как в системе",
+        "updateNow" to "Скачать обновление", "later" to "Позже", "updateChanges" to "Что изменилось", "themeDark" to "Тёмная", "themeLight" to "Светлая", "themeSystem" to "Как в системе",
         "data" to "Твои данные", "export" to "Экспортировать копию", "import" to "Импортировать копию", "clearData" to "Удалить все записи",
         "clearConfirm" to "Все записи на этом устройстве будут удалены без возможности отмены. Сначала экспортируй копию, если она нужна.",
         "deleteAll" to "Удалить всё", "cancel" to "Отмена", "done" to "Готово", "agreement" to "Пользовательское соглашение",
@@ -217,7 +217,7 @@ private val words = mapOf(
         "version" to "Версия", "manage" to "Настрой Linka под себя", "local" to "НА ЭТОМ УСТРОЙСТВЕ"
     ),
     "az" to mapOf(
-        "tagline" to "SƏNİN ŞƏXSİ MƏKANIN", "home" to "Ana səhifə", "inbox" to "Yadda saxlananlar", "search" to "Axtarış", "settings" to "Tənzimləmələr",
+        "tagline" to "LİNKLƏR · QEYDLƏR · FİKİRLƏR", "home" to "Ana səhifə", "inbox" to "Yadda saxlananlar", "search" to "Axtarış", "settings" to "Tənzimləmələr",
         "hero" to "Vacib olanı saxla.", "heroBody" to "Linklər, fikirlər və mətnlər — hamısı bir yerdə.",
         "quickCapture" to "Tez yadda saxla", "placeholder" to "Fikrini yaz və ya link əlavə et…", "save" to "Yadda saxla",
         "saved" to "Bu telefonda saxlanıldı", "recent" to "Son saxlananlar", "seeAll" to "Hamısı", "yourInbox" to "Sənin qeydlərin",
@@ -229,7 +229,7 @@ private val words = mapOf(
         "updates" to "Tətbiq yeniləmələri", "checkUpdates" to "Yeniləmələri yoxla", "checking" to "Yoxlanılır…", "latest" to "Ən son versiyadasan",
         "failed" to "Yeniləməni yoxlamaq mümkün olmadı. İnternet bağlantısını yoxla.", "available" to "Yeni Linka versiyası mövcuddur",
         "updateBody" to "Yeni versiya hazırdır. APK faylını endir və Android quraşdırmanı təsdiqləyəndə davam et.",
-        "updateNow" to "Yeniləməni endir", "later" to "Sonra", "themeDark" to "Tünd", "themeLight" to "Açıq", "themeSystem" to "Sistem kimi",
+        "updateNow" to "Yeniləməni endir", "later" to "Sonra", "updateChanges" to "Nələr yenidir", "themeDark" to "Tünd", "themeLight" to "Açıq", "themeSystem" to "Sistem kimi",
         "data" to "Məlumatların", "export" to "Ehtiyat nüsxəni ixrac et", "import" to "Nüsxəni idxal et", "clearData" to "Bütün qeydləri sil",
         "clearConfirm" to "Bu cihazda saxlanılan bütün qeydlər birdəfəlik silinəcək. Lazımdırsa əvvəlcə ehtiyat nüsxə yarat.",
         "deleteAll" to "Hamısını sil", "cancel" to "Ləğv et", "done" to "Hazırdır", "agreement" to "İstifadəçi razılaşması",
@@ -248,7 +248,7 @@ private val words = mapOf(
         "version" to "Versiya", "manage" to "Linka-nı özünə uyğunlaşdır", "local" to "BU CİHAZDA"
     ),
     "tr" to mapOf(
-        "tagline" to "KİŞİSEL ALANIN", "home" to "Ana sayfa", "inbox" to "Kaydedilenler", "search" to "Ara", "settings" to "Ayarlar",
+        "tagline" to "BAĞLANTILAR · NOTLAR · FİKİRLER", "home" to "Ana sayfa", "inbox" to "Kaydedilenler", "search" to "Ara", "settings" to "Ayarlar",
         "hero" to "Önemli olanı sakla.", "heroBody" to "Bağlantılar, düşünceler ve metinler tek bir yerde.",
         "quickCapture" to "Hızlı kaydet", "placeholder" to "Bir düşünce yaz veya bağlantı yapıştır…", "save" to "Kaydet",
         "saved" to "Bu telefona kaydedildi", "recent" to "Son kaydedilenler", "seeAll" to "Tümü", "yourInbox" to "Kaydedilenlerin",
@@ -260,7 +260,7 @@ private val words = mapOf(
         "updates" to "Uygulama güncellemeleri", "checkUpdates" to "Güncellemeleri kontrol et", "checking" to "Kontrol ediliyor…", "latest" to "Güncelsin",
         "failed" to "Güncellemeler kontrol edilemedi. Bağlantını kontrol edip tekrar dene.", "available" to "Yeni Linka sürümü hazır",
         "updateBody" to "Yeni bir sürüm var. APK dosyasını indir ve Android istediğinde kurulumu onayla.",
-        "updateNow" to "Güncellemeyi indir", "later" to "Daha sonra", "themeDark" to "Koyu", "themeLight" to "Açık", "themeSystem" to "Sistem",
+        "updateNow" to "Güncellemeyi indir", "later" to "Daha sonra", "updateChanges" to "Yenilikler", "themeDark" to "Koyu", "themeLight" to "Açık", "themeSystem" to "Sistem",
         "data" to "Verilerin", "export" to "Yedeği dışa aktar", "import" to "Yedeği içe aktar", "clearData" to "Tüm kayıtları sil",
         "clearConfirm" to "Bu cihazdaki tüm kayıtlar kalıcı olarak silinecek. Gerekliyse önce yedek oluştur.",
         "deleteAll" to "Tümünü sil", "cancel" to "İptal", "done" to "Tamam", "agreement" to "Kullanıcı sözleşmesi",
@@ -442,7 +442,12 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         if (tag.isNotBlank() && apk.isNotBlank() && compareVersion(tag, appVersion()) > 0) {
-                            newer = UpdateInfo(tag, apk, release.optString("html_url", "https://github.com/anarabbasov2010-eng/Linka/releases"))
+                            val releaseUrl = release.optString("html_url", "https://github.com/anarabbasov2010-eng/Linka/releases")
+                            val notes = release.optString("body", "").lineSequence()
+                                .map { it.trim().removePrefix("- ").removePrefix("* ").removePrefix("• ") }
+                                .filter { it.isNotBlank() && !it.startsWith("Automated Android build", true) && !it.startsWith("Install the APK", true) }
+                                .take(5).joinToString("\n") { "• $it" }
+                            newer = UpdateInfo(tag, apk, releaseUrl, notes.ifBlank { "• Faster startup and smoother transitions\n• UI refinements and more reliable update checks" })
                         } else if (!quiet) status = "latest"
                     } else if (!quiet) status = "failed"
                 } finally { conn.disconnect() }
