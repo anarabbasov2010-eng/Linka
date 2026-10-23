@@ -1339,7 +1339,7 @@ private fun LinkaApp(
             Column(Modifier.fillMaxSize().background(
                 Brush.verticalGradient(
                     if (theme == "oled") listOf(Color.Black, Color.Black, Color.Black)
-                    else if (dark) listOf(Color(0xFF13111B), DB, Color(0xFF08080C))
+                    else if (dark) listOf(Color(0xFF111016), DB, Color(0xFF08080C))
                     else listOf(Color(0xFFFFFEFC), LB, Color(0xFFF1EFEB))
                 )
             ).verticalScroll(rememberScrollState()).imePadding()
@@ -1915,7 +1915,7 @@ private fun FilterRow(lang: String, selected: String, onSelected: (String) -> Un
 
 @Composable
 private fun CaptureCard(
-    capture: Capture, lang: String, panel: Color, raised: Color, border: Color, main: Color, muted: Color, scale: Float,
+    capture: Capture, lang: String, panel: Color, raised: Color, border: Color, main: Color, muted: Color, scale: Float, density: String,
     onPin: (Capture) -> Unit, onCopy: (Capture) -> Unit, onOpen: (Capture) -> Unit, onEdit: (Capture) -> Unit, onDelete: (Capture) -> Unit,
     onPreviewLoaded: (Capture, LinkPreview) -> Unit
 ) {
