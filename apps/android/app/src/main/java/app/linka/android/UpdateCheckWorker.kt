@@ -11,6 +11,7 @@ import android.net.Uri
 import java.io.File
 import java.io.FileOutputStream
 import android.os.Build
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.work.Worker
 import androidx.work.WorkerParameters
@@ -78,12 +79,20 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters) : Worker(con
                     ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                     return Result.success()
                 }
+                if (!NotificationManagerCompat.from(applicationContext).areNotificationsEnabled()) {
+                    // Do not mark this version as notified; a later run can alert after the user enables notifications.
+                    return Result.success()
+                }
 
                 val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 if (Build.VERSION.SDK_INT >= 26) {
                     manager.createNotificationChannel(NotificationChannel(
                         CHANNEL_ID, "Linka updates", NotificationManager.IMPORTANCE_DEFAULT
                     ))
+                    if (manager.getNotificationChannel(CHANNEL_ID)?.importance == NotificationManager.IMPORTANCE_NONE) {
+                        // A user-disabled channel must not consume the one-notification-per-version marker.
+                        return Result.success()
+                    }
                 }
                 val pending = PendingIntent.getActivity(
                     applicationContext, 4107,
