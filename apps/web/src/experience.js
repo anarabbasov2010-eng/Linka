@@ -22,7 +22,7 @@ const COPY = {
     hint: "Saved on this device. Export a backup whenever you need.", save: "Save to inbox",
     inbox: "Your inbox", export: "Export", import: "Import", filters: ["All", "Pinned", "Links", "Notes"],
     footer: "your personal library", footerRight: "Simple by design. Back up what matters.",
-    account: "Account", settings: "Settings", language: "Language",
+    account: "Account", settings: "Settings", language: "Language", theme: "Appearance", dark: "Dark", light: "Light", system: "System", reducedMotion: "Reduce motion", reducedMotionBody: "Use shorter, calmer transitions.",
     startTitle: "Welcome to Linka", startBody: "Create your account with your email. Your library will be ready on every signed-in device.",
     email: "Email address", code: "Six-digit code", sendCreate: "Create account · send code",
     sendLogin: "Sign in · send code", verify: "Verify and continue", continueOffline: "Continue offline",
@@ -48,7 +48,7 @@ const COPY = {
     hint: "Сохранено на этом устройстве. Не забывай делать резервную копию.", save: "Сохранить",
     inbox: "Твоя библиотека", export: "Экспорт", import: "Импорт", filters: ["Всё", "Закреплённое", "Ссылки", "Заметки"],
     footer: "твоя личная библиотека", footerRight: "Ничего лишнего. Сохраняй важное в резервную копию.",
-    account: "Аккаунт", settings: "Настройки", language: "Язык",
+    account: "Аккаунт", settings: "Настройки", language: "Язык", theme: "Оформление", dark: "Тёмная", light: "Светлая", system: "Системная", reducedMotion: "Меньше анимации", reducedMotionBody: "Сокращает движение и переходы.",
     startTitle: "Добро пожаловать в Linka", startBody: "Создай аккаунт по электронной почте. Библиотека будет доступна на устройствах, где выполнен вход.",
     email: "Электронная почта", code: "Код из 6 цифр", sendCreate: "Создать аккаунт · получить код",
     sendLogin: "Войти · получить код", verify: "Подтвердить и продолжить", continueOffline: "Продолжить без аккаунта",
@@ -74,7 +74,7 @@ const COPY = {
     hint: "Bu cihazda saxlanılır. Ehtiyat nüsxə yaratmağı unutma.", save: "Yadda saxla",
     inbox: "Kitabxanan", export: "İxrac", import: "İdxal", filters: ["Hamısı", "Sabitlənmiş", "Linklər", "Qeydlər"],
     footer: "şəxsi kitabxanan", footerRight: "Sadə və səliqəli. Vacib olanları ehtiyatda saxla.",
-    account: "Hesab", settings: "Parametrlər", language: "Dil",
+    account: "Hesab", settings: "Parametrlər", language: "Dil", theme: "Görünüş", dark: "Tünd", light: "Açıq", system: "Sistem", reducedMotion: "Az animasiya", reducedMotionBody: "Hərəkət və keçidlər azaldılır.",
     startTitle: "Linka-ya xoş gəlmisən", startBody: "E-poçtla hesab yarat. Kitabxanan daxil olduğun bütün cihazlarda əlçatan olacaq.",
     email: "E-poçt ünvanı", code: "6 rəqəmli kod", sendCreate: "Hesab yarat · kod göndər",
     sendLogin: "Daxil ol · kod göndər", verify: "Təsdiqlə və davam et", continueOffline: "Hesabsız davam et",
@@ -100,7 +100,7 @@ const COPY = {
     hint: "Bu cihazda saklanır. Yedek almayı unutma.", save: "Gelen kutusuna kaydet",
     inbox: "Kitaplığın", export: "Dışa aktar", import: "İçe aktar", filters: ["Tümü", "Sabitlenen", "Bağlantılar", "Notlar"],
     footer: "kişisel kitaplığın", footerRight: "Sade tasarım. Önemli olanları yedekle.",
-    account: "Hesap", settings: "Ayarlar", language: "Dil",
+    account: "Hesap", settings: "Ayarlar", language: "Dil", theme: "Görünüm", dark: "Koyu", light: "Açık", system: "Sistem", reducedMotion: "Hareketi azalt", reducedMotionBody: "Hareket ve geçişleri azaltır.",
     startTitle: "Linka'ya hoş geldin", startBody: "E-posta adresinle hesap oluştur. Kitaplığın giriş yaptığın tüm cihazlarda kullanılabilir.",
     email: "E-posta adresi", code: "Altı haneli kod", sendCreate: "Hesap oluştur · kod gönder",
     sendLogin: "Giriş yap · kod gönder", verify: "Doğrula ve devam et", continueOffline: "Hesapsız devam et",
@@ -576,9 +576,42 @@ function showSettings() {
   const picker = make("select", "linka-select");
   LANGUAGES.forEach(item => { const option=make("option","",item.label); option.value=item.value; picker.append(option); });
   picker.value = langCode();
-  picker.addEventListener("change", () => setLanguage(picker.value));
+  picker.addEventListener("change", () => { setLanguage(picker.value); dialog.close(); setTimeout(showSettings, 190); });
   pickerLabel.append(picker);
   dialog.panel.append(pickerLabel);
+
+  const themeLabel = make("label", "linka-field");
+  themeLabel.append(make("span", "", tr("theme")));
+  const themeSelect = make("select", "linka-select");
+  for (const [value, label] of [["dark", tr("dark")], ["light", tr("light")], ["system", tr("system")]]) {
+    const option = make("option", "", label); option.value = value; themeSelect.append(option);
+  }
+  themeSelect.value = localStorage.getItem("linka.theme") || "dark";
+  themeSelect.addEventListener("change", () => {
+    document.documentElement.dataset.theme = themeSelect.value;
+    localStorage.setItem("linka.theme", themeSelect.value);
+  });
+  themeLabel.append(themeSelect);
+  dialog.panel.append(themeLabel);
+
+  const motionSection = make("div", "linka-settings-block");
+  motionSection.append(make("h3", "", tr("reducedMotion")), make("p", "linka-muted", tr("reducedMotionBody")));
+  const motionToggle = button("", "linka-button linka-button-secondary");
+  const currentReducedMotion = () => localStorage.getItem("linka.reduceMotion") === "true";
+  const refreshMotionLabel = () => {
+    motionToggle.textContent = currentReducedMotion() ? "✓ " + tr("reducedMotion") : tr("reducedMotion");
+    motionToggle.setAttribute("aria-pressed", String(currentReducedMotion()));
+  };
+  refreshMotionLabel();
+  motionToggle.addEventListener("click", () => {
+    const next = !currentReducedMotion();
+    localStorage.setItem("linka.reduceMotion", String(next));
+    document.documentElement.classList.toggle("reduced-motion", next);
+    refreshMotionLabel();
+  });
+  motionSection.append(motionToggle);
+  dialog.panel.append(motionSection);
+
   const account = button(tr("account"));
   account.addEventListener("click", () => { dialog.close(); showAccount(); });
   const profile = button(tr("editProfile"), "linka-button linka-button-secondary");
@@ -634,6 +667,8 @@ export function initLinkaExperience() {
   }
   addAccountButton();
   translateInterface();
+  document.documentElement.dataset.theme = localStorage.getItem("linka.theme") || "dark";
+  document.documentElement.classList.toggle("reduced-motion", localStorage.getItem("linka.reduceMotion") === "true");
   addRevealAnimations();
   document.querySelector("#settings-button")?.addEventListener("click", event => {
     // Keep the user's existing settings entry point while adding account, language and notification controls.
