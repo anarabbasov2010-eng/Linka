@@ -56,7 +56,7 @@ async function readResponse(response) {
   try { data = raw ? JSON.parse(raw) : {}; } catch {}
   if (!response.ok) {
     const detail = data.msg || data.message || data.error_description || data.error || "";
-    if (response.status === 401 || response.status === 403) throw new Error("Sign-in failed. Check the email, password and public key.");
+    if (response.status === 401 || response.status === 403) throw new Error("Email sign-in failed. Check the address, one-time code and public project key.");
     if (response.status === 404 || (response.status === 400 && /linka_sync/i.test(raw))) {
       throw new Error("The Linka sync table is missing. Set up the shared sync database first.");
     }
