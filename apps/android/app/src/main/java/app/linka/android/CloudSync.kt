@@ -150,6 +150,29 @@ internal suspend fun verifyEmailOtp(
     LinkaTokenVault.encrypt(refresh)
 }
 
+internal data class GoogleOAuthSession(val encryptedRefreshToken: String, val email: String, val displayName: String)
+
+internal suspend fun completeGoogleOAuthSession(
+    projectUrl: String,
+    anonKey: String,
+    accessToken: String,
+    refreshToken: String
+): GoogleOAuthSession = withContext(Dispatchers.IO) {
+    val base = projectUrl.trim().trimEnd('/')
+    require(base.startsWith("https://", ignoreCase = true)) { "Use the HTTPS URL of your Supabase project." }
+    require(anonKey.isNotBlank() && accessToken.isNotBlank() && refreshToken.isNotBlank()) {
+        "Google returned an incomplete sign-in session. Try again."
+    }
+    val user = JSONObject(requestJson("$base/auth/v1/user", "GET", anonKey.trim(), accessToken))
+    val email = user.optString("email").trim()
+    val metadata = user.optJSONObject("user_metadata") ?: JSONObject()
+    val displayName = metadata.optString("full_name")
+        .ifBlank { metadata.optString("name") }
+        .ifBlank { metadata.optString("preferred_username") }
+    require(email.isNotBlank()) { "Google did not return an email for this account." }
+    GoogleOAuthSession(LinkaTokenVault.encrypt(refreshToken), email, displayName)
+}
+
 internal suspend fun approveQrPairing(
     projectUrl: String,
     anonKey: String,
