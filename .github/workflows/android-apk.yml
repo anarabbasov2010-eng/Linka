@@ -57,6 +57,8 @@ jobs:
       - name: Build Android APK
         working-directory: apps/android
         env:
+          LINKA_SUPABASE_URL: ${{ vars.LINKA_SUPABASE_URL }}
+          LINKA_SUPABASE_PUBLISHABLE_KEY: ${{ vars.LINKA_SUPABASE_PUBLISHABLE_KEY }}
           LINKA_VERSION_CODE: ${{ github.run_number }}
           LINKA_VERSION_NAME: 0.4.${{ github.run_number }}
         run: |

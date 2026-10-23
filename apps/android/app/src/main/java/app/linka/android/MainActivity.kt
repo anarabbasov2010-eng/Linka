@@ -34,6 +34,7 @@ import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -962,8 +963,8 @@ private fun LinkaApp(
     var cloudDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-    var cloudUrl by remember { mutableStateOf(prefs.getString(SYNC_URL_KEY, "") ?: "") }
-    var cloudAnonKey by remember { mutableStateOf(prefs.getString(SYNC_ANON_KEY, "") ?: "") }
+    var cloudUrl by remember { mutableStateOf(prefs.getString(SYNC_URL_KEY, "").takeIf { !it.isNullOrBlank() } ?: BuildConfig.LINKA_SUPABASE_URL) }
+    var cloudAnonKey by remember { mutableStateOf(prefs.getString(SYNC_ANON_KEY, "").takeIf { !it.isNullOrBlank() } ?: BuildConfig.LINKA_SUPABASE_PUBLISHABLE_KEY) }
     var cloudEmail by remember { mutableStateOf(prefs.getString(SYNC_EMAIL_KEY, "") ?: "") }
     var cloudPassword by remember { mutableStateOf("") }
     var cloudBusy by remember { mutableStateOf(false) }
@@ -1552,7 +1553,7 @@ private fun CaptureCard(
                     model = capture.previewImageUrl,
                     contentDescription = capture.previewTitle.ifBlank { "Link preview" },
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 92.dp, max = 170.dp).clip(RoundedCornerShape(13.dp))
+                    modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(13.dp))
                 )
             }
             if (link) {

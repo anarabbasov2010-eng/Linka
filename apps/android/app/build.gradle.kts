@@ -6,12 +6,16 @@ plugins {
 
 val linkaVersionCode = providers.gradleProperty("linkaVersionCode").orNull?.toIntOrNull() ?: 5
 val linkaVersionName = providers.gradleProperty("linkaVersionName").orNull ?: "0.4.0"
+val linkaSupabaseUrl = (System.getenv("LINKA_SUPABASE_URL") ?: "").replace("\\", "\\\\").replace("\"", "\\\"")
+val linkaSupabaseKey = (System.getenv("LINKA_SUPABASE_PUBLISHABLE_KEY") ?: "").replace("\\", "\\\\").replace("\"", "\\\"")
 
 android {
     namespace = "app.linka.android"
     compileSdk = 35
 
     defaultConfig {
+        buildConfigField("String", "LINKA_SUPABASE_URL", "\"$linkaSupabaseUrl\"")
+        buildConfigField("String", "LINKA_SUPABASE_PUBLISHABLE_KEY", "\"$linkaSupabaseKey\"")
         applicationId = "app.linka.android.next"
         minSdk = 26
         targetSdk = 35
@@ -24,7 +28,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
 
     signingConfigs {
         create("linkaCi") {
