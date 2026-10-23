@@ -111,14 +111,14 @@ jobs:
             - The signing key for the legacy 0.4.72 package was not preserved by CI, so Android cannot replace that installation in place.
             - This recovery build uses the separate package app.linka.android.next and installs alongside the old app. Keep the old app installed until data migration is verified.
             - In old Linka, open Settings → Your data → Export backup and save/share the JSON backup. In Linka Next, open Settings → Your data → Import backup. Verify your saved items before uninstalling the old app.
-            What's new in this Android build:
-            - Optimized release build with R8 code shrinking and resource shrinking.
-            - The inbox renders a limited batch of items at a time to reduce initial UI work.
-            - Automated unit tests cover link/note filters, case-insensitive search, and pinned ordering.
-            - Shorter, calmer page transitions designed to reduce visual jumping.
-            - Update prompts are localized and include release notes.
-            - The app requests the display's highest supported refresh rate; actual FPS remains device-controlled.
-            - Motion remains native and can be disabled in Settings.
+            What's new in this Linka update:
+            - Added a slowly pulsing ambient sphere with a restrained violet-to-graphite gradient.
+            - Transparent navigation now uses a smooth spring-like active pill instead of a jumping selection.
+            - Added optional low-volume ambient sound, generated locally and disabled by default.
+            - Update notifications now use the selected app language and point to real release notes.
+            - Release notes in the update prompt are translated for English, Russian, Azerbaijani and Turkish.
+            - Preserved local-first storage, existing captures, export/import and existing account flows.
+            - Improved transition continuity and notification/status feedback.
             - Install the APK on Android 8.0 or newer. Android may ask you to confirm installation.
           files: apps/android/app/build/outputs/apk/release/Linka-Android-*.apk
           draft: false
