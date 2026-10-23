@@ -467,6 +467,7 @@ class MainActivity : ComponentActivity() {
     private var notificationsAllowed by mutableStateOf(false)
     private var waitingForInstallPermission = false
     private var permissionDialogPending = false
+    private var appInForeground by mutableStateOf(false)
     private fun prefs() = getSharedPreferences(PREFS, MODE_PRIVATE)
     private fun ensureNotificationChannel() {
         if (Build.VERSION.SDK_INT < 26) return
@@ -616,7 +617,7 @@ class MainActivity : ComponentActivity() {
                     }, downloadProgress = downloadProgress, downloadingUpdate = downloadingUpdate,
                     downloaded = downloadedApkPath != null, downloadFailed = downloadFailed, downloadFailureReason = downloadFailureReason,
                     applyUpdate = { installDownloadedUpdate() }, retryDownload = { updateInfo?.let { startUpdateDownload(it) } },
-                    version = appVersion(), accepted = accepted,
+                    version = appVersion(), accepted = accepted, appInForeground = appInForeground,
                     agree = {
                         prefs().edit().putString(TERMS_KEY, TERMS_VERSION).apply()
                         accepted = true
@@ -643,6 +644,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        appInForeground = true
         notificationsAllowed = canPostNotifications()
         val now = System.currentTimeMillis()
         val lastForegroundCheck = prefs().getLong("last_foreground_update_check", 0L)
@@ -664,6 +666,11 @@ class MainActivity : ComponentActivity() {
                 } else checkForUpdate(true)
             }
         }
+    }
+
+    override fun onPause() {
+        appInForeground = false
+        super.onPause()
     }
 
     private fun extractSharedText(intent: Intent?): String {
@@ -936,7 +943,7 @@ private fun LinkaApp(
     checkUpdates: () -> Unit, openUpdate: (UpdateInfo) -> Unit,
     autoDownload: Boolean, setAutoDownload: (Boolean) -> Unit, downloadProgress: Int, downloadingUpdate: Boolean,
     downloaded: Boolean, downloadFailed: Boolean, downloadFailureReason: String, applyUpdate: () -> Unit, retryDownload: () -> Unit,
-    version: String, accepted: Boolean, agree: () -> Unit, decline: () -> Unit
+    version: String, accepted: Boolean, appInForeground: Boolean, agree: () -> Unit, decline: () -> Unit
 ) {
     val lang = language.ifBlank { "en" }
     val dark = MaterialTheme.colorScheme.background == DB
@@ -1038,24 +1045,29 @@ private fun LinkaApp(
             tab = 0
         }
     }
-    LaunchedEffect(accepted) {
-        if (!accepted) return@LaunchedEffect
-        val token = prefs.getString(SYNC_REFRESH_KEY, "").orEmpty()
+    LaunchedEffect(accepted, appInForeground) {
+        if (!accepted || !appInForeground) return@LaunchedEffect
         val url = prefs.getString(SYNC_URL_KEY, "").orEmpty()
         val anon = prefs.getString(SYNC_ANON_KEY, "").orEmpty()
         val email = prefs.getString(SYNC_EMAIL_KEY, "").orEmpty()
-        if (token.isBlank() || url.isBlank() || anon.isBlank() || email.isBlank()) return@LaunchedEffect
-        runCatching {
-            val rawDeleted = JSONArray(prefs.getString(DELETED_IDS_KEY, "[]") ?: "[]")
-            val deleted = (0 until rawDeleted.length()).map { rawDeleted.optString(it) }.filter { it.isNotBlank() }.toSet()
-            val result = syncWithSupabase(url, anon, email, "", false, load(), deleted, token)
-            prefs.edit().putString(SYNC_REFRESH_KEY, result.encryptedRefreshToken)
-                .putString(DELETED_IDS_KEY, JSONArray().apply { result.deletedIds.forEach { put(it) } }.toString())
-                .putString(SYNC_STATUS_KEY, result.message).apply()
-            captures = result.captures
-            save(result.captures)
-            cloudStatus = result.message
-        }.onFailure { cloudStatus = it.message ?: "Cloud sync failed" }
+        if (url.isBlank() || anon.isBlank() || email.isBlank()) return@LaunchedEffect
+        while (appInForeground && accepted) {
+            val token = prefs.getString(SYNC_REFRESH_KEY, "").orEmpty()
+            if (token.isNotBlank()) {
+                runCatching {
+                    val rawDeleted = JSONArray(prefs.getString(DELETED_IDS_KEY, "[]") ?: "[]")
+                    val deleted = (0 until rawDeleted.length()).map { rawDeleted.optString(it) }.filter { it.isNotBlank() }.toSet()
+                    val result = syncWithSupabase(url, anon, email, "", false, load(), deleted, token)
+                    prefs.edit().putString(SYNC_REFRESH_KEY, result.encryptedRefreshToken)
+                        .putString(DELETED_IDS_KEY, JSONArray().apply { result.deletedIds.forEach { put(it) } }.toString())
+                        .putString(SYNC_STATUS_KEY, result.message).apply()
+                    captures = result.captures
+                    save(result.captures)
+                    cloudStatus = result.message
+                }.onFailure { cloudStatus = it.message ?: "Cloud sync failed" }
+            }
+            delay(60_000L)
+        }
     }
     val visible = filterCaptures(captures, filter, if (tab == 2) query else "")
     val oldCaptures = captures.filter { it.updatedAt < System.currentTimeMillis() - 7L * 24L * 60L * 60L * 1000L }

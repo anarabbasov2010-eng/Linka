@@ -39,6 +39,7 @@ let statusTimer = null;
 let cloudSyncTimer = null;
 let cloudSyncBusy = false;
 let cloudSyncStatus = "";
+let lastCloudRefreshAt = 0;
 const expandedCards = new Set();
 const desktopBuildVersion = String(import.meta.env.VITE_LINKA_DESKTOP_VERSION || "").trim();
 let themeMode = localStorage.getItem("linka.theme") || "dark";
@@ -527,4 +528,12 @@ document.addEventListener("keydown",event=>{
 document.documentElement.classList.toggle("reduced-motion",reduceMotion);
 render();
 if(getCloudSession()) setTimeout(() => { void syncNow({ silent: true }).catch(() => {}); }, 1200);
+function refreshCloudIfDue() {
+  if (document.hidden || !getCloudSession() || Date.now() - lastCloudRefreshAt < 15000) return;
+  lastCloudRefreshAt = Date.now();
+  void syncNow({ silent: true }).catch(() => {});
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshCloudIfDue(); });
+window.addEventListener("focus", refreshCloudIfDue);
+setInterval(refreshCloudIfDue, 60000);
 if(localStorage.getItem("linka.termsAccepted")!==TERMS_VERSION)showAgreement({mustAccept:true});
