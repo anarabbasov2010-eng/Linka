@@ -147,18 +147,18 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import coil.compose.AsyncImage
 
-private val DB = Color(0xFF08080C)
-private val DS = Color(0xFF121119)
-private val DR = Color(0xFF201D2B)
-private val DBR = Color(0xFF343044)
-private val DT = Color(0xFFF6F7FB)
-private val DM = Color(0xFFA7A2B8)
-private val LB = Color(0xFFF5F4F9)
-private val LS = Color(0xFFFCFDFF)
-private val LR = Color(0xFFEEEAF6)
-private val LBR = Color(0xFFDDD7EB)
-private val LT = Color(0xFF171B25)
-private val LM = Color(0xFF6D7789)
+private val DB = Color(0xFF09090B)
+private val DS = Color(0xFF111114)
+private val DR = Color(0xFF1B1B21)
+private val DBR = Color(0xFF303039)
+private val DT = Color(0xFFEDEDF2)
+private val DM = Color(0xFF9696A3)
+private val LB = Color(0xFFF5F4F1)
+private val LS = Color(0xFFFFFEFC)
+private val LR = Color(0xFFF0EEE9)
+private val LBR = Color(0xFFDFDDD8)
+private val LT = Color(0xFF1A191F)
+private val LM = Color(0xFF73717D)
 private const val PREFS = "linka_local_v3"
 private const val CAPTURES_KEY = "captures"
 private const val THEME_KEY = "theme"
@@ -167,6 +167,7 @@ private const val LANGUAGE_KEY = "language"
 private const val TERMS_KEY = "agreement_accepted"
 private const val TERMS_VERSION = "2026-10-23-v2"
 private const val ANIMATIONS_KEY = "animations"
+private const val DENSITY_KEY = "interface_density"
 private const val FONT_SCALE_KEY = "font_scale"
 private const val UPDATE_ALERTS_KEY = "update_alerts"
 internal const val AUTO_DOWNLOAD_KEY = "auto_download_updates"
@@ -653,7 +654,8 @@ class MainActivity : ComponentActivity() {
             var accent by remember { mutableStateOf(prefs().getString(ACCENT_KEY, "violet") ?: "violet") }
             var language by remember { mutableStateOf(prefs().getString(LANGUAGE_KEY, "") ?: "") }
             var accepted by remember { mutableStateOf(prefs().getString(TERMS_KEY, "") == TERMS_VERSION) }
-            var animations by remember { mutableStateOf(prefs().getBoolean(ANIMATIONS_KEY, true)) }
+            var animations by remember { mutableStateOf(prefs().getBoolean(ANIMATIONS_KEY, true) && !android.provider.Settings.Global.getFloat(contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f).equals(0f)) }
+            var density by remember { mutableStateOf(prefs().getString(DENSITY_KEY, "standard") ?: "standard") }
             var fontScale by remember { mutableFloatStateOf(prefs().getFloat(FONT_SCALE_KEY, 1f).coerceIn(.9f, 1.2f)) }
             var alerts by remember { mutableStateOf(prefs().getBoolean(UPDATE_ALERTS_KEY, true)) }
             var autoDownload by remember { mutableStateOf(prefs().getBoolean(AUTO_DOWNLOAD_KEY, false)) }
@@ -682,6 +684,7 @@ class MainActivity : ComponentActivity() {
                     accent = accent, setAccent = { accent = it; prefs().edit().putString(ACCENT_KEY, it).apply() },
                     language = language, setLanguage = { language = it; prefs().edit().putString(LANGUAGE_KEY, it).apply() },
                     animations = animations, setAnimations = { animations = it; prefs().edit().putBoolean(ANIMATIONS_KEY, it).apply() },
+                    density = density, setDensity = { density = it; prefs().edit().putString(DENSITY_KEY, it).apply() },
                     fontScale = fontScale, setFontScale = { fontScale = it; prefs().edit().putFloat(FONT_SCALE_KEY, it).apply() },
                     alerts = alerts, notificationPermissionGranted = notificationsAllowed, openNotificationSettings = { openNotificationSettings() }, sendTestNotification = { sendTestNotification() }, setAlerts = { enabled ->
                         if (enabled && Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -1023,7 +1026,7 @@ class MainActivity : ComponentActivity() {
 private fun LinkaApp(
     sharedText: String, sharedTrigger: Int, pairingTrigger: Int, oauthTrigger: Int, load: () -> List<Capture>, save: (List<Capture>) -> Unit, copy: (String) -> Unit, open: (String) -> Unit,
     theme: String, setTheme: (String) -> Unit, accent: String, setAccent: (String) -> Unit, language: String, setLanguage: (String) -> Unit,
-    animations: Boolean, setAnimations: (Boolean) -> Unit, fontScale: Float, setFontScale: (Float) -> Unit,
+    animations: Boolean, setAnimations: (Boolean) -> Unit, density: String, setDensity: (String) -> Unit, fontScale: Float, setFontScale: (Float) -> Unit,
     alerts: Boolean, notificationPermissionGranted: Boolean, openNotificationSettings: () -> Unit, sendTestNotification: () -> Unit, setAlerts: (Boolean) -> Unit, updateInfo: UpdateInfo?, updateStatus: String, checking: Boolean,
     checkUpdates: () -> Unit, openUpdate: (UpdateInfo) -> Unit,
     autoDownload: Boolean, setAutoDownload: (Boolean) -> Unit, downloadProgress: Int, downloadingUpdate: Boolean,
@@ -1336,12 +1339,12 @@ private fun LinkaApp(
             Column(Modifier.fillMaxSize().background(
                 Brush.verticalGradient(
                     if (theme == "oled") listOf(Color.Black, Color.Black, Color.Black)
-                    else if (dark) listOf(Color(0xFF191528), DB, Color(0xFF08080C))
-                    else listOf(Color(0xFFFFFFFF), LB, Color(0xFFF0EDF8))
+                    else if (dark) listOf(Color(0xFF13111B), DB, Color(0xFF08080C))
+                    else listOf(Color(0xFFFFFEFC), LB, Color(0xFFF1EFEB))
                 )
             ).verticalScroll(rememberScrollState()).imePadding()
                 .padding(horizontal = 18.dp).padding(top = 14.dp, bottom = 28.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                verticalArrangement = Arrangement.spacedBy(when (density) { "compact" -> 10.dp; "spacious" -> 19.dp; else -> 14.dp })) {
                 Header(lang, main, muted, panel, border) { tab = 3 }
                 when (page) {
                     0 -> {
@@ -1406,7 +1409,7 @@ private fun LinkaApp(
                             TextButton(onClick = { tab = 1 }) { Text(tr(lang, "seeAll"), color = muted, fontSize = 11.sp) }
                         }
                         if (captures.isEmpty()) EmptyState(lang, panel, border, main, muted)
-                        else captures.take(3).forEach { c -> CaptureCard(c, lang, panel, raised, border, main, muted, fontScale,
+                        else captures.take(3).forEach { c -> CaptureCard(c, lang, panel, raised, border, main, muted, fontScale, density,
                             onPin = { item -> commit(captures.map { if (it.id == item.id) it.copy(pinned = !it.pinned, updatedAt = System.currentTimeMillis()) else it }) },
                             onCopy = { copy(it.text); message = tr(lang, "copied") }, onOpen = { open(it.text) },
                             onEdit = { draft = it.text; editingId = it.id; tab = 0; message = tr(lang, "edit") },
@@ -1458,6 +1461,12 @@ private fun LinkaApp(
                             }
                             SettingLine(Icons.Outlined.Language, tr(lang, "language"), languages.first { it.first == lang }.second, main, muted) { languageDialog = true }
                             SettingSwitch(tr(lang, "animations"), animations, setAnimations, main, muted)
+                            Text(if (lang == "ru") "Плотность интерфейса" else if (lang == "az") "İnterfeys sıxlığı" else if (lang == "tr") "Arayüz yoğunluğu" else "Interface density", color = muted, fontSize = 11.sp)
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                listOf("compact" to (if (lang == "ru") "Компактно" else if (lang == "az") "Yığcam" else if (lang == "tr") "Kompakt" else "Compact"), "standard" to (if (lang == "ru") "Стандарт" else if (lang == "az") "Standart" else if (lang == "tr") "Standart" else "Standard"), "spacious" to (if (lang == "ru") "Свободно" else if (lang == "az") "Geniş" else if (lang == "tr") "Geniş" else "Spacious")).forEach { (v, label) ->
+                                    FilterChip(selected = density == v, onClick = { setDensity(v) }, label = { Text(label, fontSize = 10.sp) })
+                                }
+                            }
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(tr(lang, "fontSize"), color = main, fontSize = 12.sp, modifier = Modifier.weight(1f))
                                 Text("${(fontScale * 100).toInt()}%", color = muted, fontSize = 11.sp)
@@ -1921,7 +1930,7 @@ private fun CaptureCard(
     Card(colors = CardDefaults.cardColors(containerColor = if (capture.pinned) raised else panel), border = BorderStroke(1.dp, border),
         elevation = CardDefaults.cardElevation(defaultElevation = if (capture.pinned) 2.dp else 1.dp),
         shape = RoundedCornerShape(23.dp), modifier = Modifier.fillMaxWidth().animateContentSize(spring(dampingRatio = .82f, stiffness = 320f))) {
-        Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        Column(Modifier.padding(when (density) { "compact" -> 12.dp; "spacious" -> 21.dp; else -> 15.dp }), verticalArrangement = Arrangement.spacedBy(when (density) { "compact" -> 6.dp; "spacious" -> 13.dp; else -> 9.dp })) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 Icon(if (link) Icons.Outlined.Link else Icons.Outlined.NoteAlt, null, tint = muted, modifier = Modifier.size(16.dp))
                 Text(if (capture.pinned) tr(lang, "pinned").uppercase() else tr(lang, captureTypeKey(capture)).uppercase(), color = muted, fontSize = 9.sp, letterSpacing = 1.sp)
