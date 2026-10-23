@@ -634,9 +634,11 @@ private fun LinkaApp(
                                 if (editingId != null) TextButton(onClick = { draft = ""; editingId = null; message = "" }, modifier = Modifier.align(Alignment.End)) {
                                     Text(tr(lang, "cancel"), color = muted, fontSize = 11.sp)
                                 }
-                                AnimatedVisibility(message.isNotBlank(), enter = fadeIn() + slideInVertically { it / 4 }, exit = fadeOut()) {
-                                    Text(message, color = muted, fontSize = 11.sp * fontScale)
-                                }
+                                AnimatedVisibility(
+                                    visible = message.isNotBlank() && page == 0,
+                                    enter = fadeIn(spring(dampingRatio = .88f, stiffness = 360f)) + slideInVertically { it / 5 },
+                                    exit = fadeOut(spring(stiffness = 420f)) + slideOutVertically { it / 8 }
+                                ) { InlineNotice(message, panel, border, main, muted, fontScale) }
                             }
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -719,7 +721,11 @@ private fun LinkaApp(
                                 context.startActivity(Intent.createChooser(send, tr(lang, "export")))
                             }
                             SettingLine(Icons.Outlined.Inbox, tr(lang, "import"), "", main, muted) { importLauncher.launch(arrayOf("application/json", "text/*", "application/octet-stream")) }
-                            AnimatedVisibility(message.isNotBlank()) { Text(message, color = muted, fontSize = 11.sp) }
+                            AnimatedVisibility(
+                                visible = message.isNotBlank() && page == 3,
+                                enter = fadeIn(spring(dampingRatio = .88f, stiffness = 360f)) + slideInVertically { it / 5 },
+                                exit = fadeOut(spring(stiffness = 420f)) + slideOutVertically { it / 8 }
+                            ) { InlineNotice(message, panel, border, main, muted, fontScale) }
                             SettingLine(Icons.Outlined.DeleteOutline, tr(lang, "clearData"), "", Color(0xFFDA6969), muted) { clearDialog = true }
                         }
                         SettingsGroup(tr(lang, "agreement"), panel, border, main) {
@@ -842,6 +848,27 @@ private fun StatCard(value: String, label: String, panel: Color, border: Color, 
         }
     }
 }
+@Composable
+private fun InlineNotice(message: String, panel: Color, border: Color, main: Color, muted: Color, scale: Float) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = panel),
+        border = BorderStroke(1.dp, border),
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(9.dp)
+        ) {
+            Surface(color = main.copy(alpha = .08f), shape = CircleShape) {
+                Icon(Icons.Outlined.Check, null, tint = main, modifier = Modifier.padding(6.dp).size(15.dp))
+            }
+            Text(message, color = main, fontSize = 11.sp * scale, lineHeight = 16.sp, modifier = Modifier.weight(1f))
+        }
+    }
+}
+
 @Composable
 private fun SectionTitle(title: String, main: Color, modifier: Modifier = Modifier) {
     Text(title, modifier = modifier, color = main, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
