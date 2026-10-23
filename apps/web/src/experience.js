@@ -256,6 +256,7 @@ function translateInterface() {
   if (accountButton) { accountButton.title = tr("account"); accountButton.setAttribute("aria-label", tr("account")); }
   const settingsButton = document.querySelector("#settings-button");
   if (settingsButton) { settingsButton.title = tr("settings"); settingsButton.setAttribute("aria-label", tr("settings")); }
+  updateWebNavLabels();
 }
 function addRevealAnimations() {
   document.documentElement.classList.add("linka-enhanced");
@@ -809,6 +810,23 @@ function mountWebNavigation() {
   shell.prepend(sidebar);
   document.querySelectorAll("[data-filter]").forEach(node => node.addEventListener("click", () => activate(node.dataset.filter || "all")));
   activate("all");
+}
+
+function updateWebNavLabels() {
+  const lang = langCode();
+  const labels = {
+    en: { all: "Inbox", pinned: "Pinned", links: "Links", notes: "Notes", search: "Search", capture: "New capture", account: "Account", settings: "Settings" },
+    ru: { all: "Входящие", pinned: "Закреплённое", links: "Ссылки", notes: "Заметки", search: "Поиск", capture: "Сохранить", account: "Аккаунт", settings: "Настройки" },
+    az: { all: "Gələnlər", pinned: "Sabitlənmiş", links: "Linklər", notes: "Qeydlər", search: "Axtar", capture: "Yadda saxla", account: "Hesab", settings: "Parametrlər" },
+    tr: { all: "Gelen kutusu", pinned: "Sabitlenen", links: "Bağlantılar", notes: "Notlar", search: "Ara", capture: "Kaydet", account: "Hesap", settings: "Ayarlar" }
+  };
+  const selected = labels[lang] || labels.en;
+  document.querySelectorAll(".web-nav-item[data-nav]").forEach(node => {
+    const label = node.querySelector(".web-nav-label");
+    if (label) label.textContent = selected[node.dataset.nav] || labels.en[node.dataset.nav] || "";
+  });
+  const sidebar = document.querySelector(".web-sidebar");
+  if (sidebar) sidebar.setAttribute("aria-label", lang === "ru" ? "Навигация Linka" : lang === "az" ? "Linka naviqasiyası" : lang === "tr" ? "Linka gezinme" : "Linka navigation");
 }
 async function handleDesktopOAuthUrl(rawUrl) {
   try {
