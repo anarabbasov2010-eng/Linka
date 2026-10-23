@@ -924,6 +924,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onPause() {
         appInForeground = false
+        AmbientAudioEngine.stop()
         super.onPause()
     }
 
