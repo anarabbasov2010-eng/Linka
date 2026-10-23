@@ -21,6 +21,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -588,9 +589,9 @@ private fun LinkaApp(
         AnimatedContent(
             targetState = tab, modifier = Modifier.fillMaxSize().padding(padding),
             transitionSpec = {
-                if (animations) (fadeIn(spring(dampingRatio = .86f, stiffness = 340f)) + slideInVertically { it / 28 }) togetherWith
-                    (fadeOut(spring(dampingRatio = 1f, stiffness = 400f)) + slideOutVertically { -it / 40 })
-                else fadeIn() togetherWith fadeOut()
+                if (animations) (fadeIn(tween(durationMillis = 170)) + slideInVertically(tween(durationMillis = 190)) { it / 70 }) togetherWith
+                    (fadeOut(tween(durationMillis = 120)) + slideOutVertically(tween(durationMillis = 130)) { -it / 90 })
+                else fadeIn(tween(durationMillis = 90)) togetherWith fadeOut(tween(durationMillis = 90))
             }, label = "linka-page"
         ) { page ->
             Column(Modifier.fillMaxSize().background(bg).verticalScroll(rememberScrollState()).imePadding()
