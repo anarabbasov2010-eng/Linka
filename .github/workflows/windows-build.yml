@@ -73,6 +73,7 @@ jobs:
           LINKA_UPDATER_PUBLIC_KEY: ${{ vars.LINKA_UPDATER_PUBLIC_KEY }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: |
+          $updaterEnabled = $false
           "LINKA_UPDATER_ENABLED=false" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $configPath = Join-Path $env:GITHUB_WORKSPACE "apps/desktop/src-tauri/tauri.conf.json"
           $config = Get-Content -Raw $configPath | ConvertFrom-Json
@@ -91,12 +92,14 @@ jobs:
             $plugins["updater"] = $updater
             $config | Add-Member -MemberType NoteProperty -Name plugins -Value ([pscustomobject]$plugins) -Force
             $config.bundle.createUpdaterArtifacts = $true
+            $updaterEnabled = $true
             "LINKA_UPDATER_ENABLED=true" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
             Write-Host "Signed Linka desktop auto-updater is enabled."
           } else {
             $config.bundle.createUpdaterArtifacts = $false
             Write-Warning "Signed in-app updating is disabled until LINKA_UPDATER_PUBLIC_KEY and TAURI_SIGNING_PRIVATE_KEY are configured."
           }
+          "VITE_LINKA_UPDATER_ENABLED=$($updaterEnabled.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $config | ConvertTo-Json -Depth 100 | Set-Content -Encoding utf8 $configPath
       - name: Install web dependencies
         working-directory: apps/web
