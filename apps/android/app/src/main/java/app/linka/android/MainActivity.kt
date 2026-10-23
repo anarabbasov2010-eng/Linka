@@ -170,8 +170,8 @@ private const val SYNC_ANON_KEY = "sync_anon_key"
 private const val SYNC_EMAIL_KEY = "sync_email"
 private const val SYNC_REFRESH_KEY = "sync_refresh_token_encrypted"
 private const val SYNC_STATUS_KEY = "sync_status"
-private const val MAX_CAPTURE_CHARS = 100_000
-private const val MAX_CAPTURES = 500
+internal const val MAX_CAPTURE_CHARS = 100_000
+internal const val MAX_CAPTURES = 500
 private const val RELEASES_API = "https://api.github.com/repos/anarabbasov2010-eng/Linka/releases/latest"
 private const val NOTIFICATION_CHANNEL = "linka_updates"
 
