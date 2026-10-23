@@ -1,3 +1,5 @@
+use tauri::Manager;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default();
@@ -6,7 +8,11 @@ pub fn run() {
     // running Linka window rather than opening a second copy.
     #[cfg(desktop)]
     {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|_app, _argv, _cwd| {}));
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_focus();
+            }
+        }));
         builder = builder.plugin(tauri_plugin_deep_link::init());
         builder = builder.plugin(tauri_plugin_opener::init());
     }
