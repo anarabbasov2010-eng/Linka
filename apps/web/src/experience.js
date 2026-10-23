@@ -11,6 +11,7 @@ const ONBOARDED_KEY = "linka.experience.onboarded.v1";
 const NOTIFY_KEY = "linka.desktop-notifications.v1";
 const RELEASES_URL = "https://api.github.com/repos/anarabbasov2010-eng/Linka/releases/latest";
 const BUILD_VERSION = String(import.meta.env.VITE_LINKA_DESKTOP_VERSION || "").trim();
+const UPDATER_ENABLED = String(import.meta.env.VITE_LINKA_UPDATER_ENABLED || "false") === "true";
 const LANGUAGES = [
   { value: "en", label: "EN" }, { value: "ru", label: "RU" },
   { value: "az", label: "AZ" }, { value: "tr", label: "TR" }
@@ -37,7 +38,7 @@ const COPY = {
     waiting: "Waiting for approval…", pairingReady: "QR code ready", qrUnavailable: "QR pairing service isn't configured yet.",
     notification: "Desktop notifications", enableNotifications: "Enable notifications", notificationsOn: "Notifications enabled",
     updateTitle: "Linka update", updateReady: "A newer release is available.", updateButton: "Install update", updateDownloading: "Downloading update", updateInstalling: "Installing update", updateRestarting: "Restarting Linka…", updateInstalled: "Update installed. Restart Linka to finish.",
-    latest: "You're using the latest desktop build.", close: "Close", cancel: "Cancel",
+    latest: "You're using the latest desktop build.", updaterNotConfigured: "Signed in-app updates are not configured yet. Use the installer from GitHub Releases for manual updates.", close: "Close", cancel: "Cancel",
     codeSent: "Code sent. Check your inbox and spam folder.", codeWait: "You can request another code in",
     profileSaved: "Profile saved.", connected: "Account connected.", offlineSaved: "Setup saved. Linka will work locally.",
     errors: "Something went wrong. Check your connection and try again.", expired: "This code expired. Request a new one.",
@@ -65,7 +66,7 @@ const COPY = {
     waiting: "Ожидаем подтверждения…", pairingReady: "QR-код готов", qrUnavailable: "Сервис входа по QR ещё не настроен.",
     notification: "Уведомления на компьютере", enableNotifications: "Включить уведомления", notificationsOn: "Уведомления включены",
     updateTitle: "Обновление Linka", updateReady: "Доступна новая версия.", updateButton: "Установить обновление", updateDownloading: "Загрузка обновления", updateInstalling: "Установка обновления", updateRestarting: "Перезапуск Linka…", updateInstalled: "Обновление установлено. Перезапусти Linka.",
-    latest: "Установлена последняя версия для компьютера.", close: "Закрыть", cancel: "Отмена",
+    latest: "Установлена последняя версия для компьютера.", updaterNotConfigured: "Автообновление внутри приложения ещё не настроено. Для ручного обновления используй установщик из GitHub Releases.", close: "Закрыть", cancel: "Отмена",
     codeSent: "Код отправлен. Проверь почту и папку «Спам».", codeWait: "Повторный код можно запросить через",
     profileSaved: "Профиль сохранён.", connected: "Аккаунт подключён.", offlineSaved: "Настройки сохранены. Linka продолжит работать локально.",
     errors: "Не удалось выполнить действие. Проверь соединение и повтори попытку.", expired: "Срок действия кода истёк. Запроси новый.",
@@ -93,7 +94,7 @@ const COPY = {
     waiting: "Təsdiq gözlənilir…", pairingReady: "QR kod hazırdır", qrUnavailable: "QR giriş xidməti hələ qurulmayıb.",
     notification: "Kompüter bildirişləri", enableNotifications: "Bildirişləri aktiv et", notificationsOn: "Bildirişlər aktivdir",
     updateTitle: "Linka yeniləməsi", updateReady: "Yeni versiya mövcuddur.", updateButton: "Yeniləməni quraşdır", updateDownloading: "Yeniləmə endirilir", updateInstalling: "Yeniləmə quraşdırılır", updateRestarting: "Linka yenidən başladılır…", updateInstalled: "Yeniləmə quraşdırıldı. Linka-nı yenidən aç.",
-    latest: "Ən son masaüstü versiyası quraşdırılıb.", close: "Bağla", cancel: "Ləğv et",
+    latest: "Ən son masaüstü versiyası quraşdırılıb.", updaterNotConfigured: "Tətbiqdaxili avtomatik yeniləmə hələ qurulmayıb. Əl ilə yeniləmək üçün GitHub Releases quraşdırıcısından istifadə et.", close: "Bağla", cancel: "Ləğv et",
     codeSent: "Kod göndərildi. E-poçtu və spam qovluğunu yoxla.", codeWait: "Yeni kodu bu müddətdən sonra istəyə bilərsən:",
     profileSaved: "Profil yadda saxlanıldı.", connected: "Hesab qoşuldu.", offlineSaved: "Parametrlər saxlanıldı. Linka lokal işləyəcək.",
     errors: "Əməliyyat alınmadı. Bağlantını yoxla və yenidən cəhd et.", expired: "Kodun vaxtı bitib. Yeni kod istə.",
@@ -121,7 +122,7 @@ const COPY = {
     waiting: "Onay bekleniyor…", pairingReady: "QR kod hazır", qrUnavailable: "QR giriş hizmeti henüz yapılandırılmadı.",
     notification: "Masaüstü bildirimleri", enableNotifications: "Bildirimleri etkinleştir", notificationsOn: "Bildirimler etkin",
     updateTitle: "Linka güncellemesi", updateReady: "Yeni sürüm kullanıma hazır.", updateButton: "Güncellemeyi yükle", updateDownloading: "Güncelleme indiriliyor", updateInstalling: "Güncelleme yükleniyor", updateRestarting: "Linka yeniden başlatılıyor…", updateInstalled: "Güncelleme yüklendi. Uygulamayı yeniden aç.",
-    latest: "En güncel masaüstü sürümünü kullanıyorsun.", close: "Kapat", cancel: "Vazgeç",
+    latest: "En güncel masaüstü sürümünü kullanıyorsun.", updaterNotConfigured: "Uygulama içi otomatik güncelleme henüz yapılandırılmadı. Elle güncellemek için GitHub Releases yükleyicisini kullan.", close: "Kapat", cancel: "Vazgeç",
     codeSent: "Kod gönderildi. Gelen kutunu ve spam klasörünü kontrol et.", codeWait: "Yeni kodu şu süre sonra isteyebilirsin:",
     profileSaved: "Profil kaydedildi.", connected: "Hesap bağlandı.", offlineSaved: "Ayarlar kaydedildi. Linka yerel çalışmaya devam edecek.",
     errors: "İşlem başarısız. Bağlantını kontrol edip tekrar dene.", expired: "Kodun süresi doldu. Yeni bir kod iste.",
@@ -500,7 +501,7 @@ async function checkForRelease({ notify = false } = {}) {
 function showUpdateSettings(panel) {
   const section = make("section", "linka-settings-block");
   section.append(make("h3", "", tr("updateTitle")));
-  const detail = make("p", "linka-muted", tr("latest"));
+  const detail = make("p", "linka-muted", isDesktopShell() && !UPDATER_ENABLED ? tr("updaterNotConfigured") : tr("latest"));
   const notes = make("div", "linka-release-notes");
   notes.hidden = true;
   const check = button(tr("checkUpdates"), "linka-button linka-button-secondary");
@@ -512,7 +513,7 @@ function showUpdateSettings(panel) {
     detail.textContent = pendingNativeUpdate
       ? tr("updateReady") + " " + (pendingNativeUpdate.version || latest || "")
       : latest && BUILD_VERSION && compareVersions(BUILD_VERSION, latest) < 0
-        ? tr("updateReady") + " " + latest : tr("latest");
+        ? tr("updateReady") + " " + latest : isDesktopShell() && !UPDATER_ENABLED ? tr("updaterNotConfigured") : tr("latest");
     if (updateRecord) {
       releaseButton(section, tr("updateButton"), updateRecord.html_url || RELEASES_URL, detail);
       notes.replaceChildren(make("strong", "", tr("updateChanges")));
