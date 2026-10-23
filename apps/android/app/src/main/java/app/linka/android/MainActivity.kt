@@ -116,11 +116,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import org.json.JSONArray
@@ -281,7 +284,7 @@ private val words = mapOf(
         "empty" to "Nothing here yet", "emptyBody" to "Save something above, or share text from another app to Linka. Migrating from 0.4.72? Export a backup in old Linka, then import it here from Settings → Your data.",
         "private" to "Private by default", "privacyBody" to "Stored on this device. Export a backup whenever you need it.",
         "appearance" to "Appearance", "language" to "App language", "animations" to "Smooth animations",
-        "fontSize" to "Text size", "updateAlerts" to "Update notifications", "updateAlertsBody" to "Notify me when a newer Android version is released.",
+        "fontSize" to "Text size", "updateAlerts" to "Update notifications", "updateAlertsBody" to "Notify me when a newer Android version is released.", "notificationsEnabled" to "Notifications are allowed on this device.", "notificationsBlocked" to "Android is blocking Linka notifications. Enable them in system settings.", "notificationSettings" to "Open notification settings",
         "updates" to "App updates", "checkUpdates" to "Check for updates", "checking" to "Checking…", "latest" to "You're up to date",
         "failed" to "Couldn't check for updates. Check your connection and try again.", "available" to "A newer Linka is ready",
         "updateBody" to "A new version is available. Download the APK and confirm installation when Android asks.",
@@ -312,7 +315,7 @@ private val words = mapOf(
         "empty" to "Пока здесь пусто", "emptyBody" to "Сохрани запись выше или отправь текст в Linka из другого приложения. Переносишь данные из Linka 0.4.72? Экспортируй копию в старом приложении, затем импортируй её здесь: Настройки → Твои данные.",
         "private" to "Приватность по умолчанию", "privacyBody" to "Данные хранятся на устройстве. При необходимости создай резервную копию.",
         "appearance" to "Внешний вид", "language" to "Язык приложения", "animations" to "Плавные анимации",
-        "fontSize" to "Размер текста", "updateAlerts" to "Уведомления об обновлениях", "updateAlertsBody" to "Сообщать о новых версиях Linka для Android.",
+        "fontSize" to "Размер текста", "updateAlerts" to "Уведомления об обновлениях", "updateAlertsBody" to "Сообщать о новых версиях Linka для Android.", "notificationsEnabled" to "Уведомления разрешены на этом устройстве.", "notificationsBlocked" to "Android блокирует уведомления Linka. Разреши их в системных настройках.", "notificationSettings" to "Открыть настройки уведомлений",
         "updates" to "Обновления приложения", "checkUpdates" to "Проверить обновления", "checking" to "Проверяем…", "latest" to "У тебя актуальная версия",
         "failed" to "Не удалось проверить обновления. Проверь подключение и повтори попытку.", "available" to "Доступна новая версия Linka",
         "updateBody" to "Вышла новая версия. Скачай APK и подтверди установку, когда Android попросит.",
@@ -343,7 +346,7 @@ private val words = mapOf(
         "empty" to "Hələ heç nə yoxdur", "emptyBody" to "Yuxarıdan qeyd saxla və ya başqa tətbiqdən mətni Linka-ya göndər. 0.4.72-dən keçirsən? Köhnə tətbiqdə ehtiyat nüsxəni ixrac et, sonra burada Parametrlər → Məlumatların bölməsindən idxal et.",
         "private" to "Məxfilik standartdır", "privacyBody" to "Məlumat bu cihazda saxlanılır. Lazım olduqda ehtiyat nüsxə yarat.",
         "appearance" to "Görünüş", "language" to "Tətbiqin dili", "animations" to "Axıcı animasiyalar",
-        "fontSize" to "Mətn ölçüsü", "updateAlerts" to "Yeniləmə bildirişləri", "updateAlertsBody" to "Yeni Android versiyası çıxanda xəbər ver.",
+        "fontSize" to "Mətn ölçüsü", "updateAlerts" to "Yeniləmə bildirişləri", "updateAlertsBody" to "Yeni Android versiyası çıxanda xəbər ver.", "notificationsEnabled" to "Bu cihazda bildirişlərə icazə verilib.", "notificationsBlocked" to "Android Linka bildirişlərini bloklayır. Sistem tənzimləmələrində icazə ver.", "notificationSettings" to "Bildiriş tənzimləmələrini aç",
         "updates" to "Tətbiq yeniləmələri", "checkUpdates" to "Yeniləmələri yoxla", "checking" to "Yoxlanılır…", "latest" to "Ən son versiyadasan",
         "failed" to "Yeniləməni yoxlamaq mümkün olmadı. İnternet bağlantısını yoxla.", "available" to "Yeni Linka versiyası mövcuddur",
         "updateBody" to "Yeni versiya hazırdır. APK faylını endir və Android quraşdırmanı təsdiqləyəndə davam et.",
@@ -374,7 +377,7 @@ private val words = mapOf(
         "empty" to "Henüz bir şey yok", "emptyBody" to "Yukarıdan kaydet veya başka uygulamadan metni Linka'ya paylaş. 0.4.72'den geçiş yapıyor musun? Eski uygulamada yedeği dışa aktar, sonra burada Ayarlar → Verilerin bölümünden içe aktar.",
         "private" to "Varsayılan olarak gizli", "privacyBody" to "Veriler bu cihazda tutulur. Gerektiğinde yedek dışa aktar.",
         "appearance" to "Görünüm", "language" to "Uygulama dili", "animations" to "Akıcı animasyonlar",
-        "fontSize" to "Metin boyutu", "updateAlerts" to "Güncelleme bildirimleri", "updateAlertsBody" to "Yeni Android sürümü çıktığında bildir.",
+        "fontSize" to "Metin boyutu", "updateAlerts" to "Güncelleme bildirimleri", "updateAlertsBody" to "Yeni Android sürümü çıktığında bildir.", "notificationsEnabled" to "Bu cihazda bildirimlere izin verildi.", "notificationsBlocked" to "Android Linka bildirimlerini engelliyor. Sistem ayarlarından izin ver.", "notificationSettings" to "Bildirim ayarlarını aç",
         "updates" to "Uygulama güncellemeleri", "checkUpdates" to "Güncellemeleri kontrol et", "checking" to "Kontrol ediliyor…", "latest" to "Güncelsin",
         "failed" to "Güncellemeler kontrol edilemedi. Bağlantını kontrol edip tekrar dene.", "available" to "Yeni Linka sürümü hazır",
         "updateBody" to "Yeni bir sürüm var. APK dosyasını indir ve Android istediğinde kurulumu onayla.",
@@ -459,8 +462,23 @@ class MainActivity : ComponentActivity() {
     private var downloadProgress by mutableIntStateOf(0)
     private var downloadedApkPath by mutableStateOf<String?>(null)
     private var downloadFailed by mutableStateOf(false)
+    private var downloadFailureReason by mutableStateOf("")
+    private var notificationsAllowed by mutableStateOf(false)
+    private var waitingForInstallPermission = false
     private var permissionDialogPending = false
     private fun prefs() = getSharedPreferences(PREFS, MODE_PRIVATE)
+    private fun canPostNotifications(): Boolean {
+        val appAllowed = NotificationManagerCompat.from(this).areNotificationsEnabled()
+        val runtimeAllowed = Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        val channelAllowed = Build.VERSION.SDK_INT < 26 ||
+            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).getNotificationChannel(NOTIFICATION_CHANNEL)?.importance != NotificationManager.IMPORTANCE_NONE
+        return appAllowed && runtimeAllowed && channelAllowed
+    }
+    private fun openNotificationSettings() {
+        val intent = if (Build.VERSION.SDK_INT >= 26) Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+        else Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
+        runCatching { startActivity(intent) }
+    }
     private fun appVersion() = runCatching { packageManager.getPackageInfo(packageName, 0).versionName ?: "0.4.0" }.getOrDefault("0.4.0")
     private fun loadCaptures(): List<Capture> = try {
         val array = JSONArray(prefs().getString(CAPTURES_KEY, "[]") ?: "[]")
@@ -498,6 +516,7 @@ class MainActivity : ComponentActivity() {
                 window.attributes = window.attributes.apply { preferredRefreshRate = preferredRate }
             }
         }
+        notificationsAllowed = canPostNotifications()
         scheduleUpdateChecks()
         incomingSharedText = extractSharedText(intent)
         incomingSharedToken = 1
@@ -525,7 +544,7 @@ class MainActivity : ComponentActivity() {
                     language = language, setLanguage = { language = it; prefs().edit().putString(LANGUAGE_KEY, it).apply() },
                     animations = animations, setAnimations = { animations = it; prefs().edit().putBoolean(ANIMATIONS_KEY, it).apply() },
                     fontScale = fontScale, setFontScale = { fontScale = it; prefs().edit().putFloat(FONT_SCALE_KEY, it).apply() },
-                    alerts = alerts, setAlerts = { enabled ->
+                    alerts = alerts, notificationPermissionGranted = notificationsAllowed, openNotificationSettings = { openNotificationSettings() }, setAlerts = { enabled ->
                         if (enabled && Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                             permissionDialogPending = true
                             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 7402)
@@ -570,6 +589,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        notificationsAllowed = canPostNotifications()
+        if (waitingForInstallPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && packageManager.canRequestPackageInstalls()) {
+            waitingForInstallPermission = false
+            installDownloadedUpdate()
+        }
         if (permissionDialogPending) {
             permissionDialogPending = false
             if (Build.VERSION.SDK_INT >= 33 &&
@@ -601,11 +625,15 @@ class MainActivity : ComponentActivity() {
             .setConstraints(constraints)
             .setInitialDelay(1, java.util.concurrent.TimeUnit.HOURS)
             .build()
-        WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
-            "linka-update-checks",
-            ExistingPeriodicWorkPolicy.KEEP,
-            request
+        val workManager = WorkManager.getInstance(applicationContext)
+        workManager.enqueueUniqueWork(
+            "linka-update-check-now", ExistingWorkPolicy.KEEP,
+            OneTimeWorkRequestBuilder<UpdateCheckWorker>()
+                .setConstraints(constraints)
+                .setInitialDelay(15, java.util.concurrent.TimeUnit.SECONDS)
+                .build()
         )
+        workManager.enqueueUniquePeriodicWork("linka-update-checks", ExistingPeriodicWorkPolicy.KEEP, request)
     }
 
     private fun startUpdateDownload(info: UpdateInfo) {
@@ -613,10 +641,15 @@ class MainActivity : ComponentActivity() {
         val safeVersion = info.version.replace(Regex("[^A-Za-z0-9._-]"), "_")
         val cachedApk = File(File(cacheDir, "updates"), "linka-update-$safeVersion.apk")
         if (cachedApk.isFile && cachedApk.length() > 1024L) {
-            downloadedApkPath = cachedApk.absolutePath
-            downloadProgress = 100
-            downloadFailed = false
-            return
+            val validationError = validateLinkaUpdateApk(this, cachedApk)
+            if (validationError == null) {
+                downloadedApkPath = cachedApk.absolutePath
+                downloadProgress = 100
+                downloadFailed = false
+                downloadFailureReason = ""
+                return
+            }
+            cachedApk.delete()
         }
         if (!info.downloadUrl.startsWith("https://")) {
             downloadFailed = true
@@ -624,6 +657,7 @@ class MainActivity : ComponentActivity() {
         }
         downloadingUpdate = true
         downloadFailed = false
+        downloadFailureReason = ""
         downloadProgress = 0
         downloadedApkPath = null
         Thread {
@@ -668,17 +702,19 @@ class MainActivity : ComponentActivity() {
                     if (!temp.isFile || temp.length() < 1024L) error("Downloaded file is incomplete")
                     val signature = temp.inputStream().use { input -> ByteArray(4).also { input.read(it) } }
                     if (!(signature[0] == 0x50.toByte() && signature[1] == 0x4b.toByte())) error("Downloaded file is not an APK archive")
+                    validateLinkaUpdateApk(this@MainActivity, temp)?.let { error(it) }
                     finalFile = File(folder, "linka-update-${info.version.replace(Regex("[^A-Za-z0-9._-]"), "_")}.apk")
                     if (finalFile!!.exists()) finalFile!!.delete()
                     if (!temp.renameTo(finalFile!!)) error("Could not finalize update")
                 } finally {
                     connection.disconnect()
                 }
-            } catch (_: Exception) {
+            } catch (exception: Exception) {
                 finalFile?.delete()
                 runOnUiThread {
                     downloadingUpdate = false
                     downloadFailed = true
+                    downloadFailureReason = exception.message?.take(220).orEmpty()
                     downloadedApkPath = null
                     downloadProgress = 0
                 }
@@ -700,11 +736,25 @@ class MainActivity : ComponentActivity() {
         if (!file.isFile || file.length() < 1024L) {
             downloadedApkPath = null
             downloadFailed = true
+            downloadFailureReason = "The downloaded APK is missing or incomplete."
+            return
+        }
+        val validationError = validateLinkaUpdateApk(this, file)
+        if (validationError != null) {
+            file.delete()
+            downloadedApkPath = null
+            downloadFailed = true
+            downloadFailureReason = validationError
             return
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
+            waitingForInstallPermission = true
             val settings = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName"))
-            runCatching { startActivity(settings) }
+            runCatching { startActivity(settings) }.onFailure {
+                waitingForInstallPermission = false
+                downloadFailed = true
+                downloadFailureReason = it.message?.take(220).orEmpty()
+            }
             return
         }
         runCatching {
@@ -716,6 +766,7 @@ class MainActivity : ComponentActivity() {
             startActivity(install)
         }.onFailure {
             downloadFailed = true
+            downloadFailureReason = it.message?.take(220).orEmpty()
         }
     }
 
@@ -806,7 +857,7 @@ private fun LinkaApp(
     sharedText: String, sharedTrigger: Int, load: () -> List<Capture>, save: (List<Capture>) -> Unit, copy: (String) -> Unit, open: (String) -> Unit,
     theme: String, setTheme: (String) -> Unit, language: String, setLanguage: (String) -> Unit,
     animations: Boolean, setAnimations: (Boolean) -> Unit, fontScale: Float, setFontScale: (Float) -> Unit,
-    alerts: Boolean, setAlerts: (Boolean) -> Unit, updateInfo: UpdateInfo?, updateStatus: String, checking: Boolean,
+    alerts: Boolean, notificationPermissionGranted: Boolean, openNotificationSettings: () -> Unit, setAlerts: (Boolean) -> Unit, updateInfo: UpdateInfo?, updateStatus: String, checking: Boolean,
     checkUpdates: () -> Unit, openUpdate: (UpdateInfo) -> Unit,
     autoDownload: Boolean, setAutoDownload: (Boolean) -> Unit, downloadProgress: Int, downloadingUpdate: Boolean,
     downloaded: Boolean, downloadFailed: Boolean, applyUpdate: () -> Unit, retryDownload: () -> Unit,
@@ -1086,6 +1137,14 @@ private fun LinkaApp(
                         }
                         SettingsGroup(tr(lang, "updates"), panel, border, main) {
                             SettingSwitch(tr(lang, "updateAlerts"), alerts, setAlerts, main, muted, tr(lang, "updateAlertsBody"))
+                            if (alerts && !notificationPermissionGranted) {
+                                Text(tr(lang, "notificationsBlocked"), color = Color(0xFFDA6969), fontSize = 11.sp, lineHeight = 16.sp)
+                                TextButton(onClick = openNotificationSettings, modifier = Modifier.align(Alignment.Start)) {
+                                    Text(tr(lang, "notificationSettings"), color = main, fontSize = 11.sp)
+                                }
+                            } else if (alerts) {
+                                Text(tr(lang, "notificationsEnabled"), color = muted, fontSize = 10.sp)
+                            }
                             SettingSwitch(tr(lang, "autoDownload"), autoDownload, setAutoDownload, main, muted, tr(lang, "autoDownloadBody"))
                             Button(onClick = checkUpdates, enabled = !checking, modifier = Modifier.fillMaxWidth().height(46.dp),
                                 shape = RoundedCornerShape(13.dp), colors = ButtonDefaults.buttonColors(containerColor = raised, contentColor = main)) {
@@ -1103,7 +1162,7 @@ private fun LinkaApp(
                                             androidx.compose.material3.LinearProgressIndicator(progress = { downloadProgress / 100f }, modifier = Modifier.fillMaxWidth(), color = main, trackColor = border)
                                             Text("$downloadProgress%", color = muted, fontSize = 10.sp)
                                         }
-                                        if (downloadFailed) Text(tr(lang, "downloadFailed"), color = Color(0xFFDA6969), fontSize = 11.sp)
+                                        if (downloadFailed) Text(downloadFailureReason.ifBlank { tr(lang, "downloadFailed") }, color = Color(0xFFDA6969), fontSize = 11.sp)
                                         if (downloaded) {
                                             Text(tr(lang, "downloaded"), color = main, fontSize = 11.sp)
                                             Button(onClick = applyUpdate, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = main, contentColor = bg)) {
