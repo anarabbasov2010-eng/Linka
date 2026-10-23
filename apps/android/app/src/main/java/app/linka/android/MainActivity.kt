@@ -560,7 +560,7 @@ class MainActivity : ComponentActivity() {
                         prefs().edit().putBoolean(AUTO_DOWNLOAD_KEY, enabled).apply()
                         if (enabled && updateInfo != null && downloadedApkPath == null && !downloadingUpdate) startUpdateDownload(updateInfo!!)
                     }, downloadProgress = downloadProgress, downloadingUpdate = downloadingUpdate,
-                    downloaded = downloadedApkPath != null, downloadFailed = downloadFailed,
+                    downloaded = downloadedApkPath != null, downloadFailed = downloadFailed, downloadFailureReason = downloadFailureReason,
                     applyUpdate = { installDownloadedUpdate() }, retryDownload = { updateInfo?.let { startUpdateDownload(it) } },
                     version = appVersion(), accepted = accepted,
                     agree = {
@@ -860,7 +860,7 @@ private fun LinkaApp(
     alerts: Boolean, notificationPermissionGranted: Boolean, openNotificationSettings: () -> Unit, setAlerts: (Boolean) -> Unit, updateInfo: UpdateInfo?, updateStatus: String, checking: Boolean,
     checkUpdates: () -> Unit, openUpdate: (UpdateInfo) -> Unit,
     autoDownload: Boolean, setAutoDownload: (Boolean) -> Unit, downloadProgress: Int, downloadingUpdate: Boolean,
-    downloaded: Boolean, downloadFailed: Boolean, applyUpdate: () -> Unit, retryDownload: () -> Unit,
+    downloaded: Boolean, downloadFailed: Boolean, downloadFailureReason: String, applyUpdate: () -> Unit, retryDownload: () -> Unit,
     version: String, accepted: Boolean, agree: () -> Unit, decline: () -> Unit
 ) {
     val lang = language.ifBlank { "en" }
