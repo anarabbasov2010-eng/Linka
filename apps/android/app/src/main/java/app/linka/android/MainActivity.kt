@@ -586,6 +586,23 @@ class MainActivity : ComponentActivity() {
         (getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("Linka", value))
     }
 
+    private fun rememberPairingIntent(value: Intent?) {
+        val uri = value?.data ?: return
+        if (!uri.scheme.equals("linka", ignoreCase = true) || !uri.host.equals("pair", ignoreCase = true)) return
+        val id = uri.getQueryParameter("id").orEmpty()
+        val secret = uri.getQueryParameter("secret").orEmpty()
+        if (id.isBlank() || secret.length < 32) return
+        prefs().edit().putString("pending_pair_id", id).putString("pending_pair_secret", secret).apply()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        rememberPairingIntent(intent)
+        incomingSharedText = extractSharedText(intent)
+        incomingSharedToken++
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -600,6 +617,7 @@ class MainActivity : ComponentActivity() {
         scheduleUpdateChecks()
         incomingSharedText = extractSharedText(intent)
         incomingSharedToken = 1
+        rememberPairingIntent(intent)
         checkForUpdate(true)
         setContent {
             var theme by remember { mutableStateOf(prefs().getString(THEME_KEY, "dark") ?: "dark") }
