@@ -101,6 +101,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -414,8 +415,7 @@ private val extraWords = mapOf(
         "syncNeedCode" to "Request a fresh email code first.", "syncOtpExpired" to "Code expired. Request a new one.",
         "syncQrApproved" to "Desktop sign-in approved.", "syncNeedSignInForQr" to "Sign in to approve the QR request.",
         "syncWait" to "Resend available in", "syncVerifyAndSync" to "Verify code and sync",
-        "syncHelp" to "Enter the shared Linka project URL and public key. Request a one-time email code to create an account or sign in; passwords are not used or stored."
-        "syncHelp" to "Create a free Supabase project, paste its Project URL and publishable key, then copy the SQL below into its SQL Editor. Your password is not saved; the refresh session is encrypted with Android Keystore.",
+        "syncHelp" to "Enter the shared Linka project URL and public key. Request a one-time email code to create an account or sign in; passwords are not used or stored.",
         "syncSetupSql" to "Copy database setup SQL", "syncForget" to "Forget this account", "syncClose" to "Close",
         "syncWorking" to "Syncing…", "syncCopied" to "SQL copied. Run it in Supabase → SQL Editor.",
         "syncRequired" to "Cloud sync needs your own Supabase project. Until connected, Linka continues to work locally.",
