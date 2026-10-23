@@ -857,7 +857,8 @@ private fun LinkaApp(
                     o.optString("previewTitle", ""), o.optString("previewDescription", ""), o.optString("previewImageUrl", ""))
                 }
             }
-            commit((imported + captures).distinctBy { it.id }.take(MAX_CAPTURES))
+            captures = (imported + captures).distinctBy { it.id }.take(MAX_CAPTURES)
+            save(captures)
             message = tr(lang, "importSuccess")
         }.onFailure { message = tr(lang, "importFailed") }
     }
@@ -926,7 +927,8 @@ private fun LinkaApp(
                 .putString(DELETED_IDS_KEY, JSONArray().apply { result.deletedIds.forEach { put(it) } }.toString())
                 .putString(SYNC_STATUS_KEY, result.message).apply()
             captures = result.captures
-                        save(result.captures)
+            save(result.captures)
+            cloudStatus = result.message
         }.onFailure { cloudStatus = it.message ?: "Cloud sync failed" }
     }
     val visible = filterCaptures(captures, filter, if (tab == 2) query else "")
