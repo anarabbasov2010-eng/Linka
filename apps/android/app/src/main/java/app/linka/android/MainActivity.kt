@@ -507,6 +507,95 @@ private val extraWords = mapOf(
         "syncLatest" to "Son eşitleme", "syncOpen" to "Bulut eşitlemesini kur", "syncOffline" to "Hesapsız devam et"
     )
 )
+private fun localizeUpdateNotes(raw: String, lang: String): String {
+    val source = raw.lines().map { it.trim().removePrefix("•").removePrefix("-").removePrefix("*").trim() }.filter { it.isNotBlank() }
+    val lines = mutableListOf<String>()
+    if (source.any { it.contains("signing key", true) || it.contains("migration from Linka 0.4.72", true) }) {
+        lines += when (lang) {
+            "ru" -> "Важно: эта версия устанавливается рядом со старой Linka. Экспортируй резервную копию в старом приложении и импортируй её здесь перед удалением старой версии."
+            "az" -> "Vacib: bu versiya köhnə Linka ilə yanaşı quraşdırılır. Köhnə tətbiqdən ehtiyat nüsxəni ixrac et və onu burada idxal etmədən əvvəlki versiyanı silmə."
+            "tr" -> "Önemli: bu sürüm eski Linka'nın yanına kurulur. Eski uygulamadan yedek dışa aktar ve eski sürümü kaldırmadan önce burada içe aktar."
+            else -> "Important: this version installs alongside old Linka. Export a backup from the old app and import it here before removing the old version."
+        }
+    }
+    source.forEach { line ->
+        val lower = line.lowercase(Locale.ROOT)
+        val translated = when {
+            "ambient sphere" in lower || "pulsing sphere" in lower -> when (lang) {
+                "ru" -> "Добавлена медленно пульсирующая фиолетово-графитовая сфера на фоне."
+                "az" -> "Arxa fona yavaş nəbz vuran bənövşəyi-qrafit kürə əlavə edildi."
+                "tr" -> "Arka plana yavaşça nabız atan mor-grafit küre eklendi."
+                else -> "Added a slowly pulsing violet-graphite ambient sphere."
+            }
+            "transparent navigation" in lower || "spring navigation" in lower || "navigation pill" in lower -> when (lang) {
+                "ru" -> "Нижняя навигация стала прозрачной; активный раздел плавно перемещается с упругим откликом."
+                "az" -> "Alt naviqasiya şəffaf oldu; aktiv bölmə yumşaq animasiya ilə hərəkət edir."
+                "tr" -> "Alt gezinme şeffaflaştı; etkin bölüm yumuşak bir animasyonla hareket ediyor."
+                else -> "Made bottom navigation translucent with a smooth, spring-like active state."
+            }
+            "ambient sound" in lower || "synth pad" in lower -> when (lang) {
+                "ru" -> "Добавлен необязательный тихий атмосферный синтезаторный фон; он выключен по умолчанию."
+                "az" -> "İstəyə bağlı sakit atmosfer sintezator səsi əlavə edildi; standart olaraq sönülüdür."
+                "tr" -> "İsteğe bağlı, sakin bir ortam synth sesi eklendi; varsayılan olarak kapalıdır."
+                else -> "Added optional, quiet ambient synth audio; disabled by default."
+            }
+            "notification" in lower -> when (lang) {
+                "ru" -> "Уточнены уведомления и отображение состояния обновлений."
+                "az" -> "Bildirişlər və yeniləmə statusunun göstərilməsi təkmilləşdirildi."
+                "tr" -> "Bildirimler ve güncelleme durumunun gösterimi iyileştirildi."
+                else -> "Improved notification and update-status feedback."
+            }
+            "release notes" in lower || "localized update" in lower -> when (lang) {
+                "ru" -> "Сведения об изменениях отображаются на выбранном языке."
+                "az" -> "Dəyişiklik qeydləri seçilmiş dildə göstərilir."
+                "tr" -> "Sürüm notları seçilen dilde gösterilir."
+                else -> "Release notes now follow the selected app language."
+            }
+            "shorter, calmer page transitions" in lower || "visual jumping" in lower -> when (lang) {
+                "ru" -> "Переходы между разделами стали короче и плавнее."
+                "az" -> "Bölmələr arasındakı keçidlər qısaldıldı və yumşaldıldı."
+                "tr" -> "Bölümler arası geçişler kısaltıldı ve yumuşatıldı."
+                else -> "Shorter, calmer transitions between sections."
+            }
+            "inbox renders" in lower || "limited batch" in lower -> when (lang) {
+                "ru" -> "Список загружает записи партиями, снижая нагрузку при запуске."
+                "az" -> "Siyahı başlanğıc yükünü azaltmaq üçün qeydləri hissə-hissə göstərir."
+                "tr" -> "Gelen kutusu açılış yükünü azaltmak için kayıtları gruplar halinde gösterir."
+                else -> "The inbox renders items in batches to reduce initial work."
+            }
+            "r8" in lower || "resource shrinking" in lower -> when (lang) {
+                "ru" -> "Оптимизирована сборка Android: уменьшены код и ресурсы приложения."
+                "az" -> "Android yığımı optimallaşdırıldı: kod və resursların ölçüsü azaldıldı."
+                "tr" -> "Android derlemesi optimize edildi; kod ve kaynak boyutu küçültüldü."
+                else -> "Optimized the Android build with code and resource shrinking."
+            }
+            "highest supported refresh rate" in lower -> when (lang) {
+                "ru" -> "Приложение запрашивает максимальную поддерживаемую частоту экрана; фактическая частота зависит от устройства."
+                "az" -> "Tətbiq ekranın dəstəklədiyi ən yüksək yenilənmə tezliyini istəyir; faktiki tezlik cihazdan asılıdır."
+                "tr" -> "Uygulama ekranın desteklediği en yüksek yenileme hızını ister; gerçek hız cihaza bağlıdır."
+                else -> "Requests the display's highest supported refresh rate; actual FPS depends on the device."
+            }
+            "motion remains native" in lower || "disabled in settings" in lower -> when (lang) {
+                "ru" -> "Анимации можно отключить в настройках."
+                "az" -> "Animasiyaları parametrlərdə söndürmək olar."
+                "tr" -> "Animasyonlar ayarlardan kapatılabilir."
+                else -> "Animations can be disabled in Settings."
+            }
+            else -> null
+        }
+        if (translated != null && translated !in lines) lines += translated
+    }
+    if (lines.isEmpty()) {
+        return when (lang) {
+            "ru" -> "• Более плавная навигация и улучшенная работа интерфейса\n• Уточнены уведомления и проверка обновлений"
+            "az" -> "• Daha hamar naviqasiya və təkmilləşdirilmiş interfeys\n• Bildirişlər və yeniləmə yoxlaması yaxşılaşdırıldı"
+            "tr" -> "• Daha akıcı gezinme ve iyileştirilmiş arayüz\n• Bildirimler ve güncelleme denetimi iyileştirildi"
+            else -> "• Smoother navigation and interface refinements\n• Improved notifications and update checks"
+        }
+    }
+    return lines.take(8).joinToString("\n") { "• $it" }
+}
+
 private fun tr(lang: String, key: String) = words[lang]?.get(key) ?: extraWords[lang]?.get(key) ?: words["en"]?.get(key) ?: extraWords["en"]?.get(key) ?: key
 
 /**
@@ -801,9 +890,15 @@ class MainActivity : ComponentActivity() {
         incomingSharedToken++
     }
 
+    override fun onPause() {
+        AmbientAudioEngine.stop()
+        super.onPause()
+    }
+
     override fun onResume() {
         super.onResume()
         appInForeground = true
+        if (prefs().getBoolean(AMBIENT_AUDIO_KEY, false)) AmbientAudioEngine.start()
         notificationsAllowed = canPostNotifications()
         val now = System.currentTimeMillis()
         val lastForegroundCheck = prefs().getLong("last_foreground_update_check", 0L)
@@ -1673,7 +1768,7 @@ private fun LinkaApp(
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(tr(lang, "updateBody"), color = muted, fontSize = 13.sp, lineHeight = 19.sp)
                     Text(tr(lang, "updateChanges"), color = main, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                    Text(updateInfo.changes, color = muted, fontSize = 12.sp, lineHeight = 18.sp)
+                    Text(localizeUpdateNotes(updateInfo.changes, lang), color = muted, fontSize = 12.sp, lineHeight = 18.sp)
                 }
             },
             confirmButton = {
