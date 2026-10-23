@@ -1020,7 +1020,7 @@ private fun LinkaApp(
     var visibleLimit by remember { mutableIntStateOf(30) }
     var deleting by remember { mutableStateOf<Capture?>(null) }
     var clearDialog by remember { mutableStateOf(false) }
-    var cloudDialog by remember { mutableStateOf(false) }
+    var cloudDialog by remember { mutableStateOf(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(SYNC_REFRESH_KEY, "").isNullOrBlank()) }
     var cloudConfigExpanded by remember { mutableStateOf(false) }
     var profileDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
