@@ -39,7 +39,7 @@ jobs:
           LINKA_VERSION_NAME: 0.4.${{ github.run_number }}
         run: |
           mkdir -p ~/.android
-          gradle assembleRelease -PlinkaVersionCode="$LINKA_VERSION_CODE" -PlinkaVersionName="$LINKA_VERSION_NAME"
+          gradle testDebugUnitTest assembleRelease -PlinkaVersionCode="$LINKA_VERSION_CODE" -PlinkaVersionName="$LINKA_VERSION_NAME"
           cp app/build/outputs/apk/release/app-release.apk "app/build/outputs/apk/release/Linka-Android-$LINKA_VERSION_NAME.apk"
 
       - name: Upload workflow artifact
@@ -58,6 +58,8 @@ jobs:
           body: |
             What's new in this Android build:
             - Optimized release build with R8 code shrinking and resource shrinking.
+            - The inbox renders a limited batch of items at a time to reduce initial UI work.
+            - Automated unit tests cover link/note filters, case-insensitive search, and pinned ordering.
             - Shorter, calmer page transitions designed to reduce visual jumping.
             - Update prompts are localized and include release notes.
             - The app requests the display's highest supported refresh rate; actual FPS remains device-controlled.
