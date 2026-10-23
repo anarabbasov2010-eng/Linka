@@ -1091,6 +1091,11 @@ private fun LinkaApp(
                             }
                             Text("${tr(lang, "version")}: $version", color = muted, fontSize = 10.sp)
                         }
+                        SettingsGroup(tr(lang, "cloudSync"), panel, border, main) {
+                            SettingLine(Icons.Outlined.Sync, tr(lang, "cloudSync"), tr(lang, "syncOpen"), main, muted) { cloudDialog = true }
+                            Text(tr(lang, "cloudSyncBody"), color = muted, fontSize = 11.sp, lineHeight = 16.sp)
+                            if (cloudStatus.isNotBlank()) Text("${tr(lang, "syncLatest")}: $cloudStatus", color = muted, fontSize = 10.sp, lineHeight = 15.sp)
+                        }
                         SettingsGroup(tr(lang, "data"), panel, border, main) {
                             SettingLine(Icons.Outlined.ContentCopy, tr(lang, "export"), "", main, muted) {
                                 val array = JSONArray()
@@ -1151,6 +1156,97 @@ private fun LinkaApp(
             }
         )
     }
+    if (cloudDialog) AlertDialog(
+        onDismissRequest = { if (!cloudBusy) cloudDialog = false },
+        containerColor = panel,
+        shape = RoundedCornerShape(22.dp),
+        title = { Text(tr(lang, "cloudSync"), color = main, fontWeight = FontWeight.SemiBold) },
+        text = {
+            Column(Modifier.heightIn(max = 470.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(tr(lang, "syncHelp"), color = muted, fontSize = 12.sp, lineHeight = 18.sp)
+                OutlinedTextField(value = cloudUrl, onValueChange = { cloudUrl = it }, label = { Text(tr(lang, "syncEndpoint")) },
+                    singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+                    textStyle = TextStyle(color = main, fontSize = 12.sp), colors = fieldColors(bg, border, main, muted))
+                OutlinedTextField(value = cloudAnonKey, onValueChange = { cloudAnonKey = it }, label = { Text(tr(lang, "syncAnonKey")) },
+                    singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+                    textStyle = TextStyle(color = main, fontSize = 12.sp), colors = fieldColors(bg, border, main, muted))
+                OutlinedTextField(value = cloudEmail, onValueChange = { cloudEmail = it }, label = { Text(tr(lang, "syncEmail")) },
+                    singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+                    textStyle = TextStyle(color = main, fontSize = 12.sp), colors = fieldColors(bg, border, main, muted))
+                OutlinedTextField(value = cloudPassword, onValueChange = { cloudPassword = it }, label = { Text(tr(lang, "syncPassword")) },
+                    singleLine = true, visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+                    textStyle = TextStyle(color = main, fontSize = 12.sp), colors = fieldColors(bg, border, main, muted))
+                TextButton(onClick = {
+                    copy(CLOUD_SYNC_SETUP_SQL)
+                    cloudStatus = tr(lang, "syncCopied")
+                }, modifier = Modifier.align(Alignment.Start)) { Text(tr(lang, "syncSetupSql"), color = main, fontSize = 11.sp) }
+                if (cloudStatus.isNotBlank()) Text(cloudStatus, color = main, fontSize = 11.sp, lineHeight = 16.sp)
+                if (prefs.getString(SYNC_REFRESH_KEY, "").orEmpty().isNotBlank()) {
+                    TextButton(onClick = {
+                        prefs.edit().remove(SYNC_REFRESH_KEY).apply()
+                        cloudStatus = tr(lang, "syncRequired")
+                    }, modifier = Modifier.align(Alignment.Start)) {
+                        Text(tr(lang, "syncForget"), color = Color(0xFFDA6969), fontSize = 11.sp)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(enabled = !cloudBusy, onClick = {
+                cloudBusy = true
+                prefs.edit().putString(SYNC_URL_KEY, cloudUrl.trim().trimEnd('/'))
+                    .putString(SYNC_ANON_KEY, cloudAnonKey.trim()).putString(SYNC_EMAIL_KEY, cloudEmail.trim()).apply()
+                scope.launch {
+                    try {
+                        val stored = prefs.getString(SYNC_REFRESH_KEY, "").orEmpty()
+                        val rawDeleted = JSONArray(prefs.getString(DELETED_IDS_KEY, "[]") ?: "[]")
+                        val deletedIds = (0 until rawDeleted.length()).map { rawDeleted.optString(it) }.filter { it.isNotBlank() }.toSet()
+                        val result = syncWithSupabase(cloudUrl, cloudAnonKey, cloudEmail, cloudPassword, false, captures, deletedIds, stored)
+                        prefs.edit().putString(SYNC_REFRESH_KEY, result.encryptedRefreshToken)
+                            .putString(DELETED_IDS_KEY, JSONArray().apply { result.deletedIds.forEach { put(it) } }.toString())
+                            .putString(SYNC_STATUS_KEY, result.message).apply()
+                        commit(result.captures)
+                        cloudStatus = result.message
+                        cloudPassword = ""
+                    } catch (e: Exception) {
+                        cloudStatus = e.message ?: "Cloud sync failed"
+                    } finally {
+                        cloudBusy = false
+                    }
+                }
+            }, shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = main, contentColor = bg)) {
+                Text(if (cloudBusy) tr(lang, "syncWorking") else tr(lang, "syncNow"), fontSize = 11.sp)
+            }
+        },
+        dismissButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                TextButton(enabled = !cloudBusy, onClick = {
+                    cloudBusy = true
+                    prefs.edit().putString(SYNC_URL_KEY, cloudUrl.trim().trimEnd('/'))
+                        .putString(SYNC_ANON_KEY, cloudAnonKey.trim()).putString(SYNC_EMAIL_KEY, cloudEmail.trim()).apply()
+                    scope.launch {
+                        try {
+                            val rawDeleted = JSONArray(prefs.getString(DELETED_IDS_KEY, "[]") ?: "[]")
+                            val deletedIds = (0 until rawDeleted.length()).map { rawDeleted.optString(it) }.filter { it.isNotBlank() }.toSet()
+                            val result = syncWithSupabase(cloudUrl, cloudAnonKey, cloudEmail, cloudPassword, true, captures, deletedIds, "")
+                            prefs.edit().putString(SYNC_REFRESH_KEY, result.encryptedRefreshToken)
+                                .putString(DELETED_IDS_KEY, JSONArray().apply { result.deletedIds.forEach { put(it) } }.toString())
+                                .putString(SYNC_STATUS_KEY, result.message).apply()
+                            commit(result.captures)
+                            cloudStatus = result.message
+                            cloudPassword = ""
+                        } catch (e: Exception) {
+                            cloudStatus = e.message ?: "Cloud sync failed"
+                        } finally {
+                            cloudBusy = false
+                        }
+                    }
+                }) { Text(tr(lang, "createAccount"), color = main, fontSize = 10.sp) }
+                TextButton(enabled = !cloudBusy, onClick = { cloudDialog = false }) { Text(tr(lang, "syncClose"), color = muted, fontSize = 10.sp) }
+            }
+        }
+    )
     if (!accepted || agreementDialog) AgreementDialog(lang, panel, border, main, muted, !accepted,
         onAgree = agree, onDecline = decline, onClose = { agreementDialog = false })
     if (languageDialog) AlertDialog(onDismissRequest = { languageDialog = false }, containerColor = panel,
