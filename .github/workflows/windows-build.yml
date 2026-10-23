@@ -1,21 +1,18 @@
 name: Windows installer
 on:
-  workflow_run:
-    workflows: ["Android APK and releases"]
-    types: [completed]
+  push:
     branches: [main]
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 permissions:
   contents: write
 
 concurrency:
   group: windows-installers
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   windows:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,16 +20,35 @@ jobs:
         with:
           node-version: 22
       - uses: dtolnay/rust-toolchain@stable
-      - name: Resolve latest Linka release version
+      - name: Wait for Android release built from this commit
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $tag = (gh api "repos/$env:GITHUB_REPOSITORY/releases/latest" --jq .tag_name).Trim()
-          if (-not $tag) { throw "No published Linka Android release was found." }
-          $version = $tag.TrimStart("v")
-          if ($version -notmatch '^\d+\.\d+\.\d+
-          "LINKA_RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $release = $null
+          $commitSha = ""
+          for ($attempt = 1; $attempt -le 30; $attempt++) {
+            $tag = (gh api "repos/$env:GITHUB_REPOSITORY/releases/latest" --jq .tag_name 2>$null)
+            if ($LASTEXITCODE -eq 0 -and $tag) {
+              $tag = $tag.Trim()
+              $ref = gh api "repos/$env:GITHUB_REPOSITORY/git/ref/tags/$tag" | ConvertFrom-Json
+              $targetSha = $ref.object.sha
+              if ($ref.object.type -eq "tag") {
+                $tagObject = gh api "repos/$env:GITHUB_REPOSITORY/git/tags/$($ref.object.sha)" | ConvertFrom-Json
+                $targetSha = $tagObject.object.sha
+              }
+              if ($targetSha -eq $env:GITHUB_SHA) {
+                $release = gh api "repos/$env:GITHUB_REPOSITORY/releases/tags/$tag" | ConvertFrom-Json
+                break
+              }
+            }
+            Write-Host "Waiting for Android release for commit $env:GITHUB_SHA (attempt $attempt/30)..."
+            Start-Sleep -Seconds 15
+          }
+          if (-not $release) { throw "Timed out waiting for the Android release matching this commit. No mismatched Windows installer was published." }
+          $version = $release.tag_name.TrimStart("v")
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Unexpected release tag: $($release.tag_name)" }
+          "LINKA_RELEASE_TAG=$($release.tag_name)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "VITE_LINKA_DESKTOP_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $configPath = Join-Path $env:GITHUB_WORKSPACE "apps/desktop/src-tauri/tauri.conf.json"
           $config = Get-Content -Raw $configPath | ConvertFrom-Json
@@ -44,44 +60,9 @@ jobs:
       - name: Install desktop tooling
         working-directory: apps/desktop
         run: npm install --no-audit --no-fund
-      - name: Build Windows installer
-        working-directory: apps/desktop
-        run: npm run build
-      - name: Upload Windows installer artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Linka-Windows-x64-setup
-          path: apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
-          if-no-files-found: error
-          retention-days: 30
-      - name: Publish installer to the latest Linka release
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          files=(apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe)
-          if [[ ! -f "${files[0]:-}" ]]; then
-            echo "::error::No Windows NSIS installer was produced."
-            exit 1
-          fi
-          cp "${files[0]}" Linka-Windows-x64-setup.exe
-          tag="${LINKA_RELEASE_TAG:-$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq .tag_name)}"
-          echo "Uploading Windows installer to release $tag"
-          gh release upload "$tag" Linka-Windows-x64-setup.exe --clobber --repo "$GITHUB_REPOSITORY"
-) { throw "Unexpected release tag: $tag" }
-          "LINKA_RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          "VITE_LINKA_DESKTOP_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          $configPath = Join-Path $env:GITHUB_WORKSPACE "apps/desktop/src-tauri/tauri.conf.json"
-          $config = Get-Content -Raw $configPath | ConvertFrom-Json
-          $config.version = $version
-          $config | ConvertTo-Json -Depth 100 | Set-Content -Encoding utf8 $configPath
-      - name: Install web dependencies
+      - name: Test web inbox and cloud sync merge
         working-directory: apps/web
-        run: npm install --no-audit --no-fund
-      - name: Install desktop tooling
-        working-directory: apps/desktop
-        run: npm install --no-audit --no-fund
+        run: npm test
       - name: Build Windows installer
         working-directory: apps/desktop
         run: npm run build
@@ -92,7 +73,7 @@ jobs:
           path: apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
           if-no-files-found: error
           retention-days: 30
-      - name: Publish installer to the latest Linka release
+      - name: Publish installer to matching Linka release
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -104,6 +85,4 @@ jobs:
             exit 1
           fi
           cp "${files[0]}" Linka-Windows-x64-setup.exe
-          tag="${LINKA_RELEASE_TAG:-$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq .tag_name)}"
-          echo "Uploading Windows installer to release $tag"
-          gh release upload "$tag" Linka-Windows-x64-setup.exe --clobber --repo "$GITHUB_REPOSITORY"
+          gh release upload "$LINKA_RELEASE_TAG" Linka-Windows-x64-setup.exe --clobber --repo "$GITHUB_REPOSITORY"
