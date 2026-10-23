@@ -28,6 +28,19 @@ class CaptureFilteringTest {
         assertEquals(listOf("n2", "n1"), filterCaptures(captures, "all", "note").map { it.id })
     }
 
+    @Test fun searchMatchesLinkDomainWithoutProtocol() {
+        assertEquals(listOf("l1"), filterCaptures(captures, "all", "example.com").map { it.id })
+    }
+
+    @Test fun searchMatchesExtractedPreviewText() {
+        val enriched = captures.map {
+            if (it.id == "l1") it.copy(previewTitle = "Baku architecture", previewDescription = "A photo essay")
+            else it
+        }
+        assertEquals(listOf("l1"), filterCaptures(enriched, "all", "architecture").map { it.id })
+        assertEquals(listOf("l1"), filterCaptures(enriched, "all", "photo essay").map { it.id })
+    }
+
     @Test fun pinnedFilterOnlyReturnsPinnedItems() {
         assertEquals(listOf("p1"), filterCaptures(captures, "pinned", "").map { it.id })
     }
