@@ -175,7 +175,7 @@ private val words = mapOf(
         "updates" to "App updates", "checkUpdates" to "Check for updates", "checking" to "Checking…", "latest" to "You're up to date",
         "failed" to "Couldn't check for updates. Check your connection and try again.", "available" to "A newer Linka is ready",
         "updateBody" to "A new version is available. Download the APK and confirm installation when Android asks.",
-        "updateNow" to "Download update", "later" to "Not now", "updateChanges" to "What's new", "themeDark" to "Dark", "themeLight" to "Light", "themeSystem" to "System",
+        "updateNow" to "Download update", "later" to "Not now", "updateChanges" to "What's new", "autoDownload" to "Download updates automatically", "autoDownloadBody" to "Download new APKs inside Linka when a release is detected.", "downloadProgress" to "Downloading update", "downloaded" to "Ready to install", "applyUpdate" to "Apply and restart", "downloadFailed" to "Download failed. Check your connection and retry.", "downloadWaiting" to "Preparing download…", "themeDark" to "Dark", "themeLight" to "Light", "themeSystem" to "System",
         "data" to "Your data", "export" to "Export backup", "import" to "Import backup", "clearData" to "Delete all captures",
         "clearConfirm" to "This permanently deletes all captures saved on this device. Export a backup first if you need one.",
         "deleteAll" to "Delete all", "cancel" to "Cancel", "done" to "Done", "agreement" to "User agreement",
@@ -206,7 +206,7 @@ private val words = mapOf(
         "updates" to "Обновления приложения", "checkUpdates" to "Проверить обновления", "checking" to "Проверяем…", "latest" to "У тебя актуальная версия",
         "failed" to "Не удалось проверить обновления. Проверь подключение и повтори попытку.", "available" to "Доступна новая версия Linka",
         "updateBody" to "Вышла новая версия. Скачай APK и подтверди установку, когда Android попросит.",
-        "updateNow" to "Скачать обновление", "later" to "Позже", "updateChanges" to "Что изменилось", "themeDark" to "Тёмная", "themeLight" to "Светлая", "themeSystem" to "Как в системе",
+        "updateNow" to "Скачать обновление", "later" to "Позже", "updateChanges" to "Что изменилось", "autoDownload" to "Скачивать обновления автоматически", "autoDownloadBody" to "Скачивать новые APK внутри Linka при обнаружении релиза.", "downloadProgress" to "Загрузка обновления", "downloaded" to "Готово к установке", "applyUpdate" to "Применить и перезапустить", "downloadFailed" to "Не удалось скачать. Проверь интернет и повтори.", "downloadWaiting" to "Подготовка загрузки…", "themeDark" to "Тёмная", "themeLight" to "Светлая", "themeSystem" to "Как в системе",
         "data" to "Твои данные", "export" to "Экспортировать копию", "import" to "Импортировать копию", "clearData" to "Удалить все записи",
         "clearConfirm" to "Все записи на этом устройстве будут удалены без возможности отмены. Сначала экспортируй копию, если она нужна.",
         "deleteAll" to "Удалить всё", "cancel" to "Отмена", "done" to "Готово", "agreement" to "Пользовательское соглашение",
@@ -704,6 +704,7 @@ private fun LinkaApp(
                         }
                         SettingsGroup(tr(lang, "updates"), panel, border, main) {
                             SettingSwitch(tr(lang, "updateAlerts"), alerts, setAlerts, main, muted, tr(lang, "updateAlertsBody"))
+                            SettingSwitch(tr(lang, "autoDownload"), autoDownload, setAutoDownload, main, muted, tr(lang, "autoDownloadBody"))
                             Button(onClick = checkUpdates, enabled = !checking, modifier = Modifier.fillMaxWidth().height(46.dp),
                                 shape = RoundedCornerShape(13.dp), colors = ButtonDefaults.buttonColors(containerColor = raised, contentColor = main)) {
                                 Icon(Icons.Outlined.SystemUpdate, null, modifier = Modifier.size(17.dp)); Spacer(Modifier.width(8.dp))
@@ -715,9 +716,22 @@ private fun LinkaApp(
                                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                         Text("${tr(lang, "available")}: ${updateInfo.version}", color = main, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
                                         Text(tr(lang, "updateBody"), color = muted, fontSize = 11.sp, lineHeight = 16.sp)
-                                        Button(onClick = { openUpdate(updateInfo.downloadUrl) }, modifier = Modifier.fillMaxWidth(),
-                                            shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = main, contentColor = bg)) {
-                                            Text(tr(lang, "updateNow"), fontSize = 12.sp)
+                                        if (downloadingUpdate) {
+                                            Text(tr(lang, "downloadProgress"), color = muted, fontSize = 11.sp)
+                                            androidx.compose.material3.LinearProgressIndicator(progress = { downloadProgress / 100f }, modifier = Modifier.fillMaxWidth(), color = main, trackColor = border)
+                                            Text("$downloadProgress%", color = muted, fontSize = 10.sp)
+                                        }
+                                        if (downloadFailed) Text(tr(lang, "downloadFailed"), color = Color(0xFFDA6969), fontSize = 11.sp)
+                                        if (downloaded) {
+                                            Text(tr(lang, "downloaded"), color = main, fontSize = 11.sp)
+                                            Button(onClick = applyUpdate, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = main, contentColor = bg)) {
+                                                Text(tr(lang, "applyUpdate"), fontSize = 12.sp)
+                                            }
+                                        } else {
+                                            Button(onClick = { if (downloadFailed) retryDownload() else openUpdate(updateInfo) }, enabled = !downloadingUpdate, modifier = Modifier.fillMaxWidth(),
+                                                shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = main, contentColor = bg)) {
+                                                Text(if (downloadFailed) tr(lang, "updateNow") else if (downloadingUpdate) tr(lang, "downloadWaiting") else tr(lang, "updateNow"), fontSize = 12.sp)
+                                            }
                                         }
                                     }
                                 }
