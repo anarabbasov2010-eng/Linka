@@ -60,11 +60,10 @@ jobs:
           LINKA_SUPABASE_URL: ${{ vars.LINKA_SUPABASE_URL }}
           LINKA_SUPABASE_PUBLISHABLE_KEY: ${{ vars.LINKA_SUPABASE_PUBLISHABLE_KEY }}
         run: |
-          $config = Join-Path $env:GITHUB_WORKSPACE "apps/web/public/linka-config.js"
+          "LINKA_SUPABASE_URL=$($env:LINKA_SUPABASE_URL)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "LINKA_SUPABASE_PUBLISHABLE_KEY=$($env:LINKA_SUPABASE_PUBLISHABLE_KEY)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           if ($env:LINKA_SUPABASE_URL -and $env:LINKA_SUPABASE_PUBLISHABLE_KEY) {
-            $json = @{ projectUrl = $env:LINKA_SUPABASE_URL.TrimEnd('/'); publishableKey = $env:LINKA_SUPABASE_PUBLISHABLE_KEY } | ConvertTo-Json -Compress
-            "globalThis.LINKA_CONFIG = Object.freeze($json);" | Set-Content -Path $config -Encoding utf8
-            Write-Host "Configured the public Linka cloud endpoint."
+            Write-Host "Configured the public Linka cloud endpoint for the build."
           } else {
             Write-Warning "Linka cloud endpoint is not configured. Local-only mode remains available."
           }
