@@ -48,3 +48,13 @@ Linka's Tauri updater is designed to verify signed update archives before instal
 4. The Windows release workflow detects both values, generates the signed NSIS updater archive, and publishes it with `latest.json`. Without both values, it builds the normal installer and leaves the in-app updater disabled; the application continues to offer the release page instead.
 
 **Do not rotate or lose the private signing key after distributing a build.** An updater signature mismatch is deliberately rejected. The Windows installer continues to support installing over the existing Linka installation while preserving the same app identifier.
+
+
+## Public environment values per platform
+
+Use the same active Linka Supabase project on all builds:
+- **GitHub → Settings → Secrets and variables → Actions → Variables:** add `LINKA_SUPABASE_URL` and `LINKA_SUPABASE_PUBLISHABLE_KEY`. The Windows release workflow injects them into the public webview config; the Android workflow reads these same variable names.
+- **Vercel → Linka web project → Settings → Environment Variables:** add the same two variables and redeploy. The Vite build generates `public/linka-config.js` from them; do not add a service-role key to Vercel frontend variables.
+- **Supabase:** configure Authentication email OTP and custom SMTP, apply `supabase/migrations/202610230000_linka_sync.sql` and `202610230001_linka_login_pairings.sql`, then deploy `supabase/functions/linka-pairing/index.ts` with the documented JWT setting.
+
+The URL and publishable key are client-visible, so they are not password-equivalent secrets. The **service-role key and SMTP password are secrets** and must only be saved in the appropriate server-side secret settings. Never put them in a `VITE_*` variable, website source, mobile APK or repository.
