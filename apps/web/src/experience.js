@@ -281,6 +281,32 @@ function setLanguage(value) {
 function isDesktopShell() {
   return Boolean(window.__TAURI_INTERNALS__ || window.__TAURI__);
 }
+async function requestLinkaNotificationPermission() {
+  if (isDesktopShell()) {
+    const api = await import("@tauri-apps/plugin-notification");
+    let allowed = await api.isPermissionGranted();
+    if (!allowed) allowed = (await api.requestPermission()) === "granted";
+    return allowed;
+  }
+  if (!("Notification" in window)) return false;
+  return (Notification.permission === "granted" || await Notification.requestPermission() === "granted");
+}
+async function sendLinkaNotification(title, body, tag = "linka-notification") {
+  if (isDesktopShell()) {
+    try {
+      const api = await import("@tauri-apps/plugin-notification");
+      let allowed = await api.isPermissionGranted();
+      if (!allowed) allowed = (await api.requestPermission()) === "granted";
+      if (allowed) api.sendNotification({ title: String(title).slice(0, 100), body: String(body).slice(0, 240) });
+    } catch {
+      // Notifications should never interrupt saving or syncing library items.
+    }
+    return;
+  }
+  if ("Notification" in window && Notification.permission === "granted") {
+    try { new Notification(title, { body, tag }); } catch {}
+  }
+}
 function compareVersions(left, right) {
   const a = String(left || "").match(/\d+/g)?.map(Number) || [];
   const b = String(right || "").match(/\d+/g)?.map(Number) || [];
@@ -376,7 +402,7 @@ async function checkForRelease({ notify = false } = {}) {
     }
     if (notify && versionIsOlder && lastUpdateNotice !== latest &&
       localStorage.getItem(NOTIFY_KEY) === "true" && "Notification" in window && Notification.permission === "granted") {
-      new Notification("Linka update", { body: "Version " + latest + " is available.", tag: "linka-update-" + latest });
+      void sendLinkaNotification("Linka update", "Version " + latest + " is available.", "linka-update-" + latest);
       lastUpdateNotice = latest;
     }
   } catch {
@@ -410,17 +436,21 @@ function showNotificationSettings(panel) {
     localStorage.getItem(NOTIFY_KEY) === "true" ? tr("notificationsOn") : "Linka can show update notices while the app is open.");
   const toggle = button(localStorage.getItem(NOTIFY_KEY) === "true" ? tr("notificationsOn") : tr("enableNotifications"), "linka-button linka-button-secondary");
   toggle.addEventListener("click", async () => {
-    if (!("Notification" in window)) { setStatus(detail, "Notifications aren't supported in this app environment.", true); return; }
-    const permission = Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
-    if (permission === "granted") {
-      localStorage.setItem(NOTIFY_KEY, "true");
-      detail.textContent = tr("notificationsOn");
-      toggle.textContent = tr("notificationsOn");
-      new Notification("Linka", { body: "Notifications are enabled.", tag: "linka-notifications-test" });
-    } else {
-      localStorage.setItem(NOTIFY_KEY, "false");
-      setStatus(detail, "Notifications are blocked by the operating system or browser.", true);
-    }
+    toggle.disabled = true;
+    try {
+      const allowed = await requestLinkaNotificationPermission();
+      if (allowed) {
+        localStorage.setItem(NOTIFY_KEY, "true");
+        detail.textContent = tr("notificationsOn");
+        toggle.textContent = tr("notificationsOn");
+        await sendLinkaNotification("Linka", "Notifications are enabled.", "linka-notifications-test");
+      } else {
+        localStorage.setItem(NOTIFY_KEY, "false");
+        setStatus(detail, "Notifications are blocked by the operating system.", true);
+      }
+    } catch {
+      setStatus(detail, "Notifications are not available in this app environment.", true);
+    } finally { toggle.disabled = false; }
   });
   section.append(detail, toggle);
   panel.append(section);
@@ -700,7 +730,7 @@ function notificationForSavedCapture(event) {
   if (!enabled || !("Notification" in window) || Notification.permission !== "granted") return;
   const title = String(event?.detail?.title || "Saved to Linka").slice(0, 100);
   const body = String(event?.detail?.body || "Your item is in your library.").slice(0, 180);
-  try { new Notification(title, { body, tag: "linka-capture" }); } catch {}
+  void sendLinkaNotification(title, body, "linka-capture");
 }
 function handleIncomingPairing() {
   const params = new URLSearchParams(location.search);
