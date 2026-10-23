@@ -611,13 +611,6 @@ class MainActivity : ComponentActivity() {
         incomingPairingToken++
     }
 
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        rememberPairingIntent(intent)
-        incomingSharedText = extractSharedText(intent)
-        incomingSharedToken++
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -697,6 +690,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        rememberPairingIntent(intent)
         incomingSharedText = extractSharedText(intent)
         incomingSharedToken++
     }
