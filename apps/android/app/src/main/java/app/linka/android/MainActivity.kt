@@ -422,7 +422,7 @@ private val extraWords = mapOf(
         "syncSetupSql" to "Copy database setup SQL", "syncForget" to "Forget this account", "syncClose" to "Close",
         "syncWorking" to "Syncing…", "syncCopied" to "SQL copied. Run it in Supabase → SQL Editor.",
         "syncRequired" to "Cloud sync needs your own Supabase project. Until connected, Linka continues to work locally.",
-        "syncLatest" to "Last sync", "syncOpen" to "Set up cloud sync"
+        "syncLatest" to "Last sync", "syncOpen" to "Set up cloud sync", "syncOffline" to "Continue offline"
     ),
     "ru" to mapOf(
         "video" to "ВИДЕО", "article" to "СТАТЬЯ", "website" to "САЙТ",
@@ -440,7 +440,7 @@ private val extraWords = mapOf(
         "syncSetupSql" to "Скопировать SQL для базы", "syncForget" to "Отключить этот аккаунт", "syncClose" to "Закрыть",
         "syncWorking" to "Синхронизация…", "syncCopied" to "SQL скопирован. Выполни его в Supabase → SQL Editor.",
         "syncRequired" to "Для облачной синхронизации нужен собственный проект Supabase. Пока он не подключён, Linka продолжит работать локально.",
-        "syncLatest" to "Последняя синхронизация", "syncOpen" to "Настроить синхронизацию"
+        "syncLatest" to "Последняя синхронизация", "syncOpen" to "Настроить синхронизацию", "syncOffline" to "Продолжить без аккаунта"
     ),
     "az" to mapOf(
         "video" to "VİDEO", "article" to "MƏQALƏ", "website" to "SAYT",
@@ -458,7 +458,7 @@ private val extraWords = mapOf(
         "syncSetupSql" to "Baza SQL-ini kopyala", "syncForget" to "Hesabı ayır", "syncClose" to "Bağla",
         "syncWorking" to "Sinxronizasiya…", "syncCopied" to "SQL kopyalandı. Supabase → SQL Editor bölməsində icra et.",
         "syncRequired" to "Bulud sinxronizasiyası üçün öz Supabase layihən lazımdır. Qoşulana qədər Linka yerli işləyəcək.",
-        "syncLatest" to "Son sinxronizasiya", "syncOpen" to "Sinxronizasiyanı qur"
+        "syncLatest" to "Son sinxronizasiya", "syncOpen" to "Sinxronizasiyanı qur", "syncOffline" to "Hesabsız davam et"
     ),
     "tr" to mapOf(
         "video" to "VİDEO", "article" to "MAKALE", "website" to "WEB SİTESİ",
@@ -476,7 +476,7 @@ private val extraWords = mapOf(
         "syncSetupSql" to "Veritabanı SQL'ini kopyala", "syncForget" to "Bu hesabı unut", "syncClose" to "Kapat",
         "syncWorking" to "Senkronize ediliyor…", "syncCopied" to "SQL kopyalandı. Supabase → SQL Editor'da çalıştır.",
         "syncRequired" to "Bulut senkronizasyonu için kendi Supabase projen gerekir. Bağlanana kadar Linka yerel çalışır.",
-        "syncLatest" to "Son senkronizasyon", "syncOpen" to "Bulut senkronizasyonunu kur"
+        "syncLatest" to "Son senkronizasyon", "syncOpen" to "Bulut senkronizasyonunu kur", "syncOffline" to "Hesapsız devam et"
     )
 )
 private fun tr(lang: String, key: String) = words[lang]?.get(key) ?: extraWords[lang]?.get(key) ?: words["en"]?.get(key) ?: extraWords["en"]?.get(key) ?: key
@@ -1143,8 +1143,7 @@ private fun LinkaApp(
     }
     LaunchedEffect(accepted, language) {
         if (!accepted || language.isBlank()) return@LaunchedEffect
-        val configured = cloudUrl.startsWith("https://") && cloudAnonKey.isNotBlank()
-        if (configured && prefs.getString(SYNC_REFRESH_KEY, "").orEmpty().isBlank() &&
+        if (prefs.getString(SYNC_REFRESH_KEY, "").orEmpty().isBlank() &&
             !prefs.getBoolean("account_intro_shown", false) && pendingPairId.isBlank()) {
             prefs.edit().putBoolean("account_intro_shown", true).apply()
             cloudDialog = true
@@ -1606,6 +1605,7 @@ private fun LinkaApp(
                 if (prefs.getString(SYNC_REFRESH_KEY, "").orEmpty().isBlank()) TextButton(enabled = !cloudBusy, onClick = {
                     requestEmailCode(true)
                 }) { Text(tr(lang, "syncRegisterCode"), color = main, fontSize = 10.sp) }
+                TextButton(enabled = !cloudBusy, onClick = { cloudDialog = false }) { Text(tr(lang, "syncOffline"), color = muted, fontSize = 10.sp) }
                 TextButton(enabled = !cloudBusy, onClick = { cloudDialog = false }) { Text(tr(lang, "syncClose"), color = muted, fontSize = 10.sp) }
             }
         }
