@@ -624,7 +624,7 @@ private fun LinkaApp(
                         else visible.forEach { c -> CaptureCard(c, lang, panel, raised, border, main, muted, fontScale,
                             onPin = { item -> commit(captures.map { if (it.id == item.id) it.copy(pinned = !it.pinned, updatedAt = System.currentTimeMillis()) else it }) },
                             onCopy = { copy(it.text); message = tr(lang, "copied") }, onOpen = { open(it.text) },
-                            onEdit = { draft = it.text; commit(captures.filterNot { x -> x.id == it.id }); tab = 0 },
+                            onEdit = { draft = it.text; editingId = it.id; tab = 0; message = tr(lang, "edit") },
                             onDelete = { deleting = it })
                         }
                     }
