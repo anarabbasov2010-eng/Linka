@@ -1,0 +1,17 @@
+[package]
+name = "linka-desktop"
+version = "0.2.0"
+description = "Linka local-first inbox"
+authors = ["Linka"]
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "linka_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.0.0", features = [] }
