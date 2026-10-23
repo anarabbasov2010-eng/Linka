@@ -497,6 +497,10 @@ function showAccount({ firstRun = false } = {}) {
   });
   form.append(email.wrap, code.wrap, status, actions);
   panel.append(form, offline);
+  showQrPairing(panel, { url: service.url.value, key: service.key.value }, () => {
+    dialog.close();
+    setTimeout(() => showAccount(), 180);
+  });
   let sentAt = 0;
   let expiryAt = 0;
   let createUser = false;
