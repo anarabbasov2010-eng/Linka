@@ -1,4 +1,5 @@
 import { loadCaptures, saveCaptures, makeCapture, visibleCaptures } from "./store.js";
+import { initLinkaExperience } from "./experience.js";
 import {
   addDeletedId, createCloudAccount, disconnectCloud, getCloudConfig, getCloudSession,
   readDeletedIds, saveCloudConfig, signInCloud, syncCloudCaptures
@@ -278,7 +279,7 @@ function showAgreement({mustAccept = false} = {}) {
       panel.append(h,p); $("#app").append(panel);
     });
     const accept=document.createElement("button"); accept.className="primary"; accept.textContent="I agree and continue";
-    accept.addEventListener("click", () => { localStorage.setItem("linka.termsAccepted", TERMS_VERSION); modalRoot.replaceChildren(); say("Agreement saved on this device"); });
+    accept.addEventListener("click", () => { localStorage.setItem("linka.termsAccepted", TERMS_VERSION); modalRoot.replaceChildren(); say("Agreement saved on this device"); window.dispatchEvent(new Event("linka:agreement-accepted")); });
     actions.append(decline, accept);
   } else {
     const close=document.createElement("button"); close.className="primary"; close.textContent="Готово";
@@ -487,7 +488,7 @@ form.addEventListener("submit",event=>{
   event.preventDefault();const text=draft.value.trim();if(!text)return;
   const existing=editingId?captures.find(item=>item.id===editingId):null;
   if(existing){captures=captures.map(item=>item.id===editingId?{...item,text:text.slice(0,100000),updatedAt:Date.now()}:item);say("Запись обновлена");}
-  else{captures.unshift(makeCapture(text));say("Сохранено на этом устройстве");}
+  else{captures.unshift(makeCapture(text));say("Сохранено на этом устройстве");window.dispatchEvent(new CustomEvent("linka:capture-saved",{detail:{title:"Saved to Linka",body:text.slice(0,140)}}));}
   persist();resetEditor();render();
 });
 search.addEventListener("input",render);
@@ -537,3 +538,10 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) refr
 window.addEventListener("focus", refreshCloudIfDue);
 setInterval(refreshCloudIfDue, 60000);
 if(localStorage.getItem("linka.termsAccepted")!==TERMS_VERSION)showAgreement({mustAccept:true});
+window.addEventListener("linka:authenticated", () => {
+  if (getCloudSession()) void syncNow({ silent: true }).catch(error => say(error?.message || "Sync unavailable"));
+});
+window.addEventListener("linka:profile-saved", () => {
+  if (getCloudSession()) void syncNow({ silent: true }).catch(error => say(error?.message || "Sync unavailable"));
+});
+initLinkaExperience();
