@@ -857,8 +857,8 @@ private fun LinkaApp(
                     o.optString("previewTitle", ""), o.optString("previewDescription", ""), o.optString("previewImageUrl", ""))
                 }
             }
-            captures = (imported + captures).distinctBy { it.id }.take(MAX_CAPTURES)
-            save(captures); message = tr(lang, "importSuccess")
+            commit((imported + captures).distinctBy { it.id }.take(MAX_CAPTURES))
+            message = tr(lang, "importSuccess")
         }.onFailure { message = tr(lang, "importFailed") }
     }
     fun commit(list: List<Capture>) {
@@ -925,7 +925,8 @@ private fun LinkaApp(
             prefs.edit().putString(SYNC_REFRESH_KEY, result.encryptedRefreshToken)
                 .putString(DELETED_IDS_KEY, JSONArray().apply { result.deletedIds.forEach { put(it) } }.toString())
                 .putString(SYNC_STATUS_KEY, result.message).apply()
-            commit(result.captures)
+            captures = result.captures
+                        save(result.captures)
         }.onFailure { cloudStatus = it.message ?: "Cloud sync failed" }
     }
     val visible = filterCaptures(captures, filter, if (tab == 2) query else "")
@@ -1232,7 +1233,8 @@ private fun LinkaApp(
                         prefs.edit().putString(SYNC_REFRESH_KEY, result.encryptedRefreshToken)
                             .putString(DELETED_IDS_KEY, JSONArray().apply { result.deletedIds.forEach { put(it) } }.toString())
                             .putString(SYNC_STATUS_KEY, result.message).apply()
-                        commit(result.captures)
+                        captures = result.captures
+                        save(result.captures)
                         cloudStatus = result.message
                         cloudPassword = ""
                     } catch (e: Exception) {
@@ -1247,7 +1249,7 @@ private fun LinkaApp(
         },
         dismissButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                TextButton(enabled = !cloudBusy, onClick = {
+                if (prefs.getString(SYNC_REFRESH_KEY, "").orEmpty().isBlank()) TextButton(enabled = !cloudBusy, onClick = {
                     cloudBusy = true
                     prefs.edit().putString(SYNC_URL_KEY, cloudUrl.trim().trimEnd('/'))
                         .putString(SYNC_ANON_KEY, cloudAnonKey.trim()).putString(SYNC_EMAIL_KEY, cloudEmail.trim()).apply()
@@ -1259,7 +1261,8 @@ private fun LinkaApp(
                             prefs.edit().putString(SYNC_REFRESH_KEY, result.encryptedRefreshToken)
                                 .putString(DELETED_IDS_KEY, JSONArray().apply { result.deletedIds.forEach { put(it) } }.toString())
                                 .putString(SYNC_STATUS_KEY, result.message).apply()
-                            commit(result.captures)
+                            captures = result.captures
+                            save(result.captures)
                             cloudStatus = result.message
                             cloudPassword = ""
                         } catch (e: Exception) {
