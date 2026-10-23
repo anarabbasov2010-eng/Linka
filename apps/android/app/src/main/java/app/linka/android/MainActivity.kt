@@ -94,6 +94,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -150,8 +151,14 @@ private const val MAX_CAPTURES = 500
 private const val RELEASES_API = "https://api.github.com/repos/anarabbasov2010-eng/Linka/releases/latest"
 private const val NOTIFICATION_CHANNEL = "linka_updates"
 
-private data class Capture(val id: String, val text: String, val createdAt: Long, val updatedAt: Long = createdAt, val pinned: Boolean = false)
+internal data class Capture(val id: String, val text: String, val createdAt: Long, val updatedAt: Long = createdAt, val pinned: Boolean = false)
 private data class UpdateInfo(val version: String, val downloadUrl: String, val releaseUrl: String, val changes: String)
+
+internal fun filterCaptures(captures: List<Capture>, filter: String, query: String): List<Capture> = captures.filter { c ->
+    val isLink = c.text.startsWith("http://", true) || c.text.startsWith("https://", true)
+    val kind = when (filter) { "pinned" -> c.pinned; "links" -> isLink; "notes" -> !isLink; else -> true }
+    kind && (query.isBlank() || c.text.contains(query.trim(), ignoreCase = true))
+}.sortedWith(compareByDescending<Capture> { it.pinned }.thenByDescending { it.updatedAt })
 
 private val languages = listOf("az" to "Azərbaycan dili", "en" to "English", "ru" to "Русский", "tr" to "Türkçe")
 private val words = mapOf(
@@ -184,7 +191,7 @@ private val words = mapOf(
         "delete" to "Delete", "pin" to "Pin", "unpin" to "Unpin", "localOnly" to "Data stays on this phone. Automatic sync and accounts are not implemented yet.",
         "languageIntro" to "Choose your language", "languageBody" to "You can change this later in Settings.", "continue" to "Continue",
         "importSuccess" to "Backup imported", "importFailed" to "Couldn't read this backup file.", "emptySearch" to "Try another search or filter.",
-        "version" to "Version", "manage" to "Personalize your Linka experience", "local" to "ON THIS DEVICE"
+        "version" to "Version", "manage" to "Personalize your Linka experience", "local" to "ON THIS DEVICE", "loadMore" to "Load more"
     ),
     "ru" to mapOf(
         "tagline" to "ССЫЛКИ · ЗАМЕТКИ · МЫСЛИ", "home" to "Главная", "inbox" to "Сохранённое", "search" to "Поиск", "settings" to "Настройки",
@@ -527,6 +534,7 @@ private fun LinkaApp(
     var agreementDialog by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
     var updatePromptDismissed by remember { mutableStateOf(false) }
+    var visibleLimit by remember { mutableIntStateOf(30) }
     var deleting by remember { mutableStateOf<Capture?>(null) }
     var clearDialog by remember { mutableStateOf(false) }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -556,11 +564,8 @@ private fun LinkaApp(
             tab = 0
         }
     }
-    val visible = captures.filter { c ->
-        val isLink = c.text.startsWith("http://", true) || c.text.startsWith("https://", true)
-        val kind = when (filter) { "pinned" -> c.pinned; "links" -> isLink; "notes" -> !isLink; else -> true }
-        kind && (tab != 2 || query.isBlank() || c.text.contains(query.trim(), ignoreCase = true))
-    }.sortedWith(compareByDescending<Capture> { it.pinned }.thenByDescending { it.updatedAt })
+    val visible = filterCaptures(captures, filter, if (tab == 2) query else "")
+    LaunchedEffect(tab, filter, query) { visibleLimit = 30 }
 
     if (language.isBlank()) {
         LanguageWelcome(dark, animations, onContinue = { setLanguage(it) })
@@ -667,11 +672,16 @@ private fun LinkaApp(
                         FilterRow(lang, filter, { filter = it })
                         Text("${visible.size} ${tr(lang, "items")}", color = muted, fontSize = 11.sp)
                         if (visible.isEmpty()) EmptyState(lang, panel, border, main, muted, if (page == 2 && query.isNotBlank()) "noResults" else "empty")
-                        else visible.forEach { c -> CaptureCard(c, lang, panel, raised, border, main, muted, fontScale,
+                        else visible.take(visibleLimit).forEach { c -> CaptureCard(c, lang, panel, raised, border, main, muted, fontScale,
                             onPin = { item -> commit(captures.map { if (it.id == item.id) it.copy(pinned = !it.pinned, updatedAt = System.currentTimeMillis()) else it }) },
                             onCopy = { copy(it.text); message = tr(lang, "copied") }, onOpen = { open(it.text) },
                             onEdit = { draft = it.text; editingId = it.id; tab = 0; message = tr(lang, "edit") },
                             onDelete = { deleting = it })
+                        }
+                        if (visible.size > visibleLimit) {
+                            TextButton(onClick = { visibleLimit = (visibleLimit + 30).coerceAtMost(visible.size) }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                                Text(tr(lang, "loadMore"), color = muted, fontSize = 12.sp)
+                            }
                         }
                     }
                     else -> {
