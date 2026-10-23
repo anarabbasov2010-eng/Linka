@@ -599,15 +599,25 @@ function showAccount({ firstRun = false } = {}) {
   const googleStatus = make("p", "linka-status");
   const googleButton = button(tr("googleSignIn"));
   googleButton.setAttribute("data-auth-action", "google");
-  googleButton.addEventListener("click", () => {
+  googleButton.addEventListener("click", async () => {
+    googleButton.disabled = true;
     try {
       const config = saveCloudConfig(service.url.value, service.key.value);
-      const redirectTo = window.__TAURI_INTERNALS__
-        ? "linka://auth/callback"
-        : new URL(window.location.pathname, window.location.origin).toString();
-      startGoogleOAuth({ url: config.url, key: config.key, redirectTo });
+      if (window.__TAURI_INTERNALS__) {
+        // Keep the local Tauri webview alive while the system browser handles OAuth.
+        const authorizeUrl = new URL(`${config.url}/auth/v1/authorize`);
+        authorizeUrl.searchParams.set("provider", "google");
+        authorizeUrl.searchParams.set("redirect_to", "linka://auth/callback");
+        const { openUrl } = await import("@tauri-apps/plugin-opener");
+        await openUrl(authorizeUrl.toString());
+      } else {
+        const redirectTo = new URL(window.location.pathname, window.location.origin).toString();
+        startGoogleOAuth({ url: config.url, key: config.key, redirectTo });
+      }
     } catch (error) {
       setStatus(googleStatus, error?.message || tr("errors"), true);
+    } finally {
+      googleButton.disabled = false;
     }
   });
   panel.append(googleButton, googleStatus, emailFallback, offline);
