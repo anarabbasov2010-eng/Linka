@@ -1,21 +1,26 @@
 name: Windows installer
 on:
-  push:
+  workflow_run:
+    workflows: ["Android APK and releases"]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: windows-installers-${{ github.ref }}
-  cancel-in-progress: true
+  group: windows-installers-${{ github.event.workflow_run.head_sha || github.sha }}
+  cancel-in-progress: false
 
 jobs:
   windows:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -29,10 +34,24 @@ jobs:
       - name: Build Windows installer
         working-directory: apps/desktop
         run: npm run build
-      - name: Upload Windows installer
+      - name: Upload Windows installer artifact
         uses: actions/upload-artifact@v4
         with:
           name: Linka-Windows-x64-setup
           path: apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
           if-no-files-found: error
           retention-days: 30
+      - name: Publish installer to the latest Linka release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          files=(apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe)
+          if [[ ! -f "${files[0]:-}" ]]; then
+            echo "::error::No Windows NSIS installer was produced."
+            exit 1
+          fi
+          tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq .tag_name)"
+          echo "Uploading Windows installer to release $tag"
+          gh release upload "$tag" "${files[0]}" --clobber --repo "$GITHUB_REPOSITORY"
