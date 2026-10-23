@@ -4,6 +4,9 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val linkaVersionCode = providers.gradleProperty("linkaVersionCode").orNull?.toIntOrNull() ?: 5
+val linkaVersionName = providers.gradleProperty("linkaVersionName").orNull ?: "0.4.0"
+
 android {
     namespace = "app.linka.android"
     compileSdk = 35
@@ -12,8 +15,8 @@ android {
         applicationId = "app.linka.android"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.3.0"
+        versionCode = linkaVersionCode
+        versionName = linkaVersionName
     }
 
     compileOptions {
