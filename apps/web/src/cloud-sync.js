@@ -133,7 +133,104 @@ export function mergeCloudCaptures(localCaptures, remoteCaptures, deletedIds, ma
     .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0))
     .slice(0, maxItems);
 }
-export async function syncCloudCaptures(localCaptures, localDeletedIds = readDeletedIds()) {
+
+const OTP_COOLDOWN_MS = 120_000;
+const PROFILE_KEY = "linka.profile.v1";
+function profileStorage() { return globalThis.localStorage; }
+export function readLinkaProfile(storage = profileStorage()) {
+  const value = readObject(PROFILE_KEY, storage);
+  if (!value) return null;
+  return {
+    displayName: String(value.displayName || "").trim().slice(0, 48),
+    age: Number.isInteger(Number(value.age)) && Number(value.age) >= 13 && Number(value.age) <= 120 ? Number(value.age) : null,
+    updatedAt: Number(value.updatedAt || 0)
+  };
+}
+export function saveLinkaProfile(profile, storage = profileStorage()) {
+  const displayName = String(profile?.displayName || "").trim().replace(/\s+/g, " ").slice(0, 48);
+  const ageNumber = profile?.age === "" || profile?.age == null ? null : Number(profile.age);
+  if (!displayName) throw new Error("Enter a name to continue.");
+  if (ageNumber != null && (!Number.isInteger(ageNumber) || ageNumber < 13 || ageNumber > 120)) {
+    throw new Error("Age must be between 13 and 120, or left blank.");
+  }
+  const saved = { displayName, age: ageNumber, updatedAt: Date.now() };
+  if (!writeObject(PROFILE_KEY, saved, storage)) throw new Error("Profile could not be saved on this device.");
+  return saved;
+}
+export function getOtpCooldown(email, storage = profileStorage()) {
+  try {
+    const key = `linka.otp.cooldown.${String(email || "").trim().toLowerCase()}`;
+    const until = Number(storage?.getItem(key) || 0);
+    return Math.max(0, until - Date.now());
+  } catch { return 0; }
+}
+export async function requestEmailOtp({ url, key, email, createUser = false }) {
+  const config = requireConfig(url, key);
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) throw new Error("Enter a valid email address.");
+  const remaining = getOtpCooldown(normalizedEmail);
+  if (remaining > 0) throw new Error(`Wait ${Math.ceil(remaining / 1000)} seconds before requesting another code.`);
+  saveCloudConfig(config.url, config.key);
+  const storage = profileStorage();
+  const cooldownKey = `linka.otp.cooldown.${normalizedEmail}`;
+  try {
+    const result = await authRequest(config, "otp", { email: normalizedEmail, create_user: Boolean(createUser) });
+    try { storage?.setItem(cooldownKey, String(Date.now() + OTP_COOLDOWN_MS)); } catch {}
+    return { config, email: normalizedEmail, expiresInSeconds: 120, result };
+  } catch (error) {
+    throw new Error(error?.message || "Couldn't send the email code. Check the service configuration and try again.");
+  }
+}
+export async function verifyEmailOtp({ url, key, email, token }) {
+  const config = requireConfig(url, key);
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const code = String(token || "").replace(/\s+/g, "");
+  if (!/^[0-9]{6}$/.test(code)) throw new Error("Enter the six-digit code from your email.");
+  const result = await authRequest(config, "verify", { email: normalizedEmail, token: code, type: "email" });
+  const session = storeSession({ ...result, email: normalizedEmail }, config);
+  return { session, config };
+}
+async function pairingRequest(config, action, payload, bearer = "") {
+  const response = await fetch(`${config.url}/functions/v1/linka-pairing`, {
+    method: "POST",
+    headers: {
+      apikey: config.key,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      ...(bearer ? { Authorization: `Bearer ${bearer}` } : {})
+    },
+    body: JSON.stringify({ action, ...payload })
+  });
+  return readResponse(response);
+}
+export async function beginQrPairing({ url, key }) {
+  const config = requireConfig(url, key);
+  const result = await pairingRequest(config, "begin", {});
+  if (!result.id || !result.secret || !result.expiresAt) {
+    throw new Error("The pairing service returned an incomplete challenge. Deploy the Linka pairing function first.");
+  }
+  return { ...result, config };
+}
+export async function approveQrPairing({ id, secret, accessToken, refreshToken, url, key }) {
+  const config = requireConfig(url, key);
+  if (!getCloudSession()) throw new Error("Sign in on this device before approving a QR login.");
+  const session = await currentSession(config, getCloudSession());
+  const result = await pairingRequest(config, "approve", {
+    id: String(id || ""), secret: String(secret || ""),
+    refreshToken: String(refreshToken || session.refreshToken)
+  }, session.accessToken);
+  return result;
+}
+export async function claimQrPairing({ id, secret, url, key }) {
+  const config = requireConfig(url, key);
+  const result = await pairingRequest(config, "claim", { id: String(id || ""), secret: String(secret || "") });
+  if (!result.refreshToken || !result.email) throw new Error("The QR login was not approved yet. Try again in a moment.");
+  const renewed = await authRequest(config, "token?grant_type=refresh_token", { refresh_token: result.refreshToken });
+  const session = storeSession({ ...renewed, email: result.email }, config);
+  return { session, config };
+}
+
+export async function syncCloudCaptures(localCaptures, localDeletedIds = readDeletedIds(), profile = readLinkaProfile()) {
   const config = getCloudConfig();
   if (!config.url || !config.key) throw new Error("Set the shared sync project URL and public key in Linka settings.");
   const initial = getCloudSession();
@@ -153,9 +250,13 @@ export async function syncCloudCaptures(localCaptures, localDeletedIds = readDel
     remoteData.deletedIds.filter(id => typeof id === "string" && id).forEach(id => deleted.add(id));
   }
   const merged = mergeCloudCaptures(localCaptures, Array.isArray(remoteData?.captures) ? remoteData.captures : [], deleted);
+  const remoteProfile = remoteData?.profile && typeof remoteData.profile === "object" ? remoteData.profile : null;
+  const localProfile = profile && typeof profile === "object" ? profile : null;
+  const syncedProfile = !localProfile ? remoteProfile : (!remoteProfile || Number(localProfile.updatedAt || 0) >= Number(remoteProfile.updatedAt || 0) ? localProfile : remoteProfile);
+  if (syncedProfile) writeObject(PROFILE_KEY, syncedProfile);
   const body = {
     user_id: session.userId,
-    data: { captures: merged, deletedIds: Array.from(deleted).slice(-MAX_DELETED_IDS) },
+    data: { captures: merged, deletedIds: Array.from(deleted).slice(-MAX_DELETED_IDS), ...(syncedProfile ? { profile: syncedProfile } : {}) },
     updated_at: new Date().toISOString()
   };
   const upsert = await fetch(`${config.url}/rest/v1/linka_sync?on_conflict=user_id`, {
