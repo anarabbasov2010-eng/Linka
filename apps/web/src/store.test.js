@@ -35,3 +35,13 @@ test("filters links, notes, pinned items and search query", () => {
   assert.equal(visibleCaptures(items, "notes", "road").length, 1);
   assert.equal(visibleCaptures(items, "pinned").length, 1);
 });
+
+test("search finds cached page titles, descriptions and host names", () => {
+  const items = [
+    { id: "site", text: "https://example.com/articles", createdAt: 1, updatedAt: 1, previewTitle: "City cycling guide", previewDescription: "Safe routes around town" },
+    { id: "note", text: "Remember to buy milk", createdAt: 2, updatedAt: 2 }
+  ];
+  assert.deepEqual(visibleCaptures(items, "all", "cycling").map(item => item.id), ["site"]);
+  assert.deepEqual(visibleCaptures(items, "all", "example.com").map(item => item.id), ["site"]);
+  assert.deepEqual(visibleCaptures(items, "all", "safe routes").map(item => item.id), ["site"]);
+});

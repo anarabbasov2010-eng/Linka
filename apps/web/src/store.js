@@ -37,7 +37,10 @@ export function visibleCaptures(items, filter = "all", query = "") {
     if (filter === "pinned" && !item.pinned) return false;
     if (filter === "links" && !isLink) return false;
     if (filter === "notes" && isLink) return false;
-    return !q || item.text.toLocaleLowerCase().includes(q);
+    let host = "";
+    if (isLink) { try { host = new URL(item.text).hostname.replace(/^www\./i, ""); } catch {} }
+    const searchable = [item.text, item.previewTitle, item.previewDescription, host].join(" ").toLocaleLowerCase();
+    return !q || searchable.includes(q);
   }).sort((a,b) => Number(b.pinned)-Number(a.pinned) || b.updatedAt-a.updatedAt);
 }
 export function makeCapture(text, existing = {}) {

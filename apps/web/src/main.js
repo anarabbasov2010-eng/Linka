@@ -116,6 +116,7 @@ function render() {
   }
   shown.forEach((item, index) => {
     const card = document.createElement("article");
+    card.dataset.itemId = item.id;
     card.className = "item" + (item.pinned ? " pinned" : "");
     card.style.setProperty("--index", String(index));
     const head = document.createElement("div"); head.className = "item-head";
@@ -125,6 +126,16 @@ function render() {
     const body = document.createElement("p");
     body.className = "item-text" + (isLink(item.text) ? " link" : "");
     body.textContent = item.text;
+    const previewBits = [];
+    if (isLink(item.text) && /^https:\/\//i.test(item.previewImageUrl || "")) {
+      const frame = document.createElement("div"); frame.className = "item-cover-frame";
+      const cover = document.createElement("img"); cover.className = "item-cover"; cover.src = item.previewImageUrl;
+      cover.alt = item.previewTitle || "Link preview"; cover.loading = "lazy"; cover.decoding = "async"; cover.referrerPolicy = "no-referrer";
+      cover.addEventListener("load", () => cover.classList.add("loaded"), { once: true });
+      cover.addEventListener("error", () => frame.remove(), { once: true }); frame.append(cover); previewBits.push(frame);
+    }
+    if (isLink(item.text) && item.previewTitle) { const title = document.createElement("p"); title.className = "item-title"; title.textContent = item.previewTitle; previewBits.push(title); }
+    if (isLink(item.text) && item.previewDescription) { const description = document.createElement("p"); description.className = "item-description"; description.textContent = item.previewDescription; previewBits.push(description); }
     if (isLink(item.text)) {
       const url = document.createElement("a");
       url.href = item.text.trim(); url.target = "_blank"; url.rel = "noopener noreferrer";
@@ -135,8 +146,73 @@ function render() {
     const date = document.createElement("span"); date.className = "date"; date.textContent = formatDate(item.updatedAt || item.createdAt);
     const actions = document.createElement("div"); actions.className = "actions";
     actions.append(makeAction("Copy", "copy", item.id), makeAction("Edit", "edit", item.id), makeAction("Delete", "delete", item.id));
-    foot.append(date, actions); card.append(head, body, foot); list.append(card);
+    foot.append(date, actions); card.append(head, ...previewBits, body, foot); list.append(card);
   });
+}
+function showSearchSpace(initial = "") {
+  const content = document.createElement("div"); content.className = "search-space";
+  const head = document.createElement("div"); head.className = "modal-head";
+  const logo = document.createElement("img"); logo.className = "modal-logo"; logo.src = "/linka-mark.svg"; logo.alt = "";
+  const meta = document.createElement("div");
+  const title = document.createElement("h2"); title.textContent = "Search your library";
+  const subtitle = document.createElement("p"); subtitle.textContent = "Find a saved link, page title, or thought.";
+  meta.append(title, subtitle); head.append(logo, meta);
+  const searchWrap = document.createElement("label"); searchWrap.className = "search-space-input-wrap";
+  searchWrap.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.5"/><path d="m16 16 4 4"/></svg>';
+  const input = document.createElement("input"); input.className = "search-space-input"; input.type = "search";
+  input.placeholder = "Search everything you’ve saved…"; input.value = initial; input.autocomplete = "off"; input.setAttribute("aria-label", "Search your Linka library");
+  const hint = document.createElement("span"); hint.className = "search-hint"; hint.textContent = "Esc to close";
+  searchWrap.append(input, hint);
+  const info = document.createElement("div"); info.className = "search-space-meta";
+  const count = document.createElement("span"); const scope = document.createElement("span"); scope.textContent = "Across links and notes";
+  info.append(count, scope);
+  const results = document.createElement("div"); results.className = "search-space-results"; results.setAttribute("role", "listbox"); results.setAttribute("aria-label", "Search results");
+  content.append(head, searchWrap, info, results);
+  const layer = modalShell(content, { dismissable: true }); layer.classList.add("search-space-layer");
+  function refresh() {
+    const q = input.value.trim().toLocaleLowerCase();
+    const found = captures.filter(item => {
+      const host = isLink(item.text) ? (() => { try { return new URL(item.text).hostname.replace(/^www\./i, ""); } catch { return ""; } })() : "";
+      return !q || [item.text, item.previewTitle, item.previewDescription, host].join(" ").toLocaleLowerCase().includes(q);
+    }).sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || Number(b.updatedAt || b.createdAt) - Number(a.updatedAt || a.createdAt)).slice(0, 80);
+    count.textContent = q ? (found.length + " matching " + (found.length === 1 ? "item" : "items")) : ("Recently saved · " + found.length);
+    results.replaceChildren();
+    if (!found.length) {
+      const empty = document.createElement("div"); empty.className = "search-empty";
+      empty.innerHTML = '<div style="font-size:22px;margin-bottom:9px">⌕</div><strong>No matches yet</strong><br>Try a different word, domain, or page title.';
+      results.append(empty); return;
+    }
+    found.forEach(item => {
+      const row = document.createElement("button"); row.type = "button"; row.className = "search-result"; row.setAttribute("role", "option");
+      const thumb = document.createElement("span"); thumb.className = "search-thumb";
+      if (isLink(item.text) && /^https:\/\//i.test(item.previewImageUrl || "")) {
+        const image = document.createElement("img"); image.src = item.previewImageUrl; image.alt = ""; image.loading = "lazy"; image.decoding = "async"; image.referrerPolicy = "no-referrer";
+        thumb.append(image);
+      } else {
+        thumb.textContent = isLink(item.text) ? "↗" : "Aa";
+      }
+      const copy = document.createElement("span"); copy.className = "search-result-copy";
+      const rowTitle = document.createElement("span"); rowTitle.className = "search-result-title";
+      let host = ""; if (isLink(item.text)) { try { host = new URL(item.text).hostname.replace(/^www\./i, ""); } catch {} }
+      rowTitle.textContent = item.previewTitle || host || item.text.slice(0, 100);
+      const detail = document.createElement("span"); detail.className = "search-result-detail";
+      detail.textContent = item.previewDescription || item.text;
+      const type = document.createElement("span"); type.className = "search-result-type"; type.textContent = item.pinned ? "Pinned" : (isLink(item.text) ? "Link" : "Note");
+      copy.append(rowTitle, detail); row.append(thumb, copy, type);
+      row.addEventListener("click", () => {
+        search.value = input.value; activeFilter = "all";
+        filters.forEach(button => button.classList.toggle("active", button.dataset.filter === activeFilter));
+        render(); modalRoot.replaceChildren();
+        requestAnimationFrame(() => {
+          const match = Array.from(list.querySelectorAll("[data-item-id]")).find(node => node.dataset.itemId === item.id);
+          if (match) { match.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" }); match.classList.add("spotlight"); setTimeout(() => match.classList.remove("spotlight"), 950); }
+        });
+      });
+      results.append(row);
+    });
+  }
+  input.addEventListener("input", refresh);
+  refresh(); input.focus(); input.select();
 }
 function makeAction(label, action, id) {
   const button = document.createElement("button");
@@ -432,6 +508,15 @@ $("#import-file").addEventListener("change",async event=>{
   }catch{say("That file is not a valid Linka export");}finally{event.target.value="";}
 });
 $("#settings-button").addEventListener("click",showSettings);
+$("#search-space-button").addEventListener("click",()=>showSearchSpace(search.value));
+document.addEventListener("keydown",event=>{
+  if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="k"){
+    event.preventDefault();showSearchSpace(search.value);
+  }
+  if(event.key==="/"&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&!(event.target instanceof HTMLInputElement)&&!(event.target instanceof HTMLTextAreaElement)){
+    event.preventDefault();showSearchSpace("");
+  }
+});
 document.documentElement.classList.toggle("reduced-motion",reduceMotion);
 render();
 if(getCloudSession()) setTimeout(() => { void syncNow({ silent: true }).catch(() => {}); }, 1200);

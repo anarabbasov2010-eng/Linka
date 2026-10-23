@@ -17,7 +17,8 @@ function writeObject(key, value, storage = globalThis.localStorage) {
 }
 export function getCloudConfig(storage = globalThis.localStorage) {
   const value = readObject(CONFIG_KEY, storage);
-  return { url: String(value?.url || "").trim().replace(/\/+$/, ""), key: String(value?.key || "").trim() };
+  const defaults = globalThis.LINKA_CONFIG || {};
+  return { url: String(value?.url || defaults.projectUrl || "").trim().replace(/\/+$/, ""), key: String(value?.key || defaults.publishableKey || "").trim() };
 }
 export function saveCloudConfig(url, key, storage = globalThis.localStorage) {
   const normalizedUrl = String(url || "").trim().replace(/\/+$/, "");
