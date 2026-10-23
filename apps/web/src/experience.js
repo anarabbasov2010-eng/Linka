@@ -2,7 +2,8 @@ import QRCode from "qrcode";
 import {
   approveQrPairing, beginQrPairing, claimQrPairing, disconnectCloud,
   getCloudConfig, getCloudSession, getOtpCooldown, readLinkaProfile,
-  requestEmailOtp, saveCloudConfig, saveLinkaProfile, verifyEmailOtp
+  requestEmailOtp, saveCloudConfig, saveLinkaProfile, verifyEmailOtp,
+  startGoogleOAuth, completeGoogleOAuthCallback
 } from "./cloud-sync.js";
 
 const LANG_KEY = "linka.language.v1";
@@ -24,6 +25,7 @@ const COPY = {
     footer: "your personal library", footerRight: "Simple by design. Back up what matters.",
     account: "Account", settings: "Settings", language: "Language", theme: "Appearance", dark: "Dark", light: "Light", system: "System", reducedMotion: "Reduce motion", reducedMotionBody: "Use shorter, calmer transitions.",
     startTitle: "Welcome to Linka", startBody: "Create your account with your email. Your library will be ready on every signed-in device.",
+    googleSignIn: "Continue with Google", emailFallback: "Use email code instead",
     email: "Email address", code: "Six-digit code", sendCreate: "Create account · send code",
     sendLogin: "Sign in · send code", verify: "Verify and continue", continueOffline: "Continue offline",
     profileTitle: "A little about you", profileBody: "Choose the name you want to see in Linka. Real details aren't required.",
@@ -50,6 +52,7 @@ const COPY = {
     footer: "твоя личная библиотека", footerRight: "Ничего лишнего. Сохраняй важное в резервную копию.",
     account: "Аккаунт", settings: "Настройки", language: "Язык", theme: "Оформление", dark: "Тёмная", light: "Светлая", system: "Системная", reducedMotion: "Меньше анимации", reducedMotionBody: "Сокращает движение и переходы.",
     startTitle: "Добро пожаловать в Linka", startBody: "Создай аккаунт по электронной почте. Библиотека будет доступна на устройствах, где выполнен вход.",
+    googleSignIn: "Продолжить с Google", emailFallback: "Другой способ: код из почты",
     email: "Электронная почта", code: "Код из 6 цифр", sendCreate: "Создать аккаунт · получить код",
     sendLogin: "Войти · получить код", verify: "Подтвердить и продолжить", continueOffline: "Продолжить без аккаунта",
     profileTitle: "Расскажи немного о себе", profileBody: "Выбери имя, которое будет отображаться в Linka. Настоящие данные не обязательны.",
@@ -76,6 +79,7 @@ const COPY = {
     footer: "şəxsi kitabxanan", footerRight: "Sadə və səliqəli. Vacib olanları ehtiyatda saxla.",
     account: "Hesab", settings: "Parametrlər", language: "Dil", theme: "Görünüş", dark: "Tünd", light: "Açıq", system: "Sistem", reducedMotion: "Az animasiya", reducedMotionBody: "Hərəkət və keçidlər azaldılır.",
     startTitle: "Linka-ya xoş gəlmisən", startBody: "E-poçtla hesab yarat. Kitabxanan daxil olduğun bütün cihazlarda əlçatan olacaq.",
+    googleSignIn: "Google ilə davam et", emailFallback: "E-poçt kodu ilə giriş",
     email: "E-poçt ünvanı", code: "6 rəqəmli kod", sendCreate: "Hesab yarat · kod göndər",
     sendLogin: "Daxil ol · kod göndər", verify: "Təsdiqlə və davam et", continueOffline: "Hesabsız davam et",
     profileTitle: "Özün haqqında bir az", profileBody: "Linka-da görünəcək adı seç. Həqiqi məlumat yazmaq məcburi deyil.",
@@ -102,6 +106,7 @@ const COPY = {
     footer: "kişisel kitaplığın", footerRight: "Sade tasarım. Önemli olanları yedekle.",
     account: "Hesap", settings: "Ayarlar", language: "Dil", theme: "Görünüm", dark: "Koyu", light: "Açık", system: "Sistem", reducedMotion: "Hareketi azalt", reducedMotionBody: "Hareket ve geçişleri azaltır.",
     startTitle: "Linka'ya hoş geldin", startBody: "E-posta adresinle hesap oluştur. Kitaplığın giriş yaptığın tüm cihazlarda kullanılabilir.",
+    googleSignIn: "Google ile devam et", emailFallback: "E-posta koduyla giriş",
     email: "E-posta adresi", code: "Altı haneli kod", sendCreate: "Hesap oluştur · kod gönder",
     sendLogin: "Giriş yap · kod gönder", verify: "Doğrula ve devam et", continueOffline: "Hesapsız devam et",
     profileTitle: "Biraz kendinden bahset", profileBody: "Linka'da görünecek adı seç. Gerçek bilgileri kullanman gerekmez.",
@@ -463,7 +468,7 @@ function openProfileEditor({ firstRun = false, close = () => {} } = {}) {
   name.input.maxLength = 48;
   name.input.autocomplete = "nickname";
   const age = field(tr("age"), "number", old?.age ?? "", "16");
-  age.input.min = "1"; age.input.max = "120";
+  age.input.min = "13"; age.input.max = "120";
   const status = make("p", "linka-status");
   const actions = make("div", "linka-actions");
   const cancel = button(tr("cancel"), "linka-button linka-button-secondary");
@@ -587,7 +592,24 @@ function showAccount({ firstRun = false } = {}) {
     if (verify.hidden) sendLogin.click(); else verify.click();
   });
   form.append(email.wrap, code.wrap, status, actions);
-  panel.append(form, offline);
+  const emailFallback = make("details", "linka-config linka-email-fallback");
+  const emailFallbackSummary = make("summary", "", tr("emailFallback"));
+  emailFallback.append(emailFallbackSummary, form);
+  const googleStatus = make("p", "linka-status");
+  const googleButton = button(tr("googleSignIn"));
+  googleButton.setAttribute("data-auth-action", "google");
+  googleButton.addEventListener("click", () => {
+    try {
+      const config = saveCloudConfig(service.url.value, service.key.value);
+      const redirectTo = window.__TAURI_INTERNALS__
+        ? "linka://auth/callback"
+        : new URL(window.location.pathname, window.location.origin).toString();
+      startGoogleOAuth({ url: config.url, key: config.key, redirectTo });
+    } catch (error) {
+      setStatus(googleStatus, error?.message || tr("errors"), true);
+    }
+  });
+  panel.append(googleButton, googleStatus, emailFallback, offline);
   showQrPairing(panel, { url: service.url.value, key: service.key.value }, () => {
     dialog.close();
     setTimeout(() => showAccount(), 180);
@@ -596,7 +618,7 @@ function showAccount({ firstRun = false } = {}) {
   let expiryAt = 0;
   let createUser = false;
   let cooldownInterval = null;
-  const setBusy = busy => [sendCreate, sendLogin, verify, offline].forEach(b => b.disabled = busy);
+  const setBusy = busy => [googleButton, sendCreate, sendLogin, verify, offline].forEach(b => b.disabled = busy);
   const updateCountdown = () => {
     const remaining = Math.max(0, expiryAt - Date.now());
     if (remaining <= 0 && expiryAt) {
@@ -725,6 +747,98 @@ function addAccountButton() {
   const settings = document.querySelector("#settings-button");
   top.insertBefore(account, settings || null);
 }
+
+function mountWebNavigation() {
+  const shell = document.querySelector("#app");
+  if (!shell || window.__TAURI_INTERNALS__ || shell.querySelector(".web-sidebar")) return;
+  const sidebar = make("aside", "web-sidebar");
+  sidebar.setAttribute("aria-label", "Linka navigation");
+  const brand = make("a", "web-side-brand");
+  brand.href = "/";
+  brand.innerHTML = '<img src="/linka-mark.svg" alt=""><span>linka</span>';
+  const caption = make("div", "web-side-caption", "YOUR SPACE");
+  const nav = make("nav", "web-side-nav");
+  nav.setAttribute("aria-label", "Library sections");
+  const entries = [
+    ["all", "▦", "Inbox"], ["pinned", "⌖", "Pinned"],
+    ["links", "↗", "Links"], ["notes", "Aa", "Notes"],
+    ["search", "⌕", "Search"], ["capture", "+", "New capture"],
+    ["account", "○", "Account"], ["settings", "⚙", "Settings"]
+  ];
+  const itemButtons = new Map();
+  const activate = key => {
+    for (const [value, node] of itemButtons) {
+      const active = value === key;
+      node.classList.toggle("active", active);
+      node.setAttribute("aria-current", active ? "page" : "false");
+    }
+  };
+  for (const [key, glyph, label] of entries) {
+    const node = make("button", "web-nav-item");
+    node.type = "button";
+    node.dataset.nav = key;
+    node.innerHTML = '<span class="web-nav-glyph" aria-hidden="true"></span><span class="web-nav-label"></span>';
+    node.querySelector(".web-nav-glyph").textContent = glyph;
+    node.querySelector(".web-nav-label").textContent = label;
+    node.addEventListener("click", () => {
+      if (["all", "pinned", "links", "notes"].includes(key)) {
+        document.querySelector('[data-filter="' + key + '"]')?.click();
+        activate(key);
+        document.querySelector(".workspace")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else if (key === "search") {
+        document.querySelector("#search-space-button")?.click();
+        activate("search");
+      } else if (key === "capture") {
+        activate("capture");
+        document.querySelector("#capture-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        document.querySelector("#capture-text")?.focus({ preventScroll: true });
+      } else if (key === "account") {
+        document.querySelector("#linka-account-button")?.click();
+        activate("account");
+      } else if (key === "settings") {
+        document.querySelector("#settings-button")?.click();
+        activate("settings");
+      }
+    });
+    itemButtons.set(key, node);
+    nav.append(node);
+  }
+  const foot = make("div", "web-side-foot");
+  foot.innerHTML = '<span class="web-side-status-dot" aria-hidden="true"></span><span><strong>Private by default</strong><small>Stored here. Sync when you sign in.</small></span>';
+  sidebar.append(brand, caption, nav, foot);
+  shell.prepend(sidebar);
+  document.querySelectorAll("[data-filter]").forEach(node => node.addEventListener("click", () => activate(node.dataset.filter || "all")));
+  activate("all");
+}
+async function handleDesktopOAuthUrl(rawUrl) {
+  try {
+    const incoming = new URL(String(rawUrl));
+    if (incoming.protocol !== "linka:" || incoming.hostname !== "auth" || incoming.pathname !== "/callback") return;
+    const config = getCloudConfig();
+    const session = await completeGoogleOAuthCallback({
+      url: config.url,
+      key: config.key,
+      location: { hash: incoming.hash, pathname: "", search: "" },
+      history: null
+    });
+    if (session) window.dispatchEvent(new CustomEvent("linka:oauth-complete", { detail: session }));
+  } catch (error) {
+    document.dispatchEvent(new CustomEvent("linka:status", { detail: error?.message || tr("errors") }));
+  }
+}
+async function initDesktopDeepLinks() {
+  if (!window.__TAURI_INTERNALS__) return;
+  try {
+    const { getCurrent, onOpenUrl } = await import("@tauri-apps/plugin-deep-link");
+    const initial = await getCurrent();
+    if (initial) for (const value of initial) await handleDesktopOAuthUrl(value);
+    await onOpenUrl(values => {
+      for (const value of values) void handleDesktopOAuthUrl(value);
+    });
+  } catch (error) {
+    document.dispatchEvent(new CustomEvent("linka:status", { detail: error?.message || "Desktop sign-in callback unavailable." }));
+  }
+}
 function notificationForSavedCapture(event) {
   const enabled = localStorage.getItem(NOTIFY_KEY) === "true";
   if (!enabled || !("Notification" in window) || Notification.permission !== "granted") return;
@@ -751,12 +865,14 @@ function handleIncomingPairing() {
   }
 }
 export function initLinkaExperience() {
+  document.documentElement.dataset.platform = window.__TAURI_INTERNALS__ ? "desktop" : "web";
   const picker = document.querySelector("#linka-language");
   if (picker) {
     picker.value = langCode();
     picker.addEventListener("change", () => setLanguage(picker.value));
   }
   addAccountButton();
+  mountWebNavigation();
   translateInterface();
   document.documentElement.dataset.theme = localStorage.getItem("linka.theme") || "dark";
   document.documentElement.classList.toggle("reduced-motion", localStorage.getItem("linka.reduceMotion") === "true");
@@ -773,6 +889,18 @@ export function initLinkaExperience() {
   document.addEventListener("linka:request-profile", () => openProfileEditor());
   window.addEventListener("linka:capture-saved", notificationForSavedCapture);
   window.addEventListener("linka:profile-saved", () => window.dispatchEvent(new CustomEvent("linka:authenticated")));
+  window.addEventListener("linka:oauth-complete", () => {
+    window.dispatchEvent(new CustomEvent("linka:authenticated"));
+    const profile = readLinkaProfile();
+    if (!profile?.displayName) {
+      localStorage.removeItem(ONBOARDED_KEY);
+      setTimeout(() => openProfileEditor({ firstRun: true }), 180);
+    } else {
+      localStorage.setItem(ONBOARDED_KEY, "true");
+      setTimeout(() => showAccount(), 180);
+    }
+  });
+  void initDesktopDeepLinks();
   window.addEventListener("linka:authenticated", () => {
     const pending = localStorage.getItem("linka.pending-pairing.v1");
     if (pending) {
@@ -788,13 +916,14 @@ export function initLinkaExperience() {
   clearInterval(updateTimer);
   updateTimer = setInterval(() => checkForRelease({ notify: true }), 15 * 60 * 1000);
   handleIncomingPairing();
-  if (localStorage.getItem("linka.termsAccepted") === "2026-10-23-v2") {
+  const oauthCallbackPending = /(?:access_token|error)=/.test(location.hash || "");
+  if (!oauthCallbackPending && localStorage.getItem("linka.termsAccepted") === "2026-10-23-v2") {
     if (!localStorage.getItem(ONBOARDED_KEY)) {
       const session = getCloudSession();
       if (session && readLinkaProfile()) localStorage.setItem(ONBOARDED_KEY, "true");
       else setTimeout(() => showAccount({ firstRun: true }), 240);
     }
-  } else {
+  } else if (!oauthCallbackPending) {
     window.addEventListener("linka:agreement-accepted", () => {
       if (!localStorage.getItem(ONBOARDED_KEY)) setTimeout(() => showAccount({ firstRun: true }), 240);
     }, { once: true });
