@@ -20,7 +20,8 @@ class CaptureFilteringTest {
     }
 
     @Test fun notesFilterExcludesLinks() {
-        assertEquals(listOf("n2", "n1"), filterCaptures(captures, "notes", "").map { it.id })
+        // Pinned notes are still notes; only URL captures are excluded.
+        assertEquals(listOf("p1", "n2", "n1"), filterCaptures(captures, "notes", "").map { it.id })
     }
 
     @Test fun searchIsCaseInsensitive() {
