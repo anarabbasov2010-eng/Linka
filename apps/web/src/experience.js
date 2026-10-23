@@ -17,7 +17,7 @@ const LANGUAGES = [
 ];
 const COPY = {
   en: {
-    ambientSound: "Ambient sound", ambientSoundBody: "A quiet, slowly breathing synth pad. Off by default.", audioUnavailable: "Ambient audio is not available in this environment.",
+    ambientSound: "Ambient sound", ambientSoundBody: "A quiet, slowly breathing synth pad. Off by default.", audioUnavailable: "Ambient audio is not available in this environment.", checkUpdates: "Check for updates", updateChanges: "What changed",
     privacy: "Private by default · local-first", eyebrow: "Your personal library",
     hero: ["Keep", "what", "matters."], heroBody: "Links, notes, and useful ideas. Saved once. Easy to find again.",
     quick: "Quick capture", subtitle: "Keep the useful stuff.", placeholder: "Drop a link. Save a thought. Keep it for later…",
@@ -45,7 +45,7 @@ const COPY = {
     signOutInfo: "You have signed out. Your local library has not been deleted."
   },
   ru: {
-    ambientSound: "Атмосферный звук", ambientSoundBody: "Тихий синтезаторный фон с медленным дыханием. По умолчанию выключен.", audioUnavailable: "Атмосферный звук недоступен в этой среде.",
+    ambientSound: "Атмосферный звук", ambientSoundBody: "Тихий синтезаторный фон с медленным дыханием. По умолчанию выключен.", audioUnavailable: "Атмосферный звук недоступен в этой среде.", checkUpdates: "Проверить обновления", updateChanges: "Что изменилось",
     privacy: "Приватность по умолчанию · сначала локально", eyebrow: "Твоя личная библиотека",
     hero: ["Сохраняй", "то,", "что важно."], heroBody: "Ссылки, заметки и идеи. Сохраняй один раз — находи снова.",
     quick: "Быстрое сохранение", subtitle: "Только то, что нужно.", placeholder: "Вставь ссылку или сохрани мысль…",
@@ -73,7 +73,7 @@ const COPY = {
     signOutInfo: "Вы вышли из аккаунта. Локальная библиотека не удалена."
   },
   az: {
-    ambientSound: "Atmosfer səsi", ambientSoundBody: "Yavaş nəfəs alan sakit sintezator fonu. Standart olaraq sönülüdür.", audioUnavailable: "Atmosfer səsi bu mühitdə mövcud deyil.",
+    ambientSound: "Atmosfer səsi", ambientSoundBody: "Yavaş nəfəs alan sakit sintezator fonu. Standart olaraq sönülüdür.", audioUnavailable: "Atmosfer səsi bu mühitdə mövcud deyil.", checkUpdates: "Yeniləmələri yoxla", updateChanges: "Nə dəyişdi",
     privacy: "Məxfilik standartdır · əvvəlcə cihazda", eyebrow: "Şəxsi kitabxanan",
     hero: ["Vacib", "olanı", "saxla."], heroBody: "Linklər, qeydlər və ideyalar. Bir dəfə saxla, sonra asan tap.",
     quick: "Tez yadda saxla", subtitle: "Yalnız lazım olanlar.", placeholder: "Link əlavə et və ya fikrini yaz…",
@@ -101,7 +101,7 @@ const COPY = {
     signOutInfo: "Hesabdan çıxdın. Lokal kitabxanan silinməyib."
   },
   tr: {
-    ambientSound: "Ortam sesi", ambientSoundBody: "Yavaşça nefes alan sakin bir synth tonu. Varsayılan olarak kapalı.", audioUnavailable: "Ortam sesi bu ortamda kullanılamıyor.",
+    ambientSound: "Ortam sesi", ambientSoundBody: "Yavaşça nefes alan sakin bir synth tonu. Varsayılan olarak kapalı.", audioUnavailable: "Ortam sesi bu ortamda kullanılamıyor.", checkUpdates: "Güncellemeleri denetle", updateChanges: "Neler değişti",
     privacy: "Varsayılan gizlilik · önce cihazda", eyebrow: "Kişisel kitaplığın",
     hero: ["Önemli", "olanı", "sakla."], heroBody: "Bağlantılar, notlar ve fikirler. Bir kez kaydet, sonra kolayca bul.",
     quick: "Hızlı kayıt", subtitle: "Yalnızca gerekenler.", placeholder: "Bağlantı ekle veya bir düşünce yaz…",
@@ -163,6 +163,60 @@ function langCode() {
   if (COPY[saved]) return saved;
   const browser = String(navigator.language || "en").slice(0, 2).toLowerCase();
   return COPY[browser] ? browser : "en";
+}
+function localizeReleaseNotes(body) {
+  const language = langCode();
+  const rows = String(body || "").split(/\r?\n/).map(line => line.trim().replace(/^[-*•]\s*/, "")).filter(Boolean);
+  const dict = {
+    en: [
+      ["ambient sphere", "Added a slow, softly pulsing signature sphere behind the workspace."],
+      ["transparent navigation", "Made navigation translucent with a smoother spring-like active state."],
+      ["ambient sound", "Added optional low-volume ambient synth sound; off by default."],
+      ["notification", "Improved update notifications and in-app status feedback."],
+      ["release notes", "Release notes now follow the selected application language."],
+      ["preserved local", "Preserved local-first storage and existing saved items."]
+    ],
+    ru: [
+      ["ambient sphere", "Добавлена медленно пульсирующая фирменная сфера на фоне."],
+      ["transparent navigation", "Навигация стала прозрачнее, активный раздел переключается плавно и с упругим откликом."],
+      ["ambient sound", "Добавлен тихий атмосферный синтезаторный фон; по умолчанию он выключен."],
+      ["notification", "Улучшены уведомления об обновлениях и статусы внутри приложения."],
+      ["release notes", "Список изменений отображается на выбранном языке приложения."],
+      ["preserved local", "Сохранено локальное хранение и существующие записи."]
+    ],
+    az: [
+      ["ambient sphere", "Arxa fona yavaş nəbz vuran firmanın kürəsi əlavə edildi."],
+      ["transparent navigation", "Naviqasiya şəffaflaşdırıldı, aktiv bölmə yumşaq animasiya ilə dəyişir."],
+      ["ambient sound", "Sakit atmosfer sintezator səsi əlavə edildi; standart olaraq sönülüdür."],
+      ["notification", "Yeniləmə bildirişləri və tətbiqdaxili statuslar yaxşılaşdırıldı."],
+      ["release notes", "Dəyişiklik qeydləri seçilmiş tətbiq dilində göstərilir."],
+      ["preserved local", "Yerli yaddaş və mövcud qeydlər qorunub saxlanıldı."]
+    ],
+    tr: [
+      ["ambient sphere", "Arka plana yavaşça nabız atan imza küresi eklendi."],
+      ["transparent navigation", "Gezinme şeffaflaştırıldı; etkin bölüm yumuşak ve yaylı bir geçişle değişiyor."],
+      ["ambient sound", "Düşük sesli ortam synth sesi eklendi; varsayılan olarak kapalı."],
+      ["notification", "Güncelleme bildirimleri ve uygulama içi durum geri bildirimi iyileştirildi."],
+      ["release notes", "Sürüm notları seçilen uygulama dilinde gösteriliyor."],
+      ["preserved local", "Yerel depolama ve mevcut kayıtlar korundu."]
+    ]
+  };
+  const translations = dict[language] || dict.en;
+  const output = [];
+  for (const row of rows) {
+    const lower = row.toLowerCase();
+    if (lower.startsWith("important") || lower.startsWith("migration from linka 0.4.72")) {
+      output.push(language === "ru" ? "Важно: эта версия устанавливается рядом со старой Linka. Экспортируйте резервную копию из старого приложения и импортируйте её здесь перед удалением старой версии."
+        : language === "az" ? "Vacib: bu versiya köhnə Linka ilə yanaşı quraşdırılır. Köhnə tətbiqdən ehtiyat nüsxəni ixrac edin və köhnə versiyanı silməzdən əvvəl burada idxal edin."
+        : language === "tr" ? "Önemli: bu sürüm eski Linka'nın yanına kurulur. Eski uygulamadan yedek dışa aktarın ve eski sürümü kaldırmadan önce burada içe aktarın."
+        : "Important: this version installs alongside old Linka. Export a backup from the old app and import it here before removing the old version.");
+      continue;
+    }
+    const match = translations.find(([needle]) => lower.includes(needle));
+    if (match && !output.includes(match[1])) output.push(match[1]);
+    else if (!match && !/^(what's new|install the apk|automated android build)/i.test(row)) output.push(row);
+  }
+  return output.slice(0, 8);
 }
 function tr(key) { return (COPY[langCode()] || COPY.en)[key] ?? COPY.en[key] ?? key; }
 function make(tag, className = "", text = "") {
@@ -447,7 +501,9 @@ function showUpdateSettings(panel) {
   const section = make("section", "linka-settings-block");
   section.append(make("h3", "", tr("updateTitle")));
   const detail = make("p", "linka-muted", tr("latest"));
-  const check = button("Check now", "linka-button linka-button-secondary");
+  const notes = make("div", "linka-release-notes");
+  notes.hidden = true;
+  const check = button(tr("checkUpdates"), "linka-button linka-button-secondary");
   check.addEventListener("click", async () => {
     check.disabled = true;
     detail.textContent = "Checking…";
@@ -457,10 +513,16 @@ function showUpdateSettings(panel) {
       ? tr("updateReady") + " " + (pendingNativeUpdate.version || latest || "")
       : latest && BUILD_VERSION && compareVersions(BUILD_VERSION, latest) < 0
         ? tr("updateReady") + " " + latest : tr("latest");
-    if (updateRecord) releaseButton(section, tr("updateButton"), updateRecord.html_url || RELEASES_URL, detail);
+    if (updateRecord) {
+      releaseButton(section, tr("updateButton"), updateRecord.html_url || RELEASES_URL, detail);
+      notes.replaceChildren(make("strong", "", tr("updateChanges")));
+      const list = make("ul", "");
+      localizeReleaseNotes(updateRecord.body || "").forEach(line => list.append(make("li", "", line)));
+      if (list.children.length) { notes.append(list); notes.hidden = false; }
+    }
     check.disabled = false;
   });
-  section.append(detail, check);
+  section.append(detail, notes, check);
   panel.append(section);
 }
 function showNotificationSettings(panel) {
