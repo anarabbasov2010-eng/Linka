@@ -11,6 +11,9 @@ export function normalizeCapture(item) {
     createdAt: Number.isFinite(createdAt) && createdAt > 0 ? createdAt : Date.now(),
     updatedAt: Number(item.updatedAt || createdAt || Date.now()),
     pinned: Boolean(item.pinned),
+    previewTitle: String(item.previewTitle || "").slice(0, 180),
+    previewDescription: String(item.previewDescription || "").slice(0, 320),
+    previewImageUrl: String(item.previewImageUrl || "").slice(0, 2048),
   };
 }
 
@@ -41,6 +44,7 @@ export function makeCapture(text, existing = {}) {
   const now=Date.now();
   return normalizeCapture({
     id:existing.id || `capture-${now}-${Math.random().toString(36).slice(2,8)}`,
-    text, createdAt:existing.createdAt || now, updatedAt:now, pinned:existing.pinned || false
+    text, createdAt:existing.createdAt || now, updatedAt:now, pinned:existing.pinned || false,
+    previewTitle: existing.previewTitle || "", previewDescription: existing.previewDescription || "", previewImageUrl: existing.previewImageUrl || ""
   });
 }
