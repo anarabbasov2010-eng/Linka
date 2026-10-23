@@ -77,7 +77,7 @@ async function syncNow({ silent = false } = {}) {
     if (!silent) say(result.message);
     return result;
   } catch (error) {
-    cloudSyncStatus = error?.message || "Cloud sync failed";
+    cloudSyncStatus = error?.message || "Облачная синхронизация failed";
     if (!silent) say("Sync failed: " + cloudSyncStatus);
     throw error;
   } finally {
@@ -255,7 +255,7 @@ function addTermsBody(container) {
   const body = document.createElement("div");
   const sections = [
     ["Your data stays local", "Captures live in this browser profile or local app storage. Browser resets, cleared data, device loss or uninstallation may erase them. Keep an export backup."],
-    ["Optional cloud sync", "Sign in to the same Linka account on Android, Windows and the web to sync your library. Local storage and manual export/import remain available even when you are offline. Sync needs a configured shared Supabase project; never enter a service-role or secret key into the app."],
+    ["Optional cloud sync", "Войти to the same Linka account on Android, Windows and the web to sync your library. Local storage and manual export/import remain available even when you are offline. Sync needs a configured shared Supabase project; never enter a service-role or secret key into the app."],
     ["Use and responsibility", "You are responsible for what you save, protecting your device, and keeping backups. Do not use Linka as the only copy of critical information."],
     ["Links and early access", "Opened links are handled by external apps/sites. Linka is an early-stage utility; features can change and uninterrupted, error-free operation is not guaranteed."],
     ["Acceptable use", "Use Linka lawfully, respect other people’s rights, and avoid saving sensitive information on shared devices."]
@@ -281,14 +281,14 @@ function showAgreement({mustAccept = false} = {}) {
     accept.addEventListener("click", () => { localStorage.setItem("linka.termsAccepted", TERMS_VERSION); modalRoot.replaceChildren(); say("Agreement saved on this device"); });
     actions.append(decline, accept);
   } else {
-    const close=document.createElement("button"); close.className="primary"; close.textContent="Done";
+    const close=document.createElement("button"); close.className="primary"; close.textContent="Готово";
     close.addEventListener("click", () => modalRoot.replaceChildren());
     actions.append(close);
   }
   content.append(actions);
   return modalShell(content);
 }
-function showCloudSyncSettings() {
+function showCloudSyncНастройки() {
   const content = document.createElement("div");
   const head = document.createElement("div"); head.className = "modal-head";
   const logo = document.createElement("img"); logo.className = "modal-logo"; logo.src = "/linka-mark.svg"; logo.alt = "";
@@ -298,7 +298,7 @@ function showCloudSyncSettings() {
   meta.append(title, sub); head.append(logo, meta); content.append(head);
 
   const note = document.createElement("p");
-  note.textContent = "Your inbox remains available offline. Cloud sync needs the same Supabase project URL and public publishable/anon key on each device. Never enter a service_role or secret key here.";
+  note.textContent = "Your inbox remains available offline. Облачная синхронизация needs the same Supabase project URL and public publishable/anon key on each device. Never enter a service_role or secret key here.";
   content.append(note);
   const config = getCloudConfig();
   const session = getCloudSession();
@@ -339,15 +339,15 @@ function showCloudSyncSettings() {
   content.append(sqlButton, form);
 
   const statusLine = document.createElement("p"); statusLine.className = "cloud-status";
-  statusLine.textContent = session ? `Signed in as ${session.email || "your account"}.` : "Not connected. Create or sign in to a Linka sync account.";
+  statusLine.textContent = session ? `Signed in as ${session.email || "your account"}.` : "Нет подключения. Создай аккаунт Linka или войди в существующий.";
   content.append(statusLine);
   const actions = document.createElement("div"); actions.className = "modal-actions";
-  const close = document.createElement("button"); close.type = "button"; close.className = "ghost"; close.textContent = "Close";
+  const close = document.createElement("button"); close.type = "button"; close.className = "ghost"; close.textContent = "Закрыть";
   close.addEventListener("click", () => modalRoot.replaceChildren());
   const runAction = async action => {
     const buttons = actions.querySelectorAll("button");
     buttons.forEach(button => { button.disabled = true; });
-    statusLine.textContent = "Working…";
+    statusLine.textContent = "Выполняем…";
     try {
       saveCloudConfig(url.value, key.value);
       if (action === "signup") {
@@ -366,10 +366,10 @@ function showCloudSyncSettings() {
       }
       password.value = "";
       const result = await syncNow({ silent: true });
-      statusLine.textContent = result?.message ? `Connected. ${result.message}.` : "Connected and ready to sync.";
-      say("Linka Cloud Sync connected");
+      statusLine.textContent = result?.message ? `Connected. ${result.message}.` : "Подключено. Синхронизация готова.";
+      say("Облачная синхронизация Linka подключена");
     } catch (error) {
-      statusLine.textContent = error?.message || "Cloud sync failed.";
+      statusLine.textContent = error?.message || "Облачная синхронизация failed.";
     } finally {
       buttons.forEach(button => { button.disabled = false; });
     }
@@ -379,22 +379,22 @@ function showCloudSyncSettings() {
     button.addEventListener("click", fn); actions.append(button); return button;
   };
   if (session) {
-    makeButton("Disconnect", "ghost", () => {
+    makeButton("Отключить", "ghost", () => {
       disconnectCloud();
-      statusLine.textContent = "Disconnected. Your local captures were not deleted.";
+      statusLine.textContent = "Отключитьed. Your local captures were not deleted.";
       password.value = "";
     });
-    makeButton("Sync now", "primary", () => { void runAction("sync"); });
+    makeButton("Синхронизировать", "primary", () => { void runAction("sync"); });
   } else {
-    makeButton("Create account", "ghost", () => { void runAction("signup"); });
-    makeButton("Sign in", "primary", () => { void runAction("signin"); });
+    makeButton("Создать аккаунт", "ghost", () => { void runAction("signup"); });
+    makeButton("Войти", "primary", () => { void runAction("signin"); });
   }
   actions.append(close); content.append(actions);
   modalShell(content, { dismissable: true });
 }
 
 async function checkWindowsInstaller(statusLine, downloadLink) {
-  statusLine.textContent = "Checking the latest Linka release…";
+  statusLine.textContent = "Проверитьing the latest Linka release…";
   downloadLink.hidden = true;
   try {
     const response = await fetch("https://api.github.com/repos/anarabbasov2010-eng/Linka/releases/latest", {
@@ -405,43 +405,43 @@ async function checkWindowsInstaller(statusLine, downloadLink) {
     const tag = String(release.tag_name || "").replace(/^v/, "");
     const asset = (release.assets || []).find(item => item.name === "Linka-Windows-x64-setup.exe");
     if (!asset) {
-      statusLine.textContent = "The Windows installer for this release is still being built. Check again shortly.";
+      statusLine.textContent = "The Windows installer for this release is still being built. Проверить again shortly.";
       return;
     }
     downloadLink.href = asset.browser_download_url;
     downloadLink.hidden = false;
     downloadLink.textContent = desktopBuildVersion && compareVersions(tag, desktopBuildVersion) > 0
-      ? `Download update ${tag}`
-      : "Download Windows installer";
+      ? `Скачать update ${tag}`
+      : "Скачать Windows installer";
     if (desktopBuildVersion && compareVersions(tag, desktopBuildVersion) <= 0) {
-      statusLine.textContent = `Windows app version ${desktopBuildVersion} is current. You can reinstall the latest installer over the existing copy.`;
+      statusLine.textContent = `Приложение для Windows version ${desktopBuildVersion} is current. You can reinstall the latest installer over the existing copy.`;
     } else {
       statusLine.textContent = `Linka Windows ${tag} is available. Run the installer over your existing copy to update it.`;
     }
   } catch (error) {
-    statusLine.textContent = error?.message || "Could not check Windows updates.";
+    statusLine.textContent = error?.message || "Не удалось проверить обновления Windows.";
   }
 }
 
-function showSettings() {
+function showНастройки() {
   const content=document.createElement("div");
   const head=document.createElement("div"); head.className="modal-head";
   const logo=document.createElement("img"); logo.className="modal-logo"; logo.src="/linka-mark.svg"; logo.alt="";
-  const meta=document.createElement("div"); const title=document.createElement("h2"); title.textContent="Settings";
-  const sub=document.createElement("p"); sub.textContent="Make Linka feel like yours"; meta.append(title,sub); head.append(logo,meta); content.append(head);
+  const meta=document.createElement("div"); const title=document.createElement("h2"); title.textContent="Настройки";
+  const sub=document.createElement("p"); sub.textContent="Настрой Linka под себя"; meta.append(title,sub); head.append(logo,meta); content.append(head);
   const themeRow=document.createElement("div"); themeRow.className="setting-row";
   const themeMeta=document.createElement("div"); const themeTitle=document.createElement("strong"); themeTitle.textContent="Appearance";
-  const themeDesc=document.createElement("p"); themeDesc.textContent="Choose a comfortable colour scheme"; themeMeta.append(themeTitle,themeDesc);
+  const themeDesc=document.createElement("p"); themeDesc.textContent="Выбери удобную цветовую тему"; themeMeta.append(themeTitle,themeDesc);
   const choices=document.createElement("div"); choices.className="theme-options"; choices.setAttribute("aria-label","Theme");
-  [["dark","Dark"],["light","Light"],["system","System"]].forEach(([value,label])=>{
+  [["dark","Тёмная"],["light","Светлая"],["system","Системная"]].forEach(([value,label])=>{
     const b=document.createElement("button"); b.type="button"; b.className="theme-option"+(themeMode===value?" active":""); b.textContent=label;
     b.addEventListener("click",()=>{applyTheme(value);choices.querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b));});
     choices.append(b);
   });
   themeRow.append(themeMeta,choices); content.append(themeRow);
   const motionRow=document.createElement("div"); motionRow.className="setting-row";
-  const motionMeta=document.createElement("div"); const mt=document.createElement("strong"); mt.textContent="Reduced motion";
-  const md=document.createElement("p"); md.textContent="Respect motion sensitivity and reduce transitions"; motionMeta.append(mt,md);
+  const motionMeta=document.createElement("div"); const mt=document.createElement("strong"); mt.textContent="Меньше анимации";
+  const md=document.createElement("p"); md.textContent="Уменьшает движение и переходы интерфейса"; motionMeta.append(mt,md);
   const toggle=document.createElement("button"); toggle.type="button"; toggle.className="toggle"; toggle.setAttribute("aria-pressed",String(reduceMotion)); toggle.setAttribute("aria-label","Toggle reduced motion");
   const knob=document.createElement("span"); toggle.append(knob);
   toggle.addEventListener("click",()=>{reduceMotion=!reduceMotion;localStorage.setItem("linka.reduceMotion",String(reduceMotion));toggle.setAttribute("aria-pressed",String(reduceMotion));document.documentElement.classList.toggle("reduced-motion",reduceMotion);});
@@ -449,34 +449,34 @@ function showSettings() {
   if(reduceMotion)document.documentElement.classList.add("reduced-motion");
   const cloudRow=document.createElement("div"); cloudRow.className="setting-row";
   const cloudMeta=document.createElement("div");
-  const cloudTitle=document.createElement("strong"); cloudTitle.textContent="Cloud sync";
+  const cloudTitle=document.createElement("strong"); cloudTitle.textContent="Облачная синхронизация";
   const cloudDesc=document.createElement("p"); const cloudSession=getCloudSession();
-  cloudDesc.textContent=cloudSession ? `Connected as ${cloudSession.email || "your account"} · ${cloudSyncStatus || "sync across your devices"}` : "Sync links and notes across Android, Windows and the website";
+  cloudDesc.textContent=cloudSession ? `Connected as ${cloudSession.email || "your account"} · ${cloudSyncStatus || "sync across your devices"}` : "Синхронизируй ссылки и заметки между Android, Windows и сайтом";
   cloudMeta.append(cloudTitle,cloudDesc);
   const cloudButton=document.createElement("button"); cloudButton.type="button"; cloudButton.className="ghost"; cloudButton.textContent=cloudSession?"Manage":"Set up";
-  cloudButton.addEventListener("click",()=>{modalRoot.replaceChildren();showCloudSyncSettings();});
+  cloudButton.addEventListener("click",()=>{modalRoot.replaceChildren();showCloudSyncНастройки();});
   cloudRow.append(cloudMeta,cloudButton);content.append(cloudRow);
 
   const windowsRow=document.createElement("div"); windowsRow.className="setting-row";
   const windowsMeta=document.createElement("div");
-  const windowsTitle=document.createElement("strong"); windowsTitle.textContent="Windows app";
-  const windowsDesc=document.createElement("p"); windowsDesc.textContent=desktopBuildVersion ? `Installed version ${desktopBuildVersion}. Updates install over the existing app.` : "Check the latest Windows installer or update your existing desktop app.";
+  const windowsTitle=document.createElement("strong"); windowsTitle.textContent="Приложение для Windows";
+  const windowsDesc=document.createElement("p"); windowsDesc.textContent=desktopBuildVersion ? `Installed version ${desktopBuildVersion}. Updates install over the existing app.` : "Проверить the latest Windows installer or update your existing desktop app.";
   windowsMeta.append(windowsTitle,windowsDesc);
   const windowsControls=document.createElement("div"); windowsControls.className="windows-update-controls";
-  const windowsCheck=document.createElement("button"); windowsCheck.type="button"; windowsCheck.className="ghost"; windowsCheck.textContent="Check";
-  const windowsDownload=document.createElement("a"); windowsDownload.className="primary"; windowsDownload.textContent="Download"; windowsDownload.target="_blank"; windowsDownload.rel="noopener noreferrer"; windowsDownload.hidden=true;
-  windowsControls.append(windowsCheck,windowsDownload);
+  const windowsПроверить=document.createElement("button"); windowsПроверить.type="button"; windowsПроверить.className="ghost"; windowsПроверить.textContent="Проверить";
+  const windowsСкачать=document.createElement("a"); windowsСкачать.className="primary"; windowsСкачать.textContent="Скачать"; windowsСкачать.target="_blank"; windowsСкачать.rel="noopener noreferrer"; windowsСкачать.hidden=true;
+  windowsControls.append(windowsПроверить,windowsСкачать);
   windowsRow.append(windowsMeta,windowsControls);content.append(windowsRow);
-  const windowsStatus=document.createElement("p"); windowsStatus.className="cloud-status"; windowsStatus.textContent="Check release status before downloading an installer.";
+  const windowsStatus=document.createElement("p"); windowsStatus.className="cloud-status"; windowsStatus.textContent="Проверить release status before downloading an installer.";
   content.append(windowsStatus);
-  windowsCheck.addEventListener("click",()=>{void checkWindowsInstaller(windowsStatus,windowsDownload);});
+  windowsПроверить.addEventListener("click",()=>{void checkWindowsInstaller(windowsStatus,windowsСкачать);});
 
   const agreementRow=document.createElement("div"); agreementRow.className="setting-row";
-  const am=document.createElement("div"); const at=document.createElement("strong");at.textContent="User agreement";const ap=document.createElement("p");ap.textContent="Review the local-storage and privacy terms";am.append(at,ap);
-  const view=document.createElement("button");view.type="button";view.className="ghost";view.textContent="Read terms";
+  const am=document.createElement("div"); const at=document.createElement("strong");at.textContent="Пользовательское соглашение";const ap=document.createElement("p");ap.textContent="Review the local-storage and privacy terms";am.append(at,ap);
+  const view=document.createElement("button");view.type="button";view.className="ghost";view.textContent="Читать условия";
   view.addEventListener("click",()=>{modalRoot.replaceChildren();showAgreement({mustAccept:false});});
   agreementRow.append(am,view);content.append(agreementRow);
-  const actions=document.createElement("div");actions.className="modal-actions";const close=document.createElement("button");close.type="button";close.className="primary";close.textContent="Done";close.addEventListener("click",()=>modalRoot.replaceChildren());actions.append(close);content.append(actions);
+  const actions=document.createElement("div");actions.className="modal-actions";const close=document.createElement("button");close.type="button";close.className="primary";close.textContent="Готово";close.addEventListener("click",()=>modalRoot.replaceChildren());actions.append(close);content.append(actions);
   const layer=modalShell(content,{dismissable:true});
   const priorFocus=document.activeElement;
   layer.querySelector("button")?.focus();
@@ -486,8 +486,8 @@ draft.addEventListener("keydown",event=>{if((event.ctrlKey||event.metaKey)&&even
 form.addEventListener("submit",event=>{
   event.preventDefault();const text=draft.value.trim();if(!text)return;
   const existing=editingId?captures.find(item=>item.id===editingId):null;
-  if(existing){captures=captures.map(item=>item.id===editingId?{...item,text:text.slice(0,100000),updatedAt:Date.now()}:item);say("Capture updated");}
-  else{captures.unshift(makeCapture(text));say("Saved on this device");}
+  if(existing){captures=captures.map(item=>item.id===editingId?{...item,text:text.slice(0,100000),updatedAt:Date.now()}:item);say("Запись обновлена");}
+  else{captures.unshift(makeCapture(text));say("Сохранено на этом устройстве");}
   persist();resetEditor();render();
 });
 search.addEventListener("input",render);
@@ -498,14 +498,14 @@ list.addEventListener("click",async event=>{
   const button=event.target.closest("button[data-action]");if(!button)return;
   const {action,id}=button.dataset;const item=captures.find(entry=>entry.id===id);if(!item)return;
   if(action==="expand"){if(expandedCards.has(id))expandedCards.delete(id);else expandedCards.add(id);render();}
-  else if(action==="pin"){captures=captures.map(entry=>entry.id===id?{...entry,pinned:!entry.pinned,updatedAt:Date.now()}:entry);persist();render();say(item.pinned?"Removed from pinned":"Pinned for later");}
-  else if(action==="delete"){addDeletedId(id);captures=captures.filter(entry=>entry.id!==id);if(editingId===id)resetEditor();persist();render();say("Capture deleted");}
+  else if(action==="pin"){captures=captures.map(entry=>entry.id===id?{...entry,pinned:!entry.pinned,updatedAt:Date.now()}:entry);persist();render();say(item.pinned?"Откреплено":"Закреплено");}
+  else if(action==="delete"){addDeletedId(id);captures=captures.filter(entry=>entry.id!==id);if(editingId===id)resetEditor();persist();render();say("Запись удалена");}
   else if(action==="edit"){editingId=id;draft.value=item.text;composeLabel.textContent="Edit capture";saveButton.textContent="Save changes ↗";saveButton.disabled=false;draft.focus();window.scrollTo({top:0,behavior:"smooth"});}
-  else if(action==="copy"){try{await navigator.clipboard.writeText(item.text);say("Copied to clipboard");}catch{draft.value=item.text;draft.focus();draft.select();say("Text selected for manual copying");}}
+  else if(action==="copy"){try{await navigator.clipboard.writeText(item.text);say("Скопировано");}catch{draft.value=item.text;draft.focus();draft.select();say("Text selected for manual copying");}}
 });
 $("#export-button").addEventListener("click",()=>{
   const blob=new Blob([JSON.stringify(captures,null,2)],{type:"application/json"});
-  const url=URL.createObjectURL(blob);const anchor=document.createElement("a");anchor.href=url;anchor.download="linka-inbox.json";anchor.click();URL.revokeObjectURL(url);say("Inbox export created");
+  const url=URL.createObjectURL(blob);const anchor=document.createElement("a");anchor.href=url;anchor.download="linka-inbox.json";anchor.click();URL.revokeObjectURL(url);say("Резервная копия создана");
 });
 $("#import-button").addEventListener("click",()=>$("#import-file").click());
 $("#import-file").addEventListener("change",async event=>{
@@ -513,9 +513,9 @@ $("#import-file").addEventListener("change",async event=>{
   try{const parsed=JSON.parse(await file.text());const imported=Array.isArray(parsed)?parsed:parsed.captures;if(!Array.isArray(imported))throw new Error("Invalid file");
     const normalized=imported.map(item=>makeCapture(item.text,item)).filter(Boolean);const restoredIds=new Set(normalized.map(item=>item.id));const deleted=readDeletedIds();restoredIds.forEach(id=>deleted.delete(id));try{localStorage.setItem("linka.deletedIds.v1",JSON.stringify(Array.from(deleted)));}catch{}const map=new Map(captures.map(item=>[item.id,item]));normalized.forEach(item=>map.set(item.id,item));
     captures=Array.from(map.values()).sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,1000);persist();render();say("Imported "+normalized.length+" capture(s)");
-  }catch{say("That file is not a valid Linka export");}finally{event.target.value="";}
+  }catch{say("Этот файл не похож на экспорт Linka");}finally{event.target.value="";}
 });
-$("#settings-button").addEventListener("click",showSettings);
+$("#settings-button").addEventListener("click",showНастройки);
 $("#search-space-button").addEventListener("click",()=>showSearchSpace(search.value));
 document.addEventListener("keydown",event=>{
   if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="k"){
