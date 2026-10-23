@@ -168,6 +168,7 @@ private const val TERMS_KEY = "agreement_accepted"
 private const val TERMS_VERSION = "2026-10-23-v2"
 private const val ANIMATIONS_KEY = "animations"
 private const val DENSITY_KEY = "interface_density"
+private const val EFFECTS_KEY = "visual_effects"
 private const val FONT_SCALE_KEY = "font_scale"
 private const val UPDATE_ALERTS_KEY = "update_alerts"
 internal const val AUTO_DOWNLOAD_KEY = "auto_download_updates"
@@ -656,6 +657,7 @@ class MainActivity : ComponentActivity() {
             var accepted by remember { mutableStateOf(prefs().getString(TERMS_KEY, "") == TERMS_VERSION) }
             var animations by remember { mutableStateOf(prefs().getBoolean(ANIMATIONS_KEY, true) && !android.provider.Settings.Global.getFloat(contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f).equals(0f)) }
             var density by remember { mutableStateOf(prefs().getString(DENSITY_KEY, "standard") ?: "standard") }
+            var effects by remember { mutableStateOf(prefs().getString(EFFECTS_KEY, "balanced") ?: "balanced") }
             var fontScale by remember { mutableFloatStateOf(prefs().getFloat(FONT_SCALE_KEY, 1f).coerceIn(.9f, 1.2f)) }
             var alerts by remember { mutableStateOf(prefs().getBoolean(UPDATE_ALERTS_KEY, true)) }
             var autoDownload by remember { mutableStateOf(prefs().getBoolean(AUTO_DOWNLOAD_KEY, false)) }
@@ -685,6 +687,7 @@ class MainActivity : ComponentActivity() {
                     language = language, setLanguage = { language = it; prefs().edit().putString(LANGUAGE_KEY, it).apply() },
                     animations = animations, setAnimations = { animations = it; prefs().edit().putBoolean(ANIMATIONS_KEY, it).apply() },
                     density = density, setDensity = { density = it; prefs().edit().putString(DENSITY_KEY, it).apply() },
+                    effects = effects, setEffects = { effects = it; prefs().edit().putString(EFFECTS_KEY, it).apply() },
                     fontScale = fontScale, setFontScale = { fontScale = it; prefs().edit().putFloat(FONT_SCALE_KEY, it).apply() },
                     alerts = alerts, notificationPermissionGranted = notificationsAllowed, openNotificationSettings = { openNotificationSettings() }, sendTestNotification = { sendTestNotification() }, setAlerts = { enabled ->
                         if (enabled && Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -1026,7 +1029,7 @@ class MainActivity : ComponentActivity() {
 private fun LinkaApp(
     sharedText: String, sharedTrigger: Int, pairingTrigger: Int, oauthTrigger: Int, load: () -> List<Capture>, save: (List<Capture>) -> Unit, copy: (String) -> Unit, open: (String) -> Unit,
     theme: String, setTheme: (String) -> Unit, accent: String, setAccent: (String) -> Unit, language: String, setLanguage: (String) -> Unit,
-    animations: Boolean, setAnimations: (Boolean) -> Unit, density: String, setDensity: (String) -> Unit, fontScale: Float, setFontScale: (Float) -> Unit,
+    animations: Boolean, setAnimations: (Boolean) -> Unit, density: String, setDensity: (String) -> Unit, effects: String, setEffects: (String) -> Unit, fontScale: Float, setFontScale: (Float) -> Unit,
     alerts: Boolean, notificationPermissionGranted: Boolean, openNotificationSettings: () -> Unit, sendTestNotification: () -> Unit, setAlerts: (Boolean) -> Unit, updateInfo: UpdateInfo?, updateStatus: String, checking: Boolean,
     checkUpdates: () -> Unit, openUpdate: (UpdateInfo) -> Unit,
     autoDownload: Boolean, setAutoDownload: (Boolean) -> Unit, downloadProgress: Int, downloadingUpdate: Boolean,
@@ -1339,8 +1342,16 @@ private fun LinkaApp(
             Column(Modifier.fillMaxSize().background(
                 Brush.verticalGradient(
                     if (theme == "oled") listOf(Color.Black, Color.Black, Color.Black)
-                    else if (dark) listOf(Color(0xFF111016), DB, Color(0xFF08080C))
-                    else listOf(Color(0xFFFFFEFC), LB, Color(0xFFF1EFEB))
+                    else if (dark) when (effects) {
+                        "quiet" -> listOf(DB, DB, DB)
+                        "atmosphere" -> listOf(Color(0xFF1A1626), DB, Color(0xFF08080C))
+                        else -> listOf(Color(0xFF111016), DB, Color(0xFF08080C))
+                    }
+                    else when (effects) {
+                        "quiet" -> listOf(LB, LB, LB)
+                        "atmosphere" -> listOf(Color(0xFFF9F6FF), LB, Color(0xFFEEEAF6))
+                        else -> listOf(Color(0xFFFFFEFC), LB, Color(0xFFF1EFEB))
+                    }
                 )
             ).verticalScroll(rememberScrollState()).imePadding()
                 .padding(horizontal = 18.dp).padding(top = 14.dp, bottom = 28.dp),
@@ -1461,6 +1472,12 @@ private fun LinkaApp(
                             }
                             SettingLine(Icons.Outlined.Language, tr(lang, "language"), languages.first { it.first == lang }.second, main, muted) { languageDialog = true }
                             SettingSwitch(tr(lang, "animations"), animations, setAnimations, main, muted)
+                            Text(if (lang == "ru") "Интенсивность эффектов" else if (lang == "az") "Effektlərin intensivliyi" else if (lang == "tr") "Efekt yoğunluğu" else "Visual effects", color = muted, fontSize = 11.sp)
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                listOf("quiet" to (if (lang == "ru") "Тихо" else if (lang == "az") "Sakit" else if (lang == "tr") "Sakin" else "Quiet"), "balanced" to (if (lang == "ru") "Баланс" else if (lang == "az") "Balans" else if (lang == "tr") "Dengeli" else "Balanced"), "atmosphere" to (if (lang == "ru") "Атмосфера" else if (lang == "az") "Atmosfer" else if (lang == "tr") "Atmosfer" else "Atmosphere")).forEach { (v, label) ->
+                                    FilterChip(selected = effects == v, onClick = { setEffects(v) }, label = { Text(label, fontSize = 10.sp) })
+                                }
+                            }
                             Text(if (lang == "ru") "Плотность интерфейса" else if (lang == "az") "İnterfeys sıxlığı" else if (lang == "tr") "Arayüz yoğunluğu" else "Interface density", color = muted, fontSize = 11.sp)
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 listOf("compact" to (if (lang == "ru") "Компактно" else if (lang == "az") "Yığcam" else if (lang == "tr") "Kompakt" else "Compact"), "standard" to (if (lang == "ru") "Стандарт" else if (lang == "az") "Standart" else if (lang == "tr") "Standart" else "Standard"), "spacious" to (if (lang == "ru") "Свободно" else if (lang == "az") "Geniş" else if (lang == "tr") "Geniş" else "Spacious")).forEach { (v, label) ->
