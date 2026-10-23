@@ -72,7 +72,7 @@ body::after {
 :root[data-effects="balanced"] body::before { opacity: .48; }
 :root[data-effects="atmosphere"] body::before { opacity: .88; }
 :root[data-effects="atmosphere"] .item { transform: perspective(1000px) rotateX(var(--tilt-y,0deg)) rotateY(var(--tilt-x,0deg)); transform-style: preserve-3d; }
-:root[data-effects="atmosphere"] .item:hover { box-shadow: 0 20px 44px rgba(0,0,0,.17), 0 1px 0 #fff07 inset; }
+:root[data-effects="atmosphere"] .item:hover { transform: perspective(1000px) rotateX(var(--tilt-y,0deg)) rotateY(var(--tilt-x,0deg)) translateY(-3px); box-shadow: 0 20px 44px rgba(0,0,0,.17), 0 1px 0 #fff07 inset; }
 :root[data-effects="atmosphere"] .capture { border-color: color-mix(in srgb,var(--accent) 18%,var(--line-strong)); }
 :root[data-density="compact"] .grid { gap: 8px; }
 :root[data-density="compact"] .item { padding: 11px 12px; border-radius: 14px; }
@@ -169,4 +169,18 @@ button:active { transform: scale(.985); }
 @media (prefers-reduced-motion: reduce) {
   *,*::before,*::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
   body::before, body::after { display: none !important; }
+}
+
+.visual-setting-row, .setting-row:has(.theme-options) { align-items: flex-start; flex-direction: column; gap: 10px; }
+.visual-setting-row .theme-options, .setting-row:has(.theme-options) .theme-options { flex-wrap: wrap; justify-content: flex-start; max-width: 100%; }
+.visual-setting-row .theme-option { border: 1px solid var(--line); }
+.visual-setting-row .theme-option[style*="--option-color"] { border-color: color-mix(in srgb,var(--option-color) 32%,var(--line)); }
+.visual-setting-row .theme-option.active { border-color: color-mix(in srgb,var(--accent) 45%,var(--line-strong)); }
+:root[data-focus="true"] body::before { opacity: .045 !important; }
+:root[data-focus="true"] .orb { animation: none !important; opacity: .015 !important; }
+:root[data-focus="true"] .hero-sub { opacity: .35; }
+@media (max-width: 700px) {
+  .visual-setting-row { gap: 8px; }
+  .visual-setting-row .theme-options, .setting-row:has(.theme-options) .theme-options { justify-content: flex-start; }
+  .visual-setting-row .theme-option { padding: 7px 8px; font-size: 9px; }
 }
