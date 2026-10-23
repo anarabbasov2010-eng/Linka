@@ -323,12 +323,9 @@ function showCloudSyncНастройки() {
   age.min = "1"; age.max = "120";
   const profileFields = [displayName.parentElement, age.parentElement];
   profileFields.forEach(el => { if (el) profileWrap.append(el); });
-  const sqlButton = document.createElement("button"); sqlButton.type = "button"; sqlButton.className = "ghost";
-  sqlButton.textContent = "Настройки подключения";
   const advanced = document.createElement("details"); advanced.className = "linka-config";
   const summary = document.createElement("summary"); summary.textContent = "Для разработчика · настройки проекта";
   const advancedForm = document.createElement("div"); advancedForm.className = "cloud-form";
-  const oldForm = form;
   const urlWrap = document.createElement("label"); urlWrap.className = "cloud-field";
   const urlLabel = document.createElement("span"); urlLabel.textContent = "Project URL";
   const url = document.createElement("input"); url.type = "url"; url.value = config.url; url.placeholder = "https://…supabase.co"; url.autocomplete = "url";
@@ -351,6 +348,7 @@ function showCloudSyncНастройки() {
     button.addEventListener("click", fn); actions.append(button); return button;
   };
   let otpSent = getOtpCooldown(email.value) > 0;
+  let sessionVerified = Boolean(getCloudSession());
   let cooldownTimer = null;
   const requestButton = makeButton("Отправить код для входа", "ghost", () => void requestCode(false));
   const registerButton = makeButton("Создать аккаунт", "ghost", () => void requestCode(true));
@@ -411,8 +409,11 @@ function showCloudSyncНастройки() {
     try {
       setBusy(true);
       saveCloudConfig(url.value,key.value);
-      statusLine.textContent = "Проверяем код…";
-      await verifyEmailOtp({url:url.value,key:key.value,email:email.value,token:code.value});
+      if (!sessionVerified) {
+        statusLine.textContent = "Проверяем код…";
+        await verifyEmailOtp({url:url.value,key:key.value,email:email.value,token:code.value});
+        sessionVerified = true;
+      }
       if (!String(displayName.value || "").trim()) {
         statusLine.textContent = "Вход выполнен. Укажи имя или псевдоним, чтобы завершить профиль.";
         displayName.focus();
