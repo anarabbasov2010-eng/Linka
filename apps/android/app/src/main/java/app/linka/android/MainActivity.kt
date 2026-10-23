@@ -13,6 +13,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.text.Html
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -30,6 +31,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,6 +43,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
@@ -57,6 +60,7 @@ import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Home
@@ -98,11 +102,13 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
@@ -121,12 +127,17 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
+import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
+import java.time.LocalDate
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import coil.compose.AsyncImage
 
 private val DB = Color(0xFF09090B)
 private val DS = Color(0xFF141417)
@@ -151,19 +162,110 @@ private const val FONT_SCALE_KEY = "font_scale"
 private const val UPDATE_ALERTS_KEY = "update_alerts"
 internal const val AUTO_DOWNLOAD_KEY = "auto_download_updates"
 private const val LAST_NOTIFIED_KEY = "last_notified_version"
+private const val DELETED_IDS_KEY = "deleted_capture_ids"
+private const val SYNC_URL_KEY = "sync_project_url"
+private const val SYNC_ANON_KEY = "sync_anon_key"
+private const val SYNC_EMAIL_KEY = "sync_email"
+private const val SYNC_REFRESH_KEY = "sync_refresh_token_encrypted"
+private const val SYNC_STATUS_KEY = "sync_status"
 private const val MAX_CAPTURE_CHARS = 100_000
 private const val MAX_CAPTURES = 500
 private const val RELEASES_API = "https://api.github.com/repos/anarabbasov2010-eng/Linka/releases/latest"
 private const val NOTIFICATION_CHANNEL = "linka_updates"
 
-internal data class Capture(val id: String, val text: String, val createdAt: Long, val updatedAt: Long = createdAt, val pinned: Boolean = false)
+internal data class Capture(
+    val id: String,
+    val text: String,
+    val createdAt: Long,
+    val updatedAt: Long = createdAt,
+    val pinned: Boolean = false,
+    val previewTitle: String = "",
+    val previewDescription: String = "",
+    val previewImageUrl: String = ""
+)
+private data class LinkPreview(val title: String, val description: String, val imageUrl: String)
 private data class UpdateInfo(val version: String, val downloadUrl: String, val releaseUrl: String, val changes: String)
 
 internal fun filterCaptures(captures: List<Capture>, filter: String, query: String): List<Capture> = captures.filter { c ->
     val isLink = c.text.startsWith("http://", true) || c.text.startsWith("https://", true)
     val kind = when (filter) { "pinned" -> c.pinned; "links" -> isLink; "notes" -> !isLink; else -> true }
-    kind && (query.isBlank() || c.text.contains(query.trim(), ignoreCase = true))
+    val host = if (isLink) Uri.parse(c.text.trim()).host.orEmpty() else ""
+    val q = query.trim()
+    val matches = q.isBlank() || listOf(c.text, c.previewTitle, c.previewDescription, host)
+        .any { it.contains(q, ignoreCase = true) }
+    kind && matches
 }.sortedWith(compareByDescending<Capture> { it.pinned }.thenByDescending { it.updatedAt })
+
+private fun captureTypeKey(capture: Capture): String {
+    if (!capture.text.startsWith("http://", true) && !capture.text.startsWith("https://", true)) return "notes"
+    val host = Uri.parse(capture.text).host.orEmpty().lowercase(Locale.ROOT).removePrefix("www.")
+    return when {
+        host == "youtu.be" || host.endsWith("youtube.com") || host.endsWith("vimeo.com") || host.endsWith("tiktok.com") -> "video"
+        capture.previewTitle.isNotBlank() || capture.previewDescription.isNotBlank() -> "article"
+        else -> "website"
+    }
+}
+
+private suspend fun fetchLinkPreview(value: String): LinkPreview? = withContext(kotlinx.coroutines.Dispatchers.IO) {
+    val raw = value.trim()
+    if (!raw.startsWith("https://", true) && !raw.startsWith("http://", true)) return@withContext null
+    var connection: HttpURLConnection? = null
+    try {
+        val url = URL(raw)
+        if (url.host.isBlank() || url.host.equals("localhost", true) || url.host.endsWith(".local", true)) return@withContext null
+        connection = (url.openConnection() as HttpURLConnection).apply {
+            connectTimeout = 3500
+            readTimeout = 4500
+            instanceFollowRedirects = true
+            setRequestProperty("User-Agent", "LinkaAndroid/0.5 (link preview)")
+            setRequestProperty("Accept", "text/html,application/xhtml+xml")
+        }
+        if (connection.responseCode !in 200..299 || !connection.url.protocol.equals("https", true)) return@withContext null
+        if (!connection.contentType.orEmpty().contains("html", true) || connection.contentLengthLong > 2_000_000L) return@withContext null
+        val html = connection.inputStream.use { input ->
+            val out = ByteArrayOutputStream()
+            val buffer = ByteArray(8192)
+            var total = 0
+            while (total < 250_000) {
+                val count = input.read(buffer, 0, minOf(buffer.size, 250_000 - total))
+                if (count <= 0) break
+                out.write(buffer, 0, count)
+                total += count
+            }
+            out.toString("UTF-8")
+        }
+        fun clean(text: String): String = Html.fromHtml(text, Html.FROM_HTML_MODE_LEGACY)
+            .toString().replace(Regex("\\s+"), " ").trim().take(400)
+        fun attr(tag: String, name: String): String {
+            val match = Regex("""\b$name\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))""", RegexOption.IGNORE_CASE).find(tag) ?: return ""
+            return (1..3).firstNotNullOfOrNull { i -> match.groups[i]?.value?.takeIf { it.isNotBlank() } }.orEmpty()
+        }
+        var title = ""
+        var description = ""
+        var image = ""
+        Regex("""<meta\b[^>]*>""", RegexOption.IGNORE_CASE).findAll(html).forEach { hit ->
+            val tag = hit.value
+            val key = attr(tag, "property").ifBlank { attr(tag, "name") }.lowercase(Locale.ROOT)
+            val valueText = attr(tag, "content")
+            when (key) {
+                "og:title", "twitter:title" -> if (title.isBlank()) title = clean(valueText)
+                "description", "og:description", "twitter:description" -> if (description.isBlank()) description = clean(valueText)
+                "og:image", "twitter:image", "twitter:image:src" -> if (image.isBlank()) image = valueText.trim()
+            }
+        }
+        if (title.isBlank()) title = Regex("""<title\b[^>]*>(.*?)</title>""", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+            .find(html)?.groupValues?.getOrNull(1)?.let(::clean).orEmpty()
+        if (image.isNotBlank()) {
+            image = runCatching { URL(connection.url, image).toString() }.getOrDefault("")
+            if (!image.startsWith("https://", true)) image = ""
+        }
+        LinkPreview(title.ifBlank { connection.url.host.removePrefix("www.") }.take(180), description.take(320), image)
+    } catch (_: Exception) {
+        null
+    } finally {
+        connection?.disconnect()
+    }
+}
 
 private val languages = listOf("az" to "Azərbaycan dili", "en" to "English", "ru" to "Русский", "tr" to "Türkçe")
 private val words = mapOf(
