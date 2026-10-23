@@ -21,7 +21,6 @@ import java.net.URL
 
 private const val LINKA_PREFS = "linka_local_v3"
 private const val UPDATE_ALERTS_KEY = "update_alerts"
-private const val AUTO_DOWNLOAD_KEY = "auto_download_updates"
 private const val LAST_NOTIFIED_KEY = "last_notified_version"
 private const val CHANNEL_ID = "linka_updates"
 private const val RELEASE_URL = "https://api.github.com/repos/anarabbasov2010-eng/Linka/releases/latest"
