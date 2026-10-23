@@ -162,6 +162,7 @@ private val LM = Color(0xFF6D7789)
 private const val PREFS = "linka_local_v3"
 private const val CAPTURES_KEY = "captures"
 private const val THEME_KEY = "theme"
+private const val ACCENT_KEY = "accent"
 private const val LANGUAGE_KEY = "language"
 private const val TERMS_KEY = "agreement_accepted"
 private const val TERMS_VERSION = "2026-10-23-v2"
@@ -649,6 +650,7 @@ class MainActivity : ComponentActivity() {
         checkForUpdate(true)
         setContent {
             var theme by remember { mutableStateOf(prefs().getString(THEME_KEY, "dark") ?: "dark") }
+            var accent by remember { mutableStateOf(prefs().getString(ACCENT_KEY, "violet") ?: "violet") }
             var language by remember { mutableStateOf(prefs().getString(LANGUAGE_KEY, "") ?: "") }
             var accepted by remember { mutableStateOf(prefs().getString(TERMS_KEY, "") == TERMS_VERSION) }
             var animations by remember { mutableStateOf(prefs().getBoolean(ANIMATIONS_KEY, true)) }
@@ -656,17 +658,28 @@ class MainActivity : ComponentActivity() {
             var alerts by remember { mutableStateOf(prefs().getBoolean(UPDATE_ALERTS_KEY, true)) }
             var autoDownload by remember { mutableStateOf(prefs().getBoolean(AUTO_DOWNLOAD_KEY, false)) }
             val darkSystem = androidx.compose.foundation.isSystemInDarkTheme()
-            val dark = theme == "dark" || (theme == "system" && darkSystem)
+            val dark = theme == "dark" || theme == "oled" || (theme == "system" && darkSystem)
+            val accentColor = when (accent) {
+                "blue" -> if (dark) Color(0xFF9CC5FF) else Color(0xFF356BB4)
+                "mint" -> if (dark) Color(0xFF8FE3CF) else Color(0xFF237A68)
+                "rose" -> if (dark) Color(0xFFFFB6D2) else Color(0xFFB14E78)
+                else -> if (dark) Color(0xFFC9C0FF) else Color(0xFF6554A6)
+            }
+            val backgroundColor = if (theme == "oled") Color.Black else DB
+            val surfaceColor = if (theme == "oled") Color(0xFF050507) else DS
+            val raisedColor = if (theme == "oled") Color(0xFF111116) else DR
+            val outlineColor = if (theme == "oled") Color(0xFF26242D) else DBR
             MaterialTheme(colorScheme = if (dark) darkColorScheme(
-                background = DB, surface = DS, primary = Color(0xFFC9C0FF), onPrimary = Color(0xFF171323), onBackground = DT, onSurface = DT, surfaceVariant = DR, outline = DBR
+                background = backgroundColor, surface = surfaceColor, primary = accentColor, onPrimary = Color(0xFF171323), onBackground = DT, onSurface = DT, surfaceVariant = raisedColor, outline = outlineColor
             ) else lightColorScheme(
-                background = LB, surface = LS, primary = Color(0xFF6554A6), onPrimary = Color(0xFFFFFFFF), onBackground = LT, onSurface = LT, surfaceVariant = LR, outline = LBR
+                background = LB, surface = LS, primary = accentColor, onPrimary = Color(0xFFFFFFFF), onBackground = LT, onSurface = LT, surfaceVariant = LR, outline = LBR
             )) {
                 LinkaApp(
                     sharedText = incomingSharedText, sharedTrigger = incomingSharedToken, pairingTrigger = incomingPairingToken, oauthTrigger = incomingOAuthToken,
                     load = { loadCaptures() }, save = { saveCaptures(it) },
                     copy = { copyText(it) }, open = { openExternal(it) },
                     theme = theme, setTheme = { theme = it; prefs().edit().putString(THEME_KEY, it).apply() },
+                    accent = accent, setAccent = { accent = it; prefs().edit().putString(ACCENT_KEY, it).apply() },
                     language = language, setLanguage = { language = it; prefs().edit().putString(LANGUAGE_KEY, it).apply() },
                     animations = animations, setAnimations = { animations = it; prefs().edit().putBoolean(ANIMATIONS_KEY, it).apply() },
                     fontScale = fontScale, setFontScale = { fontScale = it; prefs().edit().putFloat(FONT_SCALE_KEY, it).apply() },
@@ -1009,7 +1022,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun LinkaApp(
     sharedText: String, sharedTrigger: Int, pairingTrigger: Int, oauthTrigger: Int, load: () -> List<Capture>, save: (List<Capture>) -> Unit, copy: (String) -> Unit, open: (String) -> Unit,
-    theme: String, setTheme: (String) -> Unit, language: String, setLanguage: (String) -> Unit,
+    theme: String, setTheme: (String) -> Unit, accent: String, setAccent: (String) -> Unit, language: String, setLanguage: (String) -> Unit,
     animations: Boolean, setAnimations: (Boolean) -> Unit, fontScale: Float, setFontScale: (Float) -> Unit,
     alerts: Boolean, notificationPermissionGranted: Boolean, openNotificationSettings: () -> Unit, sendTestNotification: () -> Unit, setAlerts: (Boolean) -> Unit, updateInfo: UpdateInfo?, updateStatus: String, checking: Boolean,
     checkUpdates: () -> Unit, openUpdate: (UpdateInfo) -> Unit,
@@ -1018,11 +1031,11 @@ private fun LinkaApp(
     version: String, accepted: Boolean, appInForeground: Boolean, agree: () -> Unit, decline: () -> Unit
 ) {
     val lang = language.ifBlank { "en" }
-    val dark = MaterialTheme.colorScheme.background == DB
-    val bg = if (dark) DB else LB
-    val panel = if (dark) DS else LS
-    val raised = if (dark) DR else LR
-    val border = if (dark) DBR else LBR
+    val dark = theme == "oled" || MaterialTheme.colorScheme.background == DB
+    val bg = if (theme == "oled") Color.Black else if (dark) DB else LB
+    val panel = if (theme == "oled") Color(0xFF050507) else if (dark) DS else LS
+    val raised = if (theme == "oled") Color(0xFF111116) else if (dark) DR else LR
+    val border = if (theme == "oled") Color(0xFF26242D) else if (dark) DBR else LBR
     val main = if (dark) DT else LT
     val muted = if (dark) DM else LM
     val context = LocalContext.current
@@ -1322,7 +1335,8 @@ private fun LinkaApp(
         ) { page ->
             Column(Modifier.fillMaxSize().background(
                 Brush.verticalGradient(
-                    if (dark) listOf(Color(0xFF191528), DB, Color(0xFF08080C))
+                    if (theme == "oled") listOf(Color.Black, Color.Black, Color.Black)
+                    else if (dark) listOf(Color(0xFF191528), DB, Color(0xFF08080C))
                     else listOf(Color(0xFFFFFFFF), LB, Color(0xFFF0EDF8))
                 )
             ).verticalScroll(rememberScrollState()).imePadding()
@@ -1432,8 +1446,14 @@ private fun LinkaApp(
                         SettingsGroup(tr(lang, "appearance"), panel, border, main) {
                             Text(tr(lang, "appearance"), color = main, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                             Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                                listOf("dark" to tr(lang, "themeDark"), "light" to tr(lang, "themeLight"), "system" to tr(lang, "themeSystem")).forEach { (v, label) ->
+                                listOf("dark" to tr(lang, "themeDark"), "oled" to "OLED Black", "light" to tr(lang, "themeLight"), "system" to tr(lang, "themeSystem")).forEach { (v, label) ->
                                     FilterChip(selected = theme == v, onClick = { setTheme(v) }, label = { Text(label, fontSize = 11.sp) })
+                                }
+                            }
+                            Text(if (lang == "ru") "Акцентный цвет" else if (lang == "az") "Vurğu rəngi" else if (lang == "tr") "Vurgu rengi" else "Accent color", color = muted, fontSize = 11.sp)
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                listOf("violet" to "Violet", "blue" to "Blue", "mint" to "Mint", "rose" to "Rose").forEach { (v, label) ->
+                                    FilterChip(selected = accent == v, onClick = { setAccent(v) }, label = { Text(label, fontSize = 10.sp) })
                                 }
                             }
                             SettingLine(Icons.Outlined.Language, tr(lang, "language"), languages.first { it.first == lang }.second, main, muted) { languageDialog = true }
