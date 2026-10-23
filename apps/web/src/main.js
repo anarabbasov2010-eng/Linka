@@ -219,6 +219,16 @@ function showCloudSyncSettings() {
   content.append(note);
   const config = getCloudConfig();
   const session = getCloudSession();
+  const setupSql = `create table if not exists public.linka_sync (
+    user_id uuid primary key references auth.users(id) on delete cascade,
+    data jsonb not null default '{"captures":[],"deletedIds":[]}'::jsonb,
+    updated_at timestamptz not null default now()
+  );
+  alter table public.linka_sync enable row level security;
+  grant select, insert, update, delete on public.linka_sync to authenticated;
+  drop policy if exists "linka_sync_own_data" on public.linka_sync;
+  create policy "linka_sync_own_data" on public.linka_sync for all to authenticated
+    using (auth.uid() = user_id) with check (auth.uid() = user_id);`;
 
   const form = document.createElement("div"); form.className = "cloud-form";
   const field = (labelText, type, value, placeholder) => {
@@ -227,11 +237,23 @@ function showCloudSyncSettings() {
     const input = document.createElement("input"); input.type = type; input.value = value || ""; input.placeholder = placeholder || ""; input.autocomplete = type === "password" ? "current-password" : (type === "email" ? "email" : "url");
     wrap.append(label, input); form.append(wrap); return input;
   };
+  const sqlButton = document.createElement("button"); sqlButton.type = "button"; sqlButton.className = "ghost"; sqlButton.textContent = "Copy database setup SQL";
+  sqlButton.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(setupSql);
+      statusLine.textContent = "SQL copied. Run it once in your Supabase project's SQL Editor.";
+    } catch {
+      const area = document.createElement("textarea"); area.value = setupSql; area.setAttribute("readonly", "");
+      area.style.position = "fixed"; area.style.opacity = "0"; document.body.append(area); area.select();
+      const copied = document.execCommand("copy"); area.remove();
+      statusLine.textContent = copied ? "SQL copied. Run it once in Supabase SQL Editor." : "Copy failed. Open docs/CLOUD-SYNC.md in the repository for the SQL.";
+    }
+  });
   const url = field("Supabase project URL", "url", config.url, "https://your-project.supabase.co");
   const key = field("Public publishable / anon key", "text", config.key, "sb_publishable_… or legacy anon key");
   const email = field("Email", "email", session?.email || "", "you@example.com");
   const password = field("Password", "password", "", "At least 8 characters");
-  content.append(form);
+  content.append(sqlButton, form);
 
   const statusLine = document.createElement("p"); statusLine.className = "cloud-status";
   statusLine.textContent = session ? `Signed in as ${session.email || "your account"}.` : "Not connected. Create or sign in to a Linka sync account.";
