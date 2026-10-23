@@ -48,7 +48,7 @@ let lastCloudRefreshAt = 0;
 const expandedCards = new Set();
 const desktopBuildVersion = String(import.meta.env.VITE_LINKA_DESKTOP_VERSION || "").trim();
 let themeMode = localStorage.getItem("linka.theme") || "dark";
-let reduceMotion = localStorage.getItem("linka.reduceMotion") === "true";
+let reduceMotion = localStorage.getItem("linka.reduceMotion") === "true" || (localStorage.getItem("linka.reduceMotion") === null && (() => { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } })());
 
 function say(message) {
   status.textContent = message;
@@ -553,7 +553,7 @@ function showНастройки() {
   const logo=document.createElement("img"); logo.className="modal-logo"; logo.src="/linka-mark.svg"; logo.alt="";
   const meta=document.createElement("div"); const title=document.createElement("h2"); title.textContent="Настройки";
   const sub=document.createElement("p"); sub.textContent="Настрой Linka под себя"; meta.append(title,sub); head.append(logo,meta); content.append(head);
-  const themeRow=document.createElement("div"); themeRow.className="setting-row";
+  const themeRow=document.createElement("div"); themeRow.className="setting-row visual-theme-row";
   const themeMeta=document.createElement("div"); const themeTitle=document.createElement("strong"); themeTitle.textContent="Appearance";
   const themeDesc=document.createElement("p"); themeDesc.textContent="Выбери удобную цветовую тему"; themeMeta.append(themeTitle,themeDesc);
   const choices=document.createElement("div"); choices.className="theme-options"; choices.setAttribute("aria-label","Theme");
