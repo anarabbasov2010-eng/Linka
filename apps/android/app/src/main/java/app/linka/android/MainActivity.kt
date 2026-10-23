@@ -448,6 +448,7 @@ private fun tr(lang: String, key: String) = words[lang]?.get(key) ?: extraWords[
 
 class MainActivity : ComponentActivity() {
     private var incomingSharedText by mutableStateOf("")
+    private var incomingSharedToken by mutableIntStateOf(0)
     private var updateInfo by mutableStateOf<UpdateInfo?>(null)
     private var updateStatus by mutableStateOf("")
     private var checkingUpdates by mutableStateOf(false)
@@ -496,6 +497,7 @@ class MainActivity : ComponentActivity() {
         }
         scheduleUpdateChecks()
         incomingSharedText = extractSharedText(intent)
+        incomingSharedToken = 1
         checkForUpdate(true)
         setContent {
             var theme by remember { mutableStateOf(prefs().getString(THEME_KEY, "dark") ?: "dark") }
@@ -513,7 +515,8 @@ class MainActivity : ComponentActivity() {
                 background = LB, surface = LS, primary = LT, onPrimary = LS, onBackground = LT, onSurface = LT, surfaceVariant = LR, outline = LBR
             )) {
                 LinkaApp(
-                    sharedText = incomingSharedText, load = { loadCaptures() }, save = { saveCaptures(it) },
+                    sharedText = incomingSharedText, sharedTrigger = incomingSharedToken,
+                    load = { loadCaptures() }, save = { saveCaptures(it) },
                     copy = { copyText(it) }, open = { openExternal(it) },
                     theme = theme, setTheme = { theme = it; prefs().edit().putString(THEME_KEY, it).apply() },
                     language = language, setLanguage = { language = it; prefs().edit().putString(LANGUAGE_KEY, it).apply() },
@@ -559,6 +562,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         incomingSharedText = extractSharedText(intent)
+        incomingSharedToken++
     }
 
     override fun onResume() {
@@ -796,7 +800,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun LinkaApp(
-    sharedText: String, load: () -> List<Capture>, save: (List<Capture>) -> Unit, copy: (String) -> Unit, open: (String) -> Unit,
+    sharedText: String, sharedTrigger: Int, load: () -> List<Capture>, save: (List<Capture>) -> Unit, copy: (String) -> Unit, open: (String) -> Unit,
     theme: String, setTheme: (String) -> Unit, language: String, setLanguage: (String) -> Unit,
     animations: Boolean, setAnimations: (Boolean) -> Unit, fontScale: Float, setFontScale: (Float) -> Unit,
     alerts: Boolean, setAlerts: (Boolean) -> Unit, updateInfo: UpdateInfo?, updateStatus: String, checking: Boolean,
@@ -827,6 +831,15 @@ private fun LinkaApp(
     var visibleLimit by remember { mutableIntStateOf(30) }
     var deleting by remember { mutableStateOf<Capture?>(null) }
     var clearDialog by remember { mutableStateOf(false) }
+    var cloudDialog by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    var cloudUrl by remember { mutableStateOf(prefs.getString(SYNC_URL_KEY, "") ?: "") }
+    var cloudAnonKey by remember { mutableStateOf(prefs.getString(SYNC_ANON_KEY, "") ?: "") }
+    var cloudEmail by remember { mutableStateOf(prefs.getString(SYNC_EMAIL_KEY, "") ?: "") }
+    var cloudPassword by remember { mutableStateOf("") }
+    var cloudBusy by remember { mutableStateOf(false) }
+    var cloudStatus by remember { mutableStateOf(prefs.getString(SYNC_STATUS_KEY, "") ?: "") }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) runCatching {
             val raw = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: error("empty file")
@@ -845,17 +858,52 @@ private fun LinkaApp(
         }.onFailure { message = tr(lang, "importFailed") }
     }
     fun commit(list: List<Capture>) {
-        captures = list.sortedWith(compareByDescending<Capture> { it.pinned }.thenByDescending { it.updatedAt }).take(MAX_CAPTURES)
+        val normalized = list.sortedWith(compareByDescending<Capture> { it.pinned }.thenByDescending { it.updatedAt }).take(MAX_CAPTURES)
+        val nextIds = normalized.map { it.id }.toSet()
+        val goneIds = captures.filterNot { it.id in nextIds }.map { it.id }
+        if (goneIds.isNotEmpty()) {
+            val stored = JSONArray(prefs.getString(DELETED_IDS_KEY, "[]") ?: "[]")
+            val ids = linkedSetOf<String>()
+            for (i in 0 until stored.length()) stored.optString(i).takeIf { it.isNotBlank() }?.let(ids::add)
+            ids.addAll(goneIds)
+            prefs.edit().putString(DELETED_IDS_KEY, JSONArray().apply { ids.toList().takeLast(5000).forEach { put(it) } }.toString()).apply()
+        }
+        captures = normalized
         save(captures)
     }
-    LaunchedEffect(sharedText) {
-        if (sharedText.isNotBlank()) {
-            draft = sharedText
+    LaunchedEffect(sharedText, sharedTrigger) {
+        val incoming = sharedText.trim().take(MAX_CAPTURE_CHARS)
+        if (incoming.isNotBlank()) {
+            val now = System.currentTimeMillis()
+            val existing = captures.firstOrNull { it.text.equals(incoming, ignoreCase = true) }
+            if (existing == null) commit(listOf(Capture(UUID.randomUUID().toString(), incoming, now, now)) + captures)
+            else commit(captures.map { if (it.id == existing.id) it.copy(updatedAt = now) else it })
+            draft = ""
             editingId = null
+            message = tr(lang, "saved")
             tab = 0
         }
     }
+    LaunchedEffect(accepted) {
+        if (!accepted) return@LaunchedEffect
+        val token = prefs.getString(SYNC_REFRESH_KEY, "").orEmpty()
+        val url = prefs.getString(SYNC_URL_KEY, "").orEmpty()
+        val anon = prefs.getString(SYNC_ANON_KEY, "").orEmpty()
+        val email = prefs.getString(SYNC_EMAIL_KEY, "").orEmpty()
+        if (token.isBlank() || url.isBlank() || anon.isBlank() || email.isBlank()) return@LaunchedEffect
+        runCatching {
+            val rawDeleted = JSONArray(prefs.getString(DELETED_IDS_KEY, "[]") ?: "[]")
+            val deleted = (0 until rawDeleted.length()).map { rawDeleted.optString(it) }.filter { it.isNotBlank() }.toSet()
+            val result = syncWithSupabase(url, anon, email, "", false, load(), deleted, token)
+            prefs.edit().putString(SYNC_REFRESH_KEY, result.encryptedRefreshToken)
+                .putString(DELETED_IDS_KEY, JSONArray().apply { result.deletedIds.forEach { put(it) } }.toString())
+                .putString(SYNC_STATUS_KEY, result.message).apply()
+            commit(result.captures)
+        }.onFailure { cloudStatus = it.message ?: "Cloud sync failed" }
+    }
     val visible = filterCaptures(captures, filter, if (tab == 2) query else "")
+    val oldCaptures = captures.filter { it.updatedAt < System.currentTimeMillis() - 7L * 24L * 60L * 60L * 1000L }
+    val resurfaced = if (oldCaptures.isEmpty()) null else oldCaptures[LocalDate.now().dayOfYear % oldCaptures.size]
     LaunchedEffect(tab, filter, query) { visibleLimit = 30 }
 
     if (language.isBlank()) {
