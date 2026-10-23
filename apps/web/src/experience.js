@@ -741,7 +741,7 @@ export function initLinkaExperience() {
     if (status) { status.textContent = String(event.detail || ""); status.style.opacity = "1"; }
   });
   document.addEventListener("linka:request-profile", () => openProfileEditor());
-  document.addEventListener("linka:capture-saved", notificationForSavedCapture);
+  window.addEventListener("linka:capture-saved", notificationForSavedCapture);
   window.addEventListener("linka:profile-saved", () => window.dispatchEvent(new CustomEvent("linka:authenticated")));
   window.addEventListener("linka:authenticated", () => {
     const pending = localStorage.getItem("linka.pending-pairing.v1");
