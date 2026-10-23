@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mergeCloudCaptures } from "./cloud-sync.js";
+import { getOtpCooldown, mergeCloudCaptures, readLinkaProfile, saveLinkaProfile } from "./cloud-sync.js";
 
 test("cloud merge picks the newest copy, keeps pins, and orders newest first", () => {
   const remote = [
@@ -31,4 +31,42 @@ test("cloud merge ignores malformed records and enforces the shared item limit",
   const merged = mergeCloudCaptures(items.concat([null, { id: "bad", text: "" }]), [], new Set());
   assert.equal(merged.length, 500);
   assert.equal(merged[0].id, "509");
+});
+
+function memoryStorage() {
+  const values = new Map();
+  return {
+    getItem(key) { return values.has(key) ? values.get(key) : null; },
+    setItem(key, value) { values.set(key, String(value)); },
+    removeItem(key) { values.delete(key); }
+  };
+}
+
+test("profile onboarding saves a cleaned display name and optional age", () => {
+  const storage = memoryStorage();
+  const saved = saveLinkaProfile({ displayName: "  Linka   User  ", age: "16" }, storage);
+  assert.equal(saved.displayName, "Linka User");
+  assert.equal(saved.age, 16);
+  assert.equal(readLinkaProfile(storage).displayName, "Linka User");
+  assert.equal(readLinkaProfile(storage).age, 16);
+});
+
+test("profile onboarding accepts a nickname without age and rejects empty or invalid values", () => {
+  const storage = memoryStorage();
+  const saved = saveLinkaProfile({ displayName: "A nickname", age: "" }, storage);
+  assert.equal(saved.age, null);
+  assert.equal(readLinkaProfile(storage).age, null);
+  assert.throws(() => saveLinkaProfile({ displayName: "   " }, storage), /name/i);
+  assert.throws(() => saveLinkaProfile({ displayName: "Name", age: 12 }, storage), /Age/i);
+  assert.throws(() => saveLinkaProfile({ displayName: "Name", age: 121 }, storage), /Age/i);
+});
+
+test("email OTP resend helper honors a per-email two-minute cooldown", () => {
+  const storage = memoryStorage();
+  const email = "Linka.User@example.com";
+  storage.setItem("linka.otp.cooldown.linka.user@example.com", String(Date.now() + 120_000));
+  const remaining = getOtpCooldown(email, storage);
+  assert.ok(remaining > 0 && remaining <= 120_000);
+  storage.setItem("linka.otp.cooldown.linka.user@example.com", String(Date.now() - 1));
+  assert.equal(getOtpCooldown(email, storage), 0);
 });

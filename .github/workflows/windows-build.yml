@@ -54,17 +54,61 @@ jobs:
           $config = Get-Content -Raw $configPath | ConvertFrom-Json
           $config.version = $version
           $config | ConvertTo-Json -Depth 100 | Set-Content -Encoding utf8 $configPath
+      - name: Inject public cloud endpoint when configured
+        shell: pwsh
+        env:
+          LINKA_SUPABASE_URL: ${{ vars.LINKA_SUPABASE_URL }}
+          LINKA_SUPABASE_PUBLISHABLE_KEY: ${{ vars.LINKA_SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          "LINKA_SUPABASE_URL=$($env:LINKA_SUPABASE_URL)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "LINKA_SUPABASE_PUBLISHABLE_KEY=$($env:LINKA_SUPABASE_PUBLISHABLE_KEY)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          if ($env:LINKA_SUPABASE_URL -and $env:LINKA_SUPABASE_PUBLISHABLE_KEY) {
+            Write-Host "Configured the public Linka cloud endpoint for the build."
+          } else {
+            Write-Warning "Linka cloud endpoint is not configured. Local-only mode remains available."
+          }
+      - name: Configure signed in-app updater when signing keys are available
+        shell: pwsh
+        env:
+          LINKA_UPDATER_PUBLIC_KEY: ${{ vars.LINKA_UPDATER_PUBLIC_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          "LINKA_UPDATER_ENABLED=false" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $configPath = Join-Path $env:GITHUB_WORKSPACE "apps/desktop/src-tauri/tauri.conf.json"
+          $config = Get-Content -Raw $configPath | ConvertFrom-Json
+          if ($env:LINKA_UPDATER_PUBLIC_KEY -and $env:TAURI_SIGNING_PRIVATE_KEY) {
+            $updater = [ordered]@{
+              pubkey = $env:LINKA_UPDATER_PUBLIC_KEY
+              endpoints = @("https://github.com/anarabbasov2010-eng/Linka/releases/latest/download/latest.json")
+              windows = @{ installMode = "passive" }
+            }
+            $plugins = [ordered]@{ updater = $updater }
+            $config | Add-Member -MemberType NoteProperty -Name plugins -Value ([pscustomobject]$plugins) -Force
+            $config.bundle.createUpdaterArtifacts = $true
+            "LINKA_UPDATER_ENABLED=true" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            Write-Host "Signed Linka desktop auto-updater is enabled."
+          } else {
+            $config.bundle.createUpdaterArtifacts = $false
+            Write-Warning "Signed in-app updating is disabled until LINKA_UPDATER_PUBLIC_KEY and TAURI_SIGNING_PRIVATE_KEY are configured."
+          }
+          $config | ConvertTo-Json -Depth 100 | Set-Content -Encoding utf8 $configPath
       - name: Install web dependencies
         working-directory: apps/web
         run: npm install --no-audit --no-fund
       - name: Install desktop tooling
         working-directory: apps/desktop
         run: npm install --no-audit --no-fund
+      - name: Generate sharp Windows app icons from the Linka vector mark
+        working-directory: apps/desktop
+        run: npx tauri icon ../web/public/linka-mark.svg --output src-tauri/icons
       - name: Test web inbox and cloud sync merge
         working-directory: apps/web
         run: npm test
       - name: Build Windows installer
         working-directory: apps/desktop
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run build
       - name: Upload Windows installer artifact
         uses: actions/upload-artifact@v4
@@ -86,3 +130,24 @@ jobs:
           fi
           cp "${files[0]}" Linka-Windows-x64-setup.exe
           gh release upload "$LINKA_RELEASE_TAG" Linka-Windows-x64-setup.exe --clobber --repo "$GITHUB_REPOSITORY"
+          if [[ "${LINKA_UPDATER_ENABLED:-false}" == "true" ]]; then
+            bundles=(apps/desktop/src-tauri/target/release/bundle/nsis/*.nsis.zip)
+            if [[ ! -f "${bundles[0]:-}" || ! -f "${bundles[0]}.sig" ]]; then
+              echo "::error::Signed updater archive or signature is missing."
+              exit 1
+            fi
+            updater_zip="${bundles[0]}"
+            signature_file="${updater_zip}.sig"
+            signature="$(cat "$signature_file")"
+            version="${LINKA_RELEASE_TAG#v}"
+            url="https://github.com/$GITHUB_REPOSITORY/releases/download/$LINKA_RELEASE_TAG/$(basename "$updater_zip")"
+            jq -n --arg version "$version" --arg notes "Linka $version" --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg url "$url" --arg signature "$signature" '{
+              version: $version,
+              notes: $notes,
+              pub_date: $date,
+              platforms: {
+                "windows-x86_64": { signature: $signature, url: $url }
+              }
+            }' > latest.json
+            gh release upload "$LINKA_RELEASE_TAG" "$updater_zip" "$signature_file" latest.json --clobber --repo "$GITHUB_REPOSITORY"
+          fi

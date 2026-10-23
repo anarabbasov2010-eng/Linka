@@ -21,7 +21,8 @@ internal data class CloudSyncResult(
     val captures: List<Capture>,
     val deletedIds: Set<String>,
     val encryptedRefreshToken: String,
-    val message: String
+    val message: String,
+    val profile: JSONObject? = null
 )
 
 private object LinkaTokenVault {
@@ -104,6 +105,103 @@ private fun requestJson(
     }
 }
 
+
+internal suspend fun requestEmailOtp(
+    projectUrl: String,
+    anonKey: String,
+    email: String,
+    createAccount: Boolean
+) = withContext(Dispatchers.IO) {
+    val base = projectUrl.trim().trimEnd('/')
+    require(base.startsWith("https://", ignoreCase = true)) { "Use the HTTPS URL of your Supabase project." }
+    require(anonKey.trim().isNotBlank()) { "Enter the public publishable key." }
+    require(Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$").matches(email.trim())) { "Enter a valid email address." }
+    requestJson(
+        "$base/auth/v1/otp", "POST", anonKey.trim(),
+        body = JSONObject().put("email", email.trim().lowercase()).put("create_user", createAccount).toString()
+    )
+}
+
+internal suspend fun verifyEmailOtp(
+    projectUrl: String,
+    anonKey: String,
+    email: String,
+    code: String
+): String = withContext(Dispatchers.IO) {
+    val base = projectUrl.trim().trimEnd('/')
+    require(base.startsWith("https://", ignoreCase = true)) { "Use the HTTPS URL of your Supabase project." }
+    require(anonKey.trim().isNotBlank()) { "Enter the public publishable key." }
+    require(Regex("^[0-9]{6}$").matches(code.trim())) { "Enter the six-digit code from your email." }
+    val raw = requestJson(
+        "$base/auth/v1/verify", "POST", anonKey.trim(),
+        body = JSONObject()
+            .put("email", email.trim().lowercase())
+            .put("token", code.trim())
+            .put("type", "email")
+            .toString()
+    )
+    val session = JSONObject(raw)
+    val refresh = session.optString("refresh_token")
+    val access = session.optString("access_token")
+    val user = session.optJSONObject("user")
+    if (refresh.isBlank() || access.isBlank() || user?.optString("id").isNullOrBlank()) {
+        throw IllegalStateException("Email confirmed, but no active session was returned. Request a fresh code and try again.")
+    }
+    LinkaTokenVault.encrypt(refresh)
+}
+
+internal data class GoogleOAuthSession(val encryptedRefreshToken: String, val email: String, val displayName: String)
+
+internal suspend fun completeGoogleOAuthSession(
+    projectUrl: String,
+    anonKey: String,
+    accessToken: String,
+    refreshToken: String
+): GoogleOAuthSession = withContext(Dispatchers.IO) {
+    val base = projectUrl.trim().trimEnd('/')
+    require(base.startsWith("https://", ignoreCase = true)) { "Use the HTTPS URL of your Supabase project." }
+    require(anonKey.isNotBlank() && accessToken.isNotBlank() && refreshToken.isNotBlank()) {
+        "Google returned an incomplete sign-in session. Try again."
+    }
+    val user = JSONObject(requestJson("$base/auth/v1/user", "GET", anonKey.trim(), accessToken))
+    val email = user.optString("email").trim()
+    val metadata = user.optJSONObject("user_metadata") ?: JSONObject()
+    val displayName = metadata.optString("full_name")
+        .ifBlank { metadata.optString("name") }
+        .ifBlank { metadata.optString("preferred_username") }
+    require(email.isNotBlank()) { "Google did not return an email for this account." }
+    GoogleOAuthSession(LinkaTokenVault.encrypt(refreshToken), email, displayName)
+}
+
+internal suspend fun approveQrPairing(
+    projectUrl: String,
+    anonKey: String,
+    encryptedRefreshToken: String,
+    pairingId: String,
+    pairingSecret: String
+): String = withContext(Dispatchers.IO) {
+    val base = projectUrl.trim().trimEnd('/')
+    require(base.startsWith("https://", ignoreCase = true)) { "Use the HTTPS URL of your Supabase project." }
+    require(anonKey.trim().isNotBlank()) { "Enter the public publishable key." }
+    require(pairingId.isNotBlank() && pairingSecret.length >= 32) { "The QR sign-in request is invalid." }
+    val oldRefresh = runCatching { LinkaTokenVault.decrypt(encryptedRefreshToken) }
+        .getOrElse { throw IllegalStateException("Sign in to Linka again before approving QR login.") }
+    val session = JSONObject(requestJson(
+        "$base/auth/v1/token?grant_type=refresh_token", "POST", anonKey.trim(),
+        body = JSONObject().put("refresh_token", oldRefresh).toString()
+    ))
+    val access = session.optString("access_token")
+    val refreshed = session.optString("refresh_token")
+    if (access.isBlank() || refreshed.isBlank()) throw IllegalStateException("The Linka session expired. Sign in again.")
+    requestJson(
+        "$base/functions/v1/linka-pairing", "POST", anonKey.trim(), access,
+        JSONObject().put("action", "approve").put("id", pairingId)
+            .put("secret", pairingSecret).put("refreshToken", refreshed).toString()
+    )
+    LinkaTokenVault.encrypt(refreshed)
+}
+
+
 private fun captureArray(captures: List<Capture>): JSONArray = JSONArray().also { array ->
     captures.forEach { c ->
         array.put(JSONObject()
@@ -142,7 +240,8 @@ internal suspend fun syncWithSupabase(
     createAccount: Boolean,
     localCaptures: List<Capture>,
     localDeletedIds: Set<String>,
-    encryptedRefreshToken: String
+    encryptedRefreshToken: String,
+    localProfile: JSONObject? = null
 ): CloudSyncResult = withContext(Dispatchers.IO) {
     val base = projectUrl.trim().trimEnd('/')
     require(base.startsWith("https://", ignoreCase = true)) {
@@ -197,6 +296,14 @@ internal suspend fun syncWithSupabase(
             for (i in 0 until array.length()) array.optString(i).takeIf { it.isNotBlank() }?.let(::add)
         }
     }.toList().takeLast(5000).toSet()
+    val remoteProfile = remoteData?.optJSONObject("profile")
+    val validLocalProfile = localProfile?.takeIf { it.optString("displayName").isNotBlank() }
+    val syncedProfile = when {
+        validLocalProfile == null -> remoteProfile
+        remoteProfile == null -> validLocalProfile
+        validLocalProfile.optLong("updatedAt", 0L) >= remoteProfile.optLong("updatedAt", 0L) -> validLocalProfile
+        else -> remoteProfile
+    }
 
     val merged = (remoteCaptures + localCaptures)
         .filterNot { it.id in deleted }
@@ -206,6 +313,7 @@ internal suspend fun syncWithSupabase(
         .take(MAX_CAPTURES)
 
     val data = JSONObject().put("captures", captureArray(merged)).put("deletedIds", JSONArray(deleted))
+    if (syncedProfile != null) data.put("profile", syncedProfile)
     val upsert = JSONObject().put("user_id", userId).put("data", data).put("updated_at", Instant.now().toString())
     requestJson(
         "$base/rest/v1/linka_sync?on_conflict=user_id",
@@ -216,7 +324,8 @@ internal suspend fun syncWithSupabase(
         captures = merged,
         deletedIds = deleted,
         encryptedRefreshToken = LinkaTokenVault.encrypt(refreshToken),
-        message = "Synced ${merged.size} items"
+        message = "Synced ${merged.size} items",
+        profile = syncedProfile
     )
 }
 

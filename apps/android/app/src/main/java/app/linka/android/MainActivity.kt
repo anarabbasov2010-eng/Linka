@@ -101,6 +101,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -175,6 +176,7 @@ private const val SYNC_ANON_KEY = "sync_anon_key"
 private const val SYNC_EMAIL_KEY = "sync_email"
 private const val SYNC_REFRESH_KEY = "sync_refresh_token_encrypted"
 private const val SYNC_STATUS_KEY = "sync_status"
+private const val PROFILE_JSON_KEY = "profile_json"
 internal const val MAX_CAPTURE_CHARS = 100_000
 internal const val MAX_CAPTURES = 500
 private const val RELEASES_API = "https://api.github.com/repos/anarabbasov2010-eng/Linka/releases/latest"
@@ -405,51 +407,87 @@ private val words = mapOf(
 private val extraWords = mapOf(
     "en" to mapOf(
         "video" to "VIDEO", "article" to "ARTICLE", "website" to "WEBSITE",
-        "rememberTitle" to "A little throwback", "rememberBody" to "Something you saved a while ago.", "readMore" to "Read more", "showLess" to "Show less",
-        "cloudSync" to "Cloud sync", "cloudSyncBody" to "Keep this library in sync between devices using your own free Supabase project.",
-        "syncNow" to "Connect and sync", "createAccount" to "Create account", "syncEndpoint" to "Supabase project URL",
-        "syncAnonKey" to "Publishable / anon key", "syncEmail" to "Account email", "syncPassword" to "Password",
-        "syncHelp" to "Create a free Supabase project, paste its Project URL and publishable key, then copy the SQL below into its SQL Editor. Your password is not saved; the refresh session is encrypted with Android Keystore.",
+        "rememberTitle" to "A little throwback", "rememberBody" to "Something you saved a while ago.",
+        "readMore" to "Read more", "showLess" to "Show less",
+        "cloudSync" to "Cloud sync", "cloudSyncBody" to "Keep this library in sync between devices using the same account.",
+        "syncNow" to "Connect and sync", "createAccount" to "Create account",
+        "syncEndpoint" to "Supabase project URL", "syncAnonKey" to "Publishable key", "syncEmail" to "Account email",
+        "syncPassword" to "Six-digit email code", "syncSendCode" to "Send sign-in code",
+        "syncRegisterCode" to "Create account · send code", "syncCodeSent" to "Code sent. Check your inbox and spam folder.",
+        "syncNeedCode" to "Request a fresh email code first.", "syncOtpExpired" to "Code expired. Request a new one.",
+        "syncQrApproved" to "Desktop sign-in approved.", "syncNeedSignInForQr" to "Sign in to approve the QR request.",
+        "syncWait" to "Resend available in", "syncVerifyAndSync" to "Verify code and sync",
+        "syncHelp" to "Use your email to create an account or sign in. Your Linka library is available on devices using the same account.",
+        "syncConfig" to "Connection settings", "syncSetupHint" to "These settings are normally set by Linka. Change them only if you need a different project.",
+        "profileTitle" to "A quick intro", "profilePrompt" to "Choose a display name. A nickname is fine; age is optional.",
+        "profileName" to "Display name", "profileAge" to "Age (optional)", "profileSave" to "Save profile",
         "syncSetupSql" to "Copy database setup SQL", "syncForget" to "Forget this account", "syncClose" to "Close",
         "syncWorking" to "Syncing…", "syncCopied" to "SQL copied. Run it in Supabase → SQL Editor.",
-        "syncRequired" to "Cloud sync needs your own Supabase project. Until connected, Linka continues to work locally.",
-        "syncLatest" to "Last sync", "syncOpen" to "Set up cloud sync"
+        "syncRequired" to "Cloud sync needs a configured Linka service. Until connected, Linka continues to work locally.",
+        "syncLatest" to "Last sync", "syncOpen" to "Set up cloud sync", "syncOffline" to "Continue offline"
     ),
     "ru" to mapOf(
         "video" to "ВИДЕО", "article" to "СТАТЬЯ", "website" to "САЙТ",
-        "rememberTitle" to "Из прошлого", "rememberBody" to "То, что ты сохранил некоторое время назад.", "readMore" to "Развернуть", "showLess" to "Свернуть",
-        "cloudSync" to "Облачная синхронизация", "cloudSyncBody" to "Синхронизируй библиотеку между устройствами через собственный бесплатный проект Supabase.",
-        "syncNow" to "Подключить и синхронизировать", "createAccount" to "Создать аккаунт", "syncEndpoint" to "URL проекта Supabase",
-        "syncAnonKey" to "Публичный / anon-ключ", "syncEmail" to "Электронная почта", "syncPassword" to "Пароль",
-        "syncHelp" to "Создай бесплатный проект Supabase, вставь Project URL и публичный ключ, затем скопируй SQL ниже в SQL Editor проекта. Пароль не сохраняется; токен сессии шифруется Android Keystore.",
+        "rememberTitle" to "Из прошлого", "rememberBody" to "То, что ты сохранил некоторое время назад.",
+        "readMore" to "Развернуть", "showLess" to "Свернуть",
+        "cloudSync" to "Облачная синхронизация", "cloudSyncBody" to "Синхронизируй библиотеку между устройствами с одним аккаунтом.",
+        "syncNow" to "Подключить и синхронизировать", "createAccount" to "Создать аккаунт",
+        "syncEndpoint" to "URL проекта Supabase", "syncAnonKey" to "Публичный ключ", "syncEmail" to "Электронная почта",
+        "syncPassword" to "Код из 6 цифр", "syncSendCode" to "Получить код для входа",
+        "syncRegisterCode" to "Создать аккаунт · получить код", "syncCodeSent" to "Код отправлен. Проверь почту и папку «Спам».",
+        "syncNeedCode" to "Сначала запроси новый код из письма.", "syncOtpExpired" to "Срок действия кода истёк. Запроси новый.",
+        "syncQrApproved" to "Вход на компьютере подтверждён.", "syncNeedSignInForQr" to "Войди в аккаунт, чтобы подтвердить QR-вход.",
+        "syncWait" to "Повторный код через", "syncVerifyAndSync" to "Подтвердить код и синхронизировать",
+        "syncHelp" to "Создай аккаунт или войди по коду из письма. Библиотека будет доступна на устройствах с этим аккаунтом.",
+        "syncConfig" to "Настройки подключения", "syncSetupHint" to "Обычно эти настройки уже заданы в Linka. Меняй их только при необходимости.",
+        "profileTitle" to "Немного о тебе", "profilePrompt" to "Выбери отображаемое имя. Можно использовать псевдоним; возраст необязателен.",
+        "profileName" to "Как тебя называть", "profileAge" to "Возраст (необязательно)", "profileSave" to "Сохранить профиль",
         "syncSetupSql" to "Скопировать SQL для базы", "syncForget" to "Отключить этот аккаунт", "syncClose" to "Закрыть",
         "syncWorking" to "Синхронизация…", "syncCopied" to "SQL скопирован. Выполни его в Supabase → SQL Editor.",
-        "syncRequired" to "Для облачной синхронизации нужен собственный проект Supabase. Пока он не подключён, Linka продолжит работать локально.",
-        "syncLatest" to "Последняя синхронизация", "syncOpen" to "Настроить синхронизацию"
+        "syncRequired" to "Облачная синхронизация ещё не подключена. Пока Linka продолжит работать локально.",
+        "syncLatest" to "Последняя синхронизация", "syncOpen" to "Настроить синхронизацию", "syncOffline" to "Продолжить без аккаунта"
     ),
     "az" to mapOf(
         "video" to "VİDEO", "article" to "MƏQALƏ", "website" to "SAYT",
-        "rememberTitle" to "Keçmişdən bir xatirə", "rememberBody" to "Bir müddət əvvəl saxladığın material.", "readMore" to "Daha çox", "showLess" to "Yığcam et",
-        "cloudSync" to "Bulud sinxronizasiyası", "cloudSyncBody" to "Öz pulsuz Supabase layihən vasitəsilə kitabxananı cihazlar arasında sinxronlaşdır.",
-        "syncNow" to "Qoşul və sinxronlaşdır", "createAccount" to "Hesab yarat", "syncEndpoint" to "Supabase layihəsinin URL-i",
-        "syncAnonKey" to "Açıq / anon açarı", "syncEmail" to "E-poçt", "syncPassword" to "Şifrə",
-        "syncHelp" to "Pulsuz Supabase layihəsi yarat, Project URL və açıq açarı daxil et, sonra aşağıdakı SQL-i layihənin SQL Editor bölməsində icra et. Şifrə saxlanmır; sessiya Android Keystore ilə şifrələnir.",
+        "rememberTitle" to "Keçmişdən bir xatirə", "rememberBody" to "Bir müddət əvvəl saxladığın material.",
+        "readMore" to "Daha çox", "showLess" to "Yığcam et",
+        "cloudSync" to "Bulud sinxronizasiyası", "cloudSyncBody" to "Kitabxananı eyni hesabla cihazlar arasında sinxronlaşdır.",
+        "syncNow" to "Qoşul və sinxronlaşdır", "createAccount" to "Hesab yarat",
+        "syncEndpoint" to "Supabase layihəsinin URL-i", "syncAnonKey" to "Açıq layihə açarı", "syncEmail" to "E-poçt",
+        "syncPassword" to "6 rəqəmli e-poçt kodu", "syncSendCode" to "Giriş kodu göndər",
+        "syncRegisterCode" to "Hesab yarat · kod göndər", "syncCodeSent" to "Kod göndərildi. E-poçtu və spam qovluğunu yoxla.",
+        "syncNeedCode" to "Əvvəlcə yeni e-poçt kodu istə.", "syncOtpExpired" to "Kodun vaxtı bitib. Yenidən istə.",
+        "syncQrApproved" to "Kompüter girişinə icazə verildi.", "syncNeedSignInForQr" to "QR girişini təsdiqləmək üçün hesabına daxil ol.",
+        "syncWait" to "Yeni kod üçün qalan vaxt", "syncVerifyAndSync" to "Təsdiqlə və sinxronlaşdır",
+        "syncHelp" to "E-poçt kodu ilə hesab yarat və ya daxil ol. Linka kitabxanan eyni hesabın olduğu cihazlarda əlçatan olacaq.",
+        "syncConfig" to "Bağlantı parametrləri", "syncSetupHint" to "Bu parametrlər adətən Linka tərəfindən verilir. Başqa layihə istifadə edəcəksənsə dəyiş.",
+        "profileTitle" to "Özün haqqında", "profilePrompt" to "Görünən adını seç. Ləqəb istifadə edə bilərsən; yaş istəyə bağlıdır.",
+        "profileName" to "Görünən ad", "profileAge" to "Yaş (istəyə görə)", "profileSave" to "Profili saxla",
         "syncSetupSql" to "Baza SQL-ini kopyala", "syncForget" to "Hesabı ayır", "syncClose" to "Bağla",
         "syncWorking" to "Sinxronizasiya…", "syncCopied" to "SQL kopyalandı. Supabase → SQL Editor bölməsində icra et.",
-        "syncRequired" to "Bulud sinxronizasiyası üçün öz Supabase layihən lazımdır. Qoşulana qədər Linka yerli işləyəcək.",
-        "syncLatest" to "Son sinxronizasiya", "syncOpen" to "Sinxronizasiyanı qur"
+        "syncRequired" to "Bulud sinxronizasiyası hələ qoşulmayıb. Linka lokal işləməyə davam edəcək.",
+        "syncLatest" to "Son sinxronizasiya", "syncOpen" to "Sinxronizasiyanı qur", "syncOffline" to "Hesabsız davam et"
     ),
     "tr" to mapOf(
         "video" to "VİDEO", "article" to "MAKALE", "website" to "WEB SİTESİ",
-        "rememberTitle" to "Geçmişten bir hatırlatma", "rememberBody" to "Bir süre önce kaydettiğin bir içerik.", "readMore" to "Daha fazla", "showLess" to "Daha az",
-        "cloudSync" to "Bulut senkronizasyonu", "cloudSyncBody" to "Kendi ücretsiz Supabase projenle kitaplığını cihazlar arasında senkronize et.",
-        "syncNow" to "Bağlan ve senkronize et", "createAccount" to "Hesap oluştur", "syncEndpoint" to "Supabase proje URL'si",
-        "syncAnonKey" to "Yayınlanabilir / anon anahtarı", "syncEmail" to "E-posta", "syncPassword" to "Şifre",
-        "syncHelp" to "Ücretsiz Supabase projesi oluştur, Project URL ve yayınlanabilir anahtarı gir, ardından aşağıdaki SQL'i SQL Editor'da çalıştır. Şifre kaydedilmez; oturum Android Keystore ile şifrelenir.",
+        "rememberTitle" to "Geçmişten bir hatırlatma", "rememberBody" to "Bir süre önce kaydettiğin bir içerik.",
+        "readMore" to "Daha fazla", "showLess" to "Daha az",
+        "cloudSync" to "Bulut senkronizasyonu", "cloudSyncBody" to "Kitaplığını aynı hesabı kullanan cihazlar arasında eşitle.",
+        "syncNow" to "Bağlan ve eşitle", "createAccount" to "Hesap oluştur",
+        "syncEndpoint" to "Supabase proje URL'si", "syncAnonKey" to "Yayınlanabilir anahtar", "syncEmail" to "E-posta",
+        "syncPassword" to "6 haneli e-posta kodu", "syncSendCode" to "Giriş kodu gönder",
+        "syncRegisterCode" to "Hesap oluştur · kod gönder", "syncCodeSent" to "Kod gönderildi. Gelen kutunu ve spam klasörünü kontrol et.",
+        "syncNeedCode" to "Önce yeni bir e-posta kodu iste.", "syncOtpExpired" to "Kodun süresi doldu. Yeni bir kod iste.",
+        "syncQrApproved" to "Masaüstü girişine izin verildi.", "syncNeedSignInForQr" to "QR girişini onaylamak için hesabına giriş yap.",
+        "syncWait" to "Yeni kod için kalan süre", "syncVerifyAndSync" to "Kodu doğrula ve eşitle",
+        "syncHelp" to "E-posta koduyla hesap oluştur veya giriş yap. Linka kitaplığın aynı hesabın açık olduğu cihazlarda kullanılabilir.",
+        "syncConfig" to "Bağlantı ayarları", "syncSetupHint" to "Bu ayarlar normalde Linka tarafından yapılandırılır. Başka bir proje kullanacaksan değiştir.",
+        "profileTitle" to "Biraz kendinden bahset", "profilePrompt" to "Görünecek bir ad seç. Takma ad kullanabilirsin; yaş isteğe bağlıdır.",
+        "profileName" to "Görünen ad", "profileAge" to "Yaş (isteğe bağlı)", "profileSave" to "Profili kaydet",
         "syncSetupSql" to "Veritabanı SQL'ini kopyala", "syncForget" to "Bu hesabı unut", "syncClose" to "Kapat",
-        "syncWorking" to "Senkronize ediliyor…", "syncCopied" to "SQL kopyalandı. Supabase → SQL Editor'da çalıştır.",
-        "syncRequired" to "Bulut senkronizasyonu için kendi Supabase projen gerekir. Bağlanana kadar Linka yerel çalışır.",
-        "syncLatest" to "Son senkronizasyon", "syncOpen" to "Bulut senkronizasyonunu kur"
+        "syncWorking" to "Eşitleniyor…", "syncCopied" to "SQL kopyalandı. Supabase → SQL Editor'da çalıştır.",
+        "syncRequired" to "Bulut eşitlemesi henüz bağlanmadı. Linka yerel çalışmayı sürdürecek.",
+        "syncLatest" to "Son eşitleme", "syncOpen" to "Bulut eşitlemesini kur", "syncOffline" to "Hesapsız devam et"
     )
 )
 private fun tr(lang: String, key: String) = words[lang]?.get(key) ?: extraWords[lang]?.get(key) ?: words["en"]?.get(key) ?: extraWords["en"]?.get(key) ?: key
@@ -457,6 +495,8 @@ private fun tr(lang: String, key: String) = words[lang]?.get(key) ?: extraWords[
 class MainActivity : ComponentActivity() {
     private var incomingSharedText by mutableStateOf("")
     private var incomingSharedToken by mutableIntStateOf(0)
+    private var incomingPairingToken by mutableIntStateOf(0)
+    private var incomingOAuthToken by mutableIntStateOf(0)
     private var updateInfo by mutableStateOf<UpdateInfo?>(null)
     private var updateStatus by mutableStateOf("")
     private var checkingUpdates by mutableStateOf(false)
@@ -562,6 +602,35 @@ class MainActivity : ComponentActivity() {
         (getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("Linka", value))
     }
 
+    private fun rememberPairingIntent(value: Intent?) {
+        val uri = value?.data ?: return
+        if (!uri.scheme.equals("linka", ignoreCase = true)) return
+        if (uri.host.equals("pair", ignoreCase = true)) {
+            val id = uri.getQueryParameter("id").orEmpty()
+            val secret = uri.getQueryParameter("secret").orEmpty()
+            if (id.isBlank() || secret.length < 32) return
+            prefs().edit().putString("pending_pair_id", id).putString("pending_pair_secret", secret).apply()
+            incomingPairingToken++
+            return
+        }
+        if (uri.host.equals("auth", ignoreCase = true) && uri.path.equals("/callback", ignoreCase = true)) {
+            val fragment = uri.fragment.orEmpty()
+            val params = Uri.parse("https://linka.invalid/?$fragment")
+            val access = params.getQueryParameter("access_token").orEmpty()
+            val refresh = params.getQueryParameter("refresh_token").orEmpty()
+            if (access.isBlank() || refresh.isBlank()) {
+                prefs().edit().putString("oauth_callback_error", params.getQueryParameter("error_description").orEmpty()).apply()
+                incomingOAuthToken++
+                return
+            }
+            prefs().edit().putString("oauth_pending_access", access)
+                .putString("oauth_pending_refresh", refresh)
+                .remove("oauth_callback_error").apply()
+            incomingOAuthToken++
+        }
+    }
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -576,6 +645,7 @@ class MainActivity : ComponentActivity() {
         scheduleUpdateChecks()
         incomingSharedText = extractSharedText(intent)
         incomingSharedToken = 1
+        rememberPairingIntent(intent)
         checkForUpdate(true)
         setContent {
             var theme by remember { mutableStateOf(prefs().getString(THEME_KEY, "dark") ?: "dark") }
@@ -593,7 +663,7 @@ class MainActivity : ComponentActivity() {
                 background = LB, surface = LS, primary = LT, onPrimary = LS, onBackground = LT, onSurface = LT, surfaceVariant = LR, outline = LBR
             )) {
                 LinkaApp(
-                    sharedText = incomingSharedText, sharedTrigger = incomingSharedToken,
+                    sharedText = incomingSharedText, sharedTrigger = incomingSharedToken, pairingTrigger = incomingPairingToken, oauthTrigger = incomingOAuthToken,
                     load = { loadCaptures() }, save = { saveCaptures(it) },
                     copy = { copyText(it) }, open = { openExternal(it) },
                     theme = theme, setTheme = { theme = it; prefs().edit().putString(THEME_KEY, it).apply() },
@@ -639,6 +709,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        rememberPairingIntent(intent)
         incomingSharedText = extractSharedText(intent)
         incomingSharedToken++
     }
@@ -937,7 +1008,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun LinkaApp(
-    sharedText: String, sharedTrigger: Int, load: () -> List<Capture>, save: (List<Capture>) -> Unit, copy: (String) -> Unit, open: (String) -> Unit,
+    sharedText: String, sharedTrigger: Int, pairingTrigger: Int, oauthTrigger: Int, load: () -> List<Capture>, save: (List<Capture>) -> Unit, copy: (String) -> Unit, open: (String) -> Unit,
     theme: String, setTheme: (String) -> Unit, language: String, setLanguage: (String) -> Unit,
     animations: Boolean, setAnimations: (Boolean) -> Unit, fontScale: Float, setFontScale: (Float) -> Unit,
     alerts: Boolean, notificationPermissionGranted: Boolean, openNotificationSettings: () -> Unit, sendTestNotification: () -> Unit, setAlerts: (Boolean) -> Unit, updateInfo: UpdateInfo?, updateStatus: String, checking: Boolean,
@@ -968,16 +1039,77 @@ private fun LinkaApp(
     var visibleLimit by remember { mutableIntStateOf(30) }
     var deleting by remember { mutableStateOf<Capture?>(null) }
     var clearDialog by remember { mutableStateOf(false) }
-    var cloudDialog by remember { mutableStateOf(false) }
+    var cloudDialog by remember { mutableStateOf(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(SYNC_REFRESH_KEY, "").isNullOrBlank()) }
+    var cloudConfigExpanded by remember { mutableStateOf(false) }
+    var profileDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    val storedProfile = remember { runCatching { JSONObject(prefs.getString(PROFILE_JSON_KEY, "{}") ?: "{}") }.getOrDefault(JSONObject()) }
+    var profileName by remember { mutableStateOf(storedProfile.optString("displayName", "")) }
+    var profileAge by remember { mutableStateOf(if (storedProfile.isNull("age")) "" else storedProfile.optString("age", "")) }
+    fun localProfileJson(): JSONObject? = runCatching {
+        val raw = prefs.getString(PROFILE_JSON_KEY, "").orEmpty()
+        if (raw.isBlank()) null else JSONObject(raw)
+    }.getOrNull()
+    fun keepSyncedProfile(profile: JSONObject?) {
+        if (profile != null && profile.optString("displayName").isNotBlank()) {
+            prefs.edit().putString(PROFILE_JSON_KEY, profile.toString()).apply()
+            profileName = profile.optString("displayName")
+            profileAge = if (profile.isNull("age")) "" else profile.optString("age", "")
+        }
+    }
     var cloudUrl by remember { mutableStateOf(prefs.getString(SYNC_URL_KEY, "").takeIf { !it.isNullOrBlank() } ?: BuildConfig.LINKA_SUPABASE_URL) }
     var cloudAnonKey by remember { mutableStateOf(prefs.getString(SYNC_ANON_KEY, "").takeIf { !it.isNullOrBlank() } ?: BuildConfig.LINKA_SUPABASE_PUBLISHABLE_KEY) }
     var cloudEmail by remember { mutableStateOf(prefs.getString(SYNC_EMAIL_KEY, "") ?: "") }
     var cloudPassword by remember { mutableStateOf("") }
+    var cloudOtp by remember { mutableStateOf("") }
+    var otpRequested by remember { mutableStateOf(prefs.getLong("otp_expires_at", 0L) > System.currentTimeMillis()) }
+    var otpResendUntil by remember { mutableLongStateOf(prefs.getLong("otp_resend_until", 0L)) }
+    var otpExpiresAt by remember { mutableLongStateOf(prefs.getLong("otp_expires_at", 0L)) }
+    var otpRemainingSeconds by remember { mutableIntStateOf(((prefs.getLong("otp_expires_at", 0L) - System.currentTimeMillis()).coerceAtLeast(0L) / 1000L).toInt()) }
+    var otpCooldownSeconds by remember { mutableIntStateOf(((prefs.getLong("otp_resend_until", 0L) - System.currentTimeMillis()).coerceAtLeast(0L) / 1000L).toInt()) }
+    var pendingPairId by remember { mutableStateOf(prefs.getString("pending_pair_id", "") ?: "") }
+    var pendingPairSecret by remember { mutableStateOf(prefs.getString("pending_pair_secret", "") ?: "") }
     var cloudBusy by remember { mutableStateOf(false) }
     var cloudStatus by remember { mutableStateOf(prefs.getString(SYNC_STATUS_KEY, "") ?: "") }
     var pendingSyncJob by remember { mutableStateOf<Job?>(null) }
+    fun requestEmailCode(createAccount: Boolean) {
+        if (otpCooldownSeconds > 0) {
+            cloudStatus = "${tr(lang, "syncWait")} ${otpCooldownSeconds}s"
+            return
+        }
+        cloudBusy = true
+        scope.launch {
+            try {
+                prefs.edit().putString(SYNC_URL_KEY, cloudUrl.trim().trimEnd('/'))
+                    .putString(SYNC_ANON_KEY, cloudAnonKey.trim())
+                    .putString(SYNC_EMAIL_KEY, cloudEmail.trim()).apply()
+                requestEmailOtp(cloudUrl, cloudAnonKey, cloudEmail, createAccount)
+                otpRequested = true
+                cloudOtp = ""
+                otpResendUntil = System.currentTimeMillis() + 120_000L
+                otpExpiresAt = System.currentTimeMillis() + 120_000L
+                prefs.edit().putLong("otp_resend_until", otpResendUntil)
+                    .putLong("otp_expires_at", otpExpiresAt).apply()
+                otpRemainingSeconds = 120
+                otpCooldownSeconds = 120
+                cloudStatus = tr(lang, "syncCodeSent")
+            } catch (e: Exception) {
+                cloudStatus = e.message ?: tr(lang, "failed")
+            } finally {
+                cloudBusy = false
+            }
+        }
+    }
+    LaunchedEffect(otpRequested, otpResendUntil, otpExpiresAt) {
+        while (true) {
+            val now = System.currentTimeMillis()
+            otpRemainingSeconds = if (otpRequested) ((otpExpiresAt - now).coerceAtLeast(0L) / 1000L).toInt() else 0
+            otpCooldownSeconds = ((otpResendUntil - now).coerceAtLeast(0L) / 1000L).toInt()
+            if (otpCooldownSeconds == 0 && (!otpRequested || otpRemainingSeconds == 0)) break
+            delay(1000L)
+        }
+    }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) runCatching {
             val raw = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: error("empty file")
@@ -1020,17 +1152,26 @@ private fun LinkaApp(
                 try {
                     val rawDeleted = JSONArray(prefs.getString(DELETED_IDS_KEY, "[]") ?: "[]")
                     val deleted = (0 until rawDeleted.length()).map { rawDeleted.optString(it) }.filter { it.isNotBlank() }.toSet()
-                    val result = syncWithSupabase(url, anon, email, "", false, captures, deleted, prefs.getString(SYNC_REFRESH_KEY, "").orEmpty())
+                    val result = syncWithSupabase(url, anon, email, "", false, captures, deleted, prefs.getString(SYNC_REFRESH_KEY, "").orEmpty(), localProfileJson())
                     prefs.edit().putString(SYNC_REFRESH_KEY, result.encryptedRefreshToken)
                         .putString(DELETED_IDS_KEY, JSONArray().apply { result.deletedIds.forEach { put(it) } }.toString())
                         .putString(SYNC_STATUS_KEY, result.message).apply()
                     captures = result.captures
                     save(result.captures)
+                    keepSyncedProfile(result.profile)
                     cloudStatus = result.message
                 } catch (e: Exception) {
                     cloudStatus = e.message ?: "Cloud sync failed"
                 }
             }
+        }
+    }
+    LaunchedEffect(accepted, language) {
+        if (!accepted || language.isBlank()) return@LaunchedEffect
+        if (prefs.getString(SYNC_REFRESH_KEY, "").orEmpty().isBlank() &&
+            !prefs.getBoolean("account_intro_shown", false) && pendingPairId.isBlank()) {
+            prefs.edit().putBoolean("account_intro_shown", true).apply()
+            cloudDialog = true
         }
     }
     LaunchedEffect(sharedText, sharedTrigger) {
@@ -1058,17 +1199,88 @@ private fun LinkaApp(
                 runCatching {
                     val rawDeleted = JSONArray(prefs.getString(DELETED_IDS_KEY, "[]") ?: "[]")
                     val deleted = (0 until rawDeleted.length()).map { rawDeleted.optString(it) }.filter { it.isNotBlank() }.toSet()
-                    val result = syncWithSupabase(url, anon, email, "", false, load(), deleted, token)
+                    val result = syncWithSupabase(url, anon, email, "", false, load(), deleted, token, localProfileJson())
                     prefs.edit().putString(SYNC_REFRESH_KEY, result.encryptedRefreshToken)
                         .putString(DELETED_IDS_KEY, JSONArray().apply { result.deletedIds.forEach { put(it) } }.toString())
                         .putString(SYNC_STATUS_KEY, result.message).apply()
                     captures = result.captures
                     save(result.captures)
+                    keepSyncedProfile(result.profile)
                     cloudStatus = result.message
                 }.onFailure { cloudStatus = it.message ?: "Cloud sync failed" }
             }
             delay(60_000L)
         }
+    }
+    LaunchedEffect(pairingTrigger) {
+        if (pairingTrigger > 0) {
+            pendingPairId = prefs.getString("pending_pair_id", "").orEmpty()
+            pendingPairSecret = prefs.getString("pending_pair_secret", "").orEmpty()
+        }
+    }
+    LaunchedEffect(oauthTrigger) {
+        if (oauthTrigger <= 0) return@LaunchedEffect
+        val callbackError = prefs.getString("oauth_callback_error", "").orEmpty()
+        if (callbackError.isNotBlank()) {
+            cloudStatus = callbackError.take(220)
+            prefs.edit().remove("oauth_callback_error").apply()
+            cloudDialog = true
+            return@LaunchedEffect
+        }
+        val access = prefs.getString("oauth_pending_access", "").orEmpty()
+        val refresh = prefs.getString("oauth_pending_refresh", "").orEmpty()
+        if (access.isBlank() || refresh.isBlank()) return@LaunchedEffect
+        cloudBusy = true
+        try {
+            val oauth = completeGoogleOAuthSession(cloudUrl, cloudAnonKey, access, refresh)
+            prefs.edit().putString(SYNC_REFRESH_KEY, oauth.encryptedRefreshToken)
+                .putString(SYNC_EMAIL_KEY, oauth.email)
+                .remove("oauth_pending_access").remove("oauth_pending_refresh").apply()
+            cloudEmail = oauth.email
+            if (profileName.isBlank() && oauth.displayName.isNotBlank()) profileName = oauth.displayName
+            cloudStatus = "Google sign-in complete."
+            if (localProfileJson()?.optString("displayName").isNullOrBlank()) {
+                profileDialog = true
+                cloudDialog = false
+            } else {
+                cloudDialog = true
+            }
+        } catch (e: Exception) {
+            cloudStatus = e.message ?: "Google sign-in could not be completed."
+            cloudDialog = true
+        } finally {
+            cloudBusy = false
+        }
+    }
+    LaunchedEffect(pendingPairId, pendingPairSecret, cloudDialog) {
+        if (pendingPairId.isBlank() || pendingPairSecret.isBlank()) return@LaunchedEffect
+        val encrypted = prefs.getString(SYNC_REFRESH_KEY, "").orEmpty()
+        val url = cloudUrl
+        val key = cloudAnonKey
+        if (encrypted.isBlank()) {
+            cloudDialog = true
+            cloudStatus = tr(lang, "syncNeedSignInForQr")
+            return@LaunchedEffect
+        }
+        if (url.isBlank() || key.isBlank()) {
+            cloudDialog = true
+            cloudStatus = tr(lang, "syncNeedSignInForQr")
+            return@LaunchedEffect
+        }
+        cloudBusy = true
+        runCatching {
+            val updated = approveQrPairing(url, key, encrypted, pendingPairId, pendingPairSecret)
+            prefs.edit().putString(SYNC_REFRESH_KEY, updated)
+                .remove("pending_pair_id").remove("pending_pair_secret").apply()
+            pendingPairId = ""
+            pendingPairSecret = ""
+            cloudStatus = tr(lang, "syncQrApproved")
+            message = tr(lang, "syncQrApproved")
+        }.onFailure {
+            cloudStatus = it.message ?: tr(lang, "failed")
+            message = cloudStatus
+        }
+        cloudBusy = false
     }
     val visible = filterCaptures(captures, filter, if (tab == 2) query else "")
     val oldCaptures = captures.filter { it.updatedAt < System.currentTimeMillis() - 7L * 24L * 60L * 60L * 1000L }
@@ -1351,23 +1563,70 @@ private fun LinkaApp(
         text = {
             Column(Modifier.heightIn(max = 470.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(tr(lang, "syncHelp"), color = muted, fontSize = 12.sp, lineHeight = 18.sp)
-                OutlinedTextField(value = cloudUrl, onValueChange = { cloudUrl = it }, label = { Text(tr(lang, "syncEndpoint")) },
-                    singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
-                    textStyle = TextStyle(color = main, fontSize = 12.sp), colors = fieldColors(bg, border, main, muted))
-                OutlinedTextField(value = cloudAnonKey, onValueChange = { cloudAnonKey = it }, label = { Text(tr(lang, "syncAnonKey")) },
-                    singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
-                    textStyle = TextStyle(color = main, fontSize = 12.sp), colors = fieldColors(bg, border, main, muted))
+                TextButton(onClick = { cloudConfigExpanded = !cloudConfigExpanded }) {
+                    Text(tr(lang, "syncConfig"), color = muted, fontSize = 10.sp)
+                }
+                if (cloudConfigExpanded || cloudUrl.isBlank() || cloudAnonKey.isBlank()) {
+                    Text(tr(lang, "syncSetupHint"), color = muted, fontSize = 10.sp, lineHeight = 15.sp)
+                    OutlinedTextField(value = cloudUrl, onValueChange = { cloudUrl = it }, label = { Text(tr(lang, "syncEndpoint")) },
+                        singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+                        textStyle = TextStyle(color = main, fontSize = 12.sp), colors = fieldColors(bg, border, main, muted))
+                    OutlinedTextField(value = cloudAnonKey, onValueChange = { cloudAnonKey = it }, label = { Text(tr(lang, "syncAnonKey")) },
+                        singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+                        textStyle = TextStyle(color = main, fontSize = 12.sp), colors = fieldColors(bg, border, main, muted))
+                    TextButton(onClick = {
+                        copy(CLOUD_SYNC_SETUP_SQL)
+                        cloudStatus = tr(lang, "syncCopied")
+                    }, modifier = Modifier.align(Alignment.Start)) {
+                        Text(tr(lang, "syncSetupSql"), color = muted, fontSize = 10.sp)
+                    }
+                }
+                if (prefs.getString(SYNC_REFRESH_KEY, "").orEmpty().isBlank()) {
+                    Button(
+                        enabled = !cloudBusy,
+                        onClick = {
+                            val redirect = "linka://auth/callback"
+                            val authorize = Uri.parse("${cloudUrl.trim().trimEnd('/')}/auth/v1/authorize")
+                                .buildUpon()
+                                .appendQueryParameter("provider", "google")
+                                .appendQueryParameter("redirect_to", redirect)
+                                .build().toString()
+                            prefs.edit().putString(SYNC_URL_KEY, cloudUrl.trim().trimEnd('/'))
+                                .putString(SYNC_ANON_KEY, cloudAnonKey.trim()).apply()
+                            open(authorize)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = main, contentColor = bg)
+                    ) { Text("Continue with Google", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
+                }
                 OutlinedTextField(value = cloudEmail, onValueChange = { cloudEmail = it }, label = { Text(tr(lang, "syncEmail")) },
                     singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
                     textStyle = TextStyle(color = main, fontSize = 12.sp), colors = fieldColors(bg, border, main, muted))
-                OutlinedTextField(value = cloudPassword, onValueChange = { cloudPassword = it }, label = { Text(tr(lang, "syncPassword")) },
-                    singleLine = true, visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
-                    textStyle = TextStyle(color = main, fontSize = 12.sp), colors = fieldColors(bg, border, main, muted))
-                TextButton(onClick = {
-                    copy(CLOUD_SYNC_SETUP_SQL)
-                    cloudStatus = tr(lang, "syncCopied")
-                }, modifier = Modifier.align(Alignment.Start)) { Text(tr(lang, "syncSetupSql"), color = main, fontSize = 11.sp) }
+                if (otpRequested && prefs.getString(SYNC_REFRESH_KEY, "").orEmpty().isBlank()) {
+                    OutlinedTextField(value = cloudOtp, onValueChange = { cloudOtp = it.filter(Char::isDigit).take(6) },
+                        label = { Text(tr(lang, "syncPassword")) }, singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+                        textStyle = TextStyle(color = main, fontSize = 16.sp, letterSpacing = 4.sp),
+                        colors = fieldColors(bg, border, main, muted))
+                    Text(tr(lang, "syncWait") + " ${otpCooldownSeconds}s · " + tr(lang, "syncOtpExpired") + " ${otpRemainingSeconds}s",
+                        color = muted, fontSize = 10.sp, lineHeight = 15.sp)
+                }
+                if (prefs.getString(SYNC_REFRESH_KEY, "").orEmpty().isBlank()) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.fillMaxWidth()) {
+                        TextButton(enabled = !cloudBusy && otpCooldownSeconds <= 0,
+                            onClick = { requestEmailCode(false) }, modifier = Modifier.weight(1f)) {
+                            Text(if (otpCooldownSeconds > 0) "${tr(lang, "syncSendCode")} · ${otpCooldownSeconds}s" else tr(lang, "syncSendCode"),
+                                color = main, fontSize = 10.sp)
+                        }
+                        TextButton(enabled = !cloudBusy && otpCooldownSeconds <= 0,
+                            onClick = { requestEmailCode(true) }, modifier = Modifier.weight(1f)) {
+                            Text(if (otpCooldownSeconds > 0) "${tr(lang, "syncRegisterCode")} · ${otpCooldownSeconds}s" else tr(lang, "syncRegisterCode"),
+                                color = main, fontSize = 10.sp)
+                        }
+                    }
+                }
                 if (cloudStatus.isNotBlank()) Text(cloudStatus, color = main, fontSize = 11.sp, lineHeight = 16.sp)
                 if (prefs.getString(SYNC_REFRESH_KEY, "").orEmpty().isNotBlank()) {
                     TextButton(onClick = {
@@ -1387,16 +1646,38 @@ private fun LinkaApp(
                 scope.launch {
                     try {
                         val stored = prefs.getString(SYNC_REFRESH_KEY, "").orEmpty()
+                        if (stored.isBlank() && !otpRequested) {
+                            cloudStatus = tr(lang, "syncNeedCode")
+                            return@launch
+                        }
+                        if (stored.isBlank() && otpRemainingSeconds <= 0) {
+                            cloudStatus = tr(lang, "syncOtpExpired")
+                            return@launch
+                        }
                         val rawDeleted = JSONArray(prefs.getString(DELETED_IDS_KEY, "[]") ?: "[]")
                         val deletedIds = (0 until rawDeleted.length()).map { rawDeleted.optString(it) }.filter { it.isNotBlank() }.toSet()
-                        val result = syncWithSupabase(cloudUrl, cloudAnonKey, cloudEmail, cloudPassword, false, captures, deletedIds, stored)
+                        val verifiedToken = if (stored.isBlank()) {
+                            verifyEmailOtp(cloudUrl, cloudAnonKey, cloudEmail, cloudOtp).also {
+                                prefs.edit().putString(SYNC_REFRESH_KEY, it).apply()
+                            }
+                        } else stored
+                        val result = syncWithSupabase(cloudUrl, cloudAnonKey, cloudEmail, "", false, captures, deletedIds, verifiedToken, localProfileJson())
                         prefs.edit().putString(SYNC_REFRESH_KEY, result.encryptedRefreshToken)
                             .putString(DELETED_IDS_KEY, JSONArray().apply { result.deletedIds.forEach { put(it) } }.toString())
                             .putString(SYNC_STATUS_KEY, result.message).apply()
                         captures = result.captures
                         save(result.captures)
+                        keepSyncedProfile(result.profile)
                         cloudStatus = result.message
                         cloudPassword = ""
+                        cloudOtp = ""
+                        otpRequested = false
+                        if (stored.isBlank()) cloudDialog = false
+                        prefs.edit().remove("otp_expires_at").apply()
+                        if (stored.isBlank() && localProfileJson()?.optString("displayName").isNullOrBlank() && result.profile?.optString("displayName").isNullOrBlank()) {
+                            profileDialog = true
+                            cloudDialog = false
+                        }
                     } catch (e: Exception) {
                         cloudStatus = e.message ?: "Cloud sync failed"
                     } finally {
@@ -1404,36 +1685,80 @@ private fun LinkaApp(
                     }
                 }
             }, shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = main, contentColor = bg)) {
-                Text(if (cloudBusy) tr(lang, "syncWorking") else tr(lang, "syncNow"), fontSize = 11.sp)
+                Text(if (cloudBusy) tr(lang, "syncWorking") else if (prefs.getString(SYNC_REFRESH_KEY, "").orEmpty().isBlank()) tr(lang, "syncVerifyAndSync") else tr(lang, "syncNow"), fontSize = 11.sp)
             }
         },
         dismissButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 if (prefs.getString(SYNC_REFRESH_KEY, "").orEmpty().isBlank()) TextButton(enabled = !cloudBusy, onClick = {
-                    cloudBusy = true
-                    prefs.edit().putString(SYNC_URL_KEY, cloudUrl.trim().trimEnd('/'))
-                        .putString(SYNC_ANON_KEY, cloudAnonKey.trim()).putString(SYNC_EMAIL_KEY, cloudEmail.trim()).apply()
-                    scope.launch {
-                        try {
-                            val rawDeleted = JSONArray(prefs.getString(DELETED_IDS_KEY, "[]") ?: "[]")
-                            val deletedIds = (0 until rawDeleted.length()).map { rawDeleted.optString(it) }.filter { it.isNotBlank() }.toSet()
-                            val result = syncWithSupabase(cloudUrl, cloudAnonKey, cloudEmail, cloudPassword, true, captures, deletedIds, "")
-                            prefs.edit().putString(SYNC_REFRESH_KEY, result.encryptedRefreshToken)
-                                .putString(DELETED_IDS_KEY, JSONArray().apply { result.deletedIds.forEach { put(it) } }.toString())
-                                .putString(SYNC_STATUS_KEY, result.message).apply()
-                            captures = result.captures
-                            save(result.captures)
-                            cloudStatus = result.message
-                            cloudPassword = ""
-                        } catch (e: Exception) {
-                            cloudStatus = e.message ?: "Cloud sync failed"
-                        } finally {
-                            cloudBusy = false
-                        }
-                    }
-                }) { Text(tr(lang, "createAccount"), color = main, fontSize = 10.sp) }
+                    requestEmailCode(true)
+                }) { Text(tr(lang, "syncRegisterCode"), color = main, fontSize = 10.sp) }
+                TextButton(enabled = !cloudBusy, onClick = { cloudDialog = false }) { Text(tr(lang, "syncOffline"), color = muted, fontSize = 10.sp) }
                 TextButton(enabled = !cloudBusy, onClick = { cloudDialog = false }) { Text(tr(lang, "syncClose"), color = muted, fontSize = 10.sp) }
             }
+        }
+    )
+    if (profileDialog) AlertDialog(
+        onDismissRequest = { profileDialog = false },
+        containerColor = panel,
+        shape = RoundedCornerShape(22.dp),
+        title = { Text(tr(lang, "profileTitle"), color = main, fontWeight = FontWeight.SemiBold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(tr(lang, "profilePrompt"), color = muted, fontSize = 12.sp, lineHeight = 18.sp)
+                OutlinedTextField(value = profileName, onValueChange = { profileName = it.take(48) },
+                    label = { Text(tr(lang, "profileName")) }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+                    textStyle = TextStyle(color = main, fontSize = 13.sp), colors = fieldColors(bg, border, main, muted))
+                OutlinedTextField(value = profileAge, onValueChange = { profileAge = it.filter(Char::isDigit).take(3) },
+                    label = { Text(tr(lang, "profileAge")) }, singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+                    textStyle = TextStyle(color = main, fontSize = 13.sp), colors = fieldColors(bg, border, main, muted))
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                val name = profileName.trim().replace(Regex("\\s+"), " ").take(48)
+                val ageValue = profileAge.trim().takeIf { it.isNotBlank() }?.toIntOrNull()
+                if (name.isBlank()) {
+                    message = tr(lang, "profileName")
+                } else if (profileAge.isNotBlank() && (ageValue == null || ageValue !in 13..120)) {
+                    message = tr(lang, "profileAge")
+                } else {
+                    val profile = JSONObject().put("displayName", name)
+                        .put("age", ageValue ?: JSONObject.NULL)
+                        .put("updatedAt", System.currentTimeMillis())
+                    prefs.edit().putString(PROFILE_JSON_KEY, profile.toString()).apply()
+                    profileName = name
+                    profileDialog = false
+                    if (prefs.getString(SYNC_REFRESH_KEY, "").orEmpty().isNotBlank() && cloudUrl.isNotBlank() && cloudAnonKey.isNotBlank()) {
+                        scope.launch {
+                            runCatching {
+                                val rawDeleted = JSONArray(prefs.getString(DELETED_IDS_KEY, "[]") ?: "[]")
+                                val deleted = (0 until rawDeleted.length()).map { rawDeleted.optString(it) }.filter { it.isNotBlank() }.toSet()
+                                val result = syncWithSupabase(cloudUrl, cloudAnonKey, cloudEmail, "", false, captures, deleted,
+                                    prefs.getString(SYNC_REFRESH_KEY, "").orEmpty(), localProfileJson())
+                                prefs.edit().putString(SYNC_REFRESH_KEY, result.encryptedRefreshToken).apply()
+                                keepSyncedProfile(result.profile)
+                                captures = result.captures
+                                save(result.captures)
+                                message = result.message
+                            }.onFailure { message = it.message ?: tr(lang, "failed") }
+                        }
+                    }
+                }
+            }, shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = main, contentColor = bg)) {
+                Text(tr(lang, "profileSave"), fontSize = 11.sp)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = {
+                profileDialog = false
+                if (profileName.isBlank()) profileName = "Linka user"
+                val profile = JSONObject().put("displayName", profileName).put("age", JSONObject.NULL).put("updatedAt", System.currentTimeMillis())
+                prefs.edit().putString(PROFILE_JSON_KEY, profile.toString()).apply()
+            }) { Text(tr(lang, "syncClose"), color = muted, fontSize = 11.sp) }
         }
     )
     if (!accepted || agreementDialog) AgreementDialog(lang, panel, border, main, muted, !accepted,

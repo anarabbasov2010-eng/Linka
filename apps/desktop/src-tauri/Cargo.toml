@@ -4,7 +4,7 @@ version = "0.3.0"
 description = "Linka local-first inbox"
 authors = ["Linka"]
 edition = "2021"
-rust-version = "1.77.2"
+rust-version = "1.90.0"
 
 [lib]
 name = "linka_desktop_lib"
@@ -15,3 +15,8 @@ tauri-build = { version = "2.0.0", features = [] }
 
 [dependencies]
 tauri = { version = "2.0.0", features = [] }
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+tauri-plugin-notification = "2"

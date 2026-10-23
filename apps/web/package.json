@@ -1,14 +1,20 @@
 {
   "name": "linka-web",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.2",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "vite build",
+    "build": "node scripts/configure-linka.mjs && vite build",
     "test": "node --test"
   },
   "devDependencies": {
     "vite": "^6.0.1"
+  },
+  "dependencies": {
+    "qrcode": "1.5.4",
+    "@tauri-apps/plugin-updater": "^2.0.0",
+    "@tauri-apps/plugin-process": "^2.0.0",
+    "@tauri-apps/plugin-notification": "^2.0.0"
   }
 }

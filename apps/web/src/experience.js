@@ -1,0 +1,802 @@
+import QRCode from "qrcode";
+import {
+  approveQrPairing, beginQrPairing, claimQrPairing, disconnectCloud,
+  getCloudConfig, getCloudSession, getOtpCooldown, readLinkaProfile,
+  requestEmailOtp, saveCloudConfig, saveLinkaProfile, verifyEmailOtp
+} from "./cloud-sync.js";
+
+const LANG_KEY = "linka.language.v1";
+const ONBOARDED_KEY = "linka.experience.onboarded.v1";
+const NOTIFY_KEY = "linka.desktop-notifications.v1";
+const RELEASES_URL = "https://api.github.com/repos/anarabbasov2010-eng/Linka/releases/latest";
+const BUILD_VERSION = String(import.meta.env.VITE_LINKA_DESKTOP_VERSION || "").trim();
+const LANGUAGES = [
+  { value: "en", label: "EN" }, { value: "ru", label: "RU" },
+  { value: "az", label: "AZ" }, { value: "tr", label: "TR" }
+];
+const COPY = {
+  en: {
+    privacy: "Private by default · local-first", eyebrow: "Your personal library",
+    hero: ["Keep", "what", "matters."], heroBody: "Links, notes, and useful ideas. Saved once. Easy to find again.",
+    quick: "Quick capture", subtitle: "Keep the useful stuff.", placeholder: "Drop a link. Save a thought. Keep it for later…",
+    hint: "Saved on this device. Export a backup whenever you need.", save: "Save to inbox",
+    inbox: "Your inbox", export: "Export", import: "Import", filters: ["All", "Pinned", "Links", "Notes"],
+    footer: "your personal library", footerRight: "Simple by design. Back up what matters.",
+    account: "Account", settings: "Settings", language: "Language", theme: "Appearance", dark: "Dark", light: "Light", system: "System", reducedMotion: "Reduce motion", reducedMotionBody: "Use shorter, calmer transitions.",
+    startTitle: "Welcome to Linka", startBody: "Create your account with your email. Your library will be ready on every signed-in device.",
+    email: "Email address", code: "Six-digit code", sendCreate: "Create account · send code",
+    sendLogin: "Sign in · send code", verify: "Verify and continue", continueOffline: "Continue offline",
+    profileTitle: "A little about you", profileBody: "Choose the name you want to see in Linka. Real details aren't required.",
+    name: "What should we call you?", age: "Age (optional)", finish: "Finish setup",
+    config: "Cloud service settings", projectUrl: "Supabase project URL", publishableKey: "Public publishable key",
+    saveConfig: "Save service settings", signedIn: "Signed in as", signOut: "Sign out", syncNow: "Sync now",
+    editProfile: "Edit profile", qrLogin: "Sign in on another device with QR", qrIntro: "Scan with a phone that already has Linka signed in. Code expires in two minutes.",
+    waiting: "Waiting for approval…", pairingReady: "QR code ready", qrUnavailable: "QR pairing service isn't configured yet.",
+    notification: "Desktop notifications", enableNotifications: "Enable notifications", notificationsOn: "Notifications enabled",
+    updateTitle: "Linka update", updateReady: "A newer release is available.", updateButton: "Install update", updateDownloading: "Downloading update", updateInstalling: "Installing update", updateRestarting: "Restarting Linka…", updateInstalled: "Update installed. Restart Linka to finish.",
+    latest: "You're using the latest desktop build.", close: "Close", cancel: "Cancel",
+    codeSent: "Code sent. Check your inbox and spam folder.", codeWait: "You can request another code in",
+    profileSaved: "Profile saved.", connected: "Account connected.", offlineSaved: "Setup saved. Linka will work locally.",
+    errors: "Something went wrong. Check your connection and try again.", expired: "This code expired. Request a new one.",
+    setupNeeded: "Add the shared project URL and public key to enable email accounts and sync.",
+    signOutInfo: "You have signed out. Your local library has not been deleted."
+  },
+  ru: {
+    privacy: "Приватность по умолчанию · сначала локально", eyebrow: "Твоя личная библиотека",
+    hero: ["Сохраняй", "то,", "что важно."], heroBody: "Ссылки, заметки и идеи. Сохраняй один раз — находи снова.",
+    quick: "Быстрое сохранение", subtitle: "Только то, что нужно.", placeholder: "Вставь ссылку или сохрани мысль…",
+    hint: "Сохранено на этом устройстве. Не забывай делать резервную копию.", save: "Сохранить",
+    inbox: "Твоя библиотека", export: "Экспорт", import: "Импорт", filters: ["Всё", "Закреплённое", "Ссылки", "Заметки"],
+    footer: "твоя личная библиотека", footerRight: "Ничего лишнего. Сохраняй важное в резервную копию.",
+    account: "Аккаунт", settings: "Настройки", language: "Язык", theme: "Оформление", dark: "Тёмная", light: "Светлая", system: "Системная", reducedMotion: "Меньше анимации", reducedMotionBody: "Сокращает движение и переходы.",
+    startTitle: "Добро пожаловать в Linka", startBody: "Создай аккаунт по электронной почте. Библиотека будет доступна на устройствах, где выполнен вход.",
+    email: "Электронная почта", code: "Код из 6 цифр", sendCreate: "Создать аккаунт · получить код",
+    sendLogin: "Войти · получить код", verify: "Подтвердить и продолжить", continueOffline: "Продолжить без аккаунта",
+    profileTitle: "Расскажи немного о себе", profileBody: "Выбери имя, которое будет отображаться в Linka. Настоящие данные не обязательны.",
+    name: "Как тебя называть?", age: "Возраст (необязательно)", finish: "Завершить настройку",
+    config: "Настройки облачного сервиса", projectUrl: "URL проекта Supabase", publishableKey: "Публичный ключ проекта",
+    saveConfig: "Сохранить настройки", signedIn: "Вход выполнен: ", signOut: "Выйти", syncNow: "Синхронизировать",
+    editProfile: "Изменить профиль", qrLogin: "Войти на другом устройстве по QR", qrIntro: "Отсканируй код телефоном, где уже выполнен вход в Linka. Код действует две минуты.",
+    waiting: "Ожидаем подтверждения…", pairingReady: "QR-код готов", qrUnavailable: "Сервис входа по QR ещё не настроен.",
+    notification: "Уведомления на компьютере", enableNotifications: "Включить уведомления", notificationsOn: "Уведомления включены",
+    updateTitle: "Обновление Linka", updateReady: "Доступна новая версия.", updateButton: "Установить обновление", updateDownloading: "Загрузка обновления", updateInstalling: "Установка обновления", updateRestarting: "Перезапуск Linka…", updateInstalled: "Обновление установлено. Перезапусти Linka.",
+    latest: "Установлена последняя версия для компьютера.", close: "Закрыть", cancel: "Отмена",
+    codeSent: "Код отправлен. Проверь почту и папку «Спам».", codeWait: "Повторный код можно запросить через",
+    profileSaved: "Профиль сохранён.", connected: "Аккаунт подключён.", offlineSaved: "Настройки сохранены. Linka продолжит работать локально.",
+    errors: "Не удалось выполнить действие. Проверь соединение и повтори попытку.", expired: "Срок действия кода истёк. Запроси новый.",
+    setupNeeded: "Укажи URL проекта и публичный ключ, чтобы включить аккаунты и синхронизацию.",
+    signOutInfo: "Вы вышли из аккаунта. Локальная библиотека не удалена."
+  },
+  az: {
+    privacy: "Məxfilik standartdır · əvvəlcə cihazda", eyebrow: "Şəxsi kitabxanan",
+    hero: ["Vacib", "olanı", "saxla."], heroBody: "Linklər, qeydlər və ideyalar. Bir dəfə saxla, sonra asan tap.",
+    quick: "Tez yadda saxla", subtitle: "Yalnız lazım olanlar.", placeholder: "Link əlavə et və ya fikrini yaz…",
+    hint: "Bu cihazda saxlanılır. Ehtiyat nüsxə yaratmağı unutma.", save: "Yadda saxla",
+    inbox: "Kitabxanan", export: "İxrac", import: "İdxal", filters: ["Hamısı", "Sabitlənmiş", "Linklər", "Qeydlər"],
+    footer: "şəxsi kitabxanan", footerRight: "Sadə və səliqəli. Vacib olanları ehtiyatda saxla.",
+    account: "Hesab", settings: "Parametrlər", language: "Dil", theme: "Görünüş", dark: "Tünd", light: "Açıq", system: "Sistem", reducedMotion: "Az animasiya", reducedMotionBody: "Hərəkət və keçidlər azaldılır.",
+    startTitle: "Linka-ya xoş gəlmisən", startBody: "E-poçtla hesab yarat. Kitabxanan daxil olduğun bütün cihazlarda əlçatan olacaq.",
+    email: "E-poçt ünvanı", code: "6 rəqəmli kod", sendCreate: "Hesab yarat · kod göndər",
+    sendLogin: "Daxil ol · kod göndər", verify: "Təsdiqlə və davam et", continueOffline: "Hesabsız davam et",
+    profileTitle: "Özün haqqında bir az", profileBody: "Linka-da görünəcək adı seç. Həqiqi məlumat yazmaq məcburi deyil.",
+    name: "Sənə necə müraciət edək?", age: "Yaş (istəyə görə)", finish: "Quraşdırmanı bitir",
+    config: "Bulud xidməti parametrləri", projectUrl: "Supabase layihəsinin URL-i", publishableKey: "Açıq layihə açarı",
+    saveConfig: "Parametrləri saxla", signedIn: "Daxil olunub: ", signOut: "Çıxış", syncNow: "Sinxronlaşdır",
+    editProfile: "Profili dəyiş", qrLogin: "QR ilə başqa cihazda daxil ol", qrIntro: "Artıq Linka-ya daxil olduğun telefonla skan et. Kod iki dəqiqəyə bitir.",
+    waiting: "Təsdiq gözlənilir…", pairingReady: "QR kod hazırdır", qrUnavailable: "QR giriş xidməti hələ qurulmayıb.",
+    notification: "Kompüter bildirişləri", enableNotifications: "Bildirişləri aktiv et", notificationsOn: "Bildirişlər aktivdir",
+    updateTitle: "Linka yeniləməsi", updateReady: "Yeni versiya mövcuddur.", updateButton: "Yeniləməni quraşdır", updateDownloading: "Yeniləmə endirilir", updateInstalling: "Yeniləmə quraşdırılır", updateRestarting: "Linka yenidən başladılır…", updateInstalled: "Yeniləmə quraşdırıldı. Linka-nı yenidən aç.",
+    latest: "Ən son masaüstü versiyası quraşdırılıb.", close: "Bağla", cancel: "Ləğv et",
+    codeSent: "Kod göndərildi. E-poçtu və spam qovluğunu yoxla.", codeWait: "Yeni kodu bu müddətdən sonra istəyə bilərsən:",
+    profileSaved: "Profil yadda saxlanıldı.", connected: "Hesab qoşuldu.", offlineSaved: "Parametrlər saxlanıldı. Linka lokal işləyəcək.",
+    errors: "Əməliyyat alınmadı. Bağlantını yoxla və yenidən cəhd et.", expired: "Kodun vaxtı bitib. Yeni kod istə.",
+    setupNeeded: "Hesabları və sinxronizasiyanı aktivləşdirmək üçün layihə URL-i və açıq açarı daxil et.",
+    signOutInfo: "Hesabdan çıxdın. Lokal kitabxanan silinməyib."
+  },
+  tr: {
+    privacy: "Varsayılan gizlilik · önce cihazda", eyebrow: "Kişisel kitaplığın",
+    hero: ["Önemli", "olanı", "sakla."], heroBody: "Bağlantılar, notlar ve fikirler. Bir kez kaydet, sonra kolayca bul.",
+    quick: "Hızlı kayıt", subtitle: "Yalnızca gerekenler.", placeholder: "Bağlantı ekle veya bir düşünce yaz…",
+    hint: "Bu cihazda saklanır. Yedek almayı unutma.", save: "Gelen kutusuna kaydet",
+    inbox: "Kitaplığın", export: "Dışa aktar", import: "İçe aktar", filters: ["Tümü", "Sabitlenen", "Bağlantılar", "Notlar"],
+    footer: "kişisel kitaplığın", footerRight: "Sade tasarım. Önemli olanları yedekle.",
+    account: "Hesap", settings: "Ayarlar", language: "Dil", theme: "Görünüm", dark: "Koyu", light: "Açık", system: "Sistem", reducedMotion: "Hareketi azalt", reducedMotionBody: "Hareket ve geçişleri azaltır.",
+    startTitle: "Linka'ya hoş geldin", startBody: "E-posta adresinle hesap oluştur. Kitaplığın giriş yaptığın tüm cihazlarda kullanılabilir.",
+    email: "E-posta adresi", code: "Altı haneli kod", sendCreate: "Hesap oluştur · kod gönder",
+    sendLogin: "Giriş yap · kod gönder", verify: "Doğrula ve devam et", continueOffline: "Hesapsız devam et",
+    profileTitle: "Biraz kendinden bahset", profileBody: "Linka'da görünecek adı seç. Gerçek bilgileri kullanman gerekmez.",
+    name: "Sana nasıl hitap edelim?", age: "Yaş (isteğe bağlı)", finish: "Kurulumu bitir",
+    config: "Bulut hizmeti ayarları", projectUrl: "Supabase proje URL'si", publishableKey: "Herkese açık proje anahtarı",
+    saveConfig: "Ayarları kaydet", signedIn: "Giriş yapıldı: ", signOut: "Çıkış yap", syncNow: "Şimdi senkronize et",
+    editProfile: "Profili düzenle", qrLogin: "QR ile başka cihazda giriş yap", qrIntro: "Linka'da zaten oturum açılmış bir telefonla tara. Kod iki dakika içinde sona erer.",
+    waiting: "Onay bekleniyor…", pairingReady: "QR kod hazır", qrUnavailable: "QR giriş hizmeti henüz yapılandırılmadı.",
+    notification: "Masaüstü bildirimleri", enableNotifications: "Bildirimleri etkinleştir", notificationsOn: "Bildirimler etkin",
+    updateTitle: "Linka güncellemesi", updateReady: "Yeni sürüm kullanıma hazır.", updateButton: "Güncellemeyi yükle", updateDownloading: "Güncelleme indiriliyor", updateInstalling: "Güncelleme yükleniyor", updateRestarting: "Linka yeniden başlatılıyor…", updateInstalled: "Güncelleme yüklendi. Uygulamayı yeniden aç.",
+    latest: "En güncel masaüstü sürümünü kullanıyorsun.", close: "Kapat", cancel: "Vazgeç",
+    codeSent: "Kod gönderildi. Gelen kutunu ve spam klasörünü kontrol et.", codeWait: "Yeni kodu şu süre sonra isteyebilirsin:",
+    profileSaved: "Profil kaydedildi.", connected: "Hesap bağlandı.", offlineSaved: "Ayarlar kaydedildi. Linka yerel çalışmaya devam edecek.",
+    errors: "İşlem başarısız. Bağlantını kontrol edip tekrar dene.", expired: "Kodun süresi doldu. Yeni bir kod iste.",
+    setupNeeded: "Hesap ve eşitlemeyi etkinleştirmek için proje URL'sini ve herkese açık anahtarı gir.",
+    signOutInfo: "Oturumu kapattın. Yerel kitaplığın silinmedi."
+  }
+};
+let updateRecord = null;
+let pendingNativeUpdate = null;
+let lastUpdateNotice = "";
+let updateTimer = null;
+
+function langCode() {
+  const saved = localStorage.getItem(LANG_KEY);
+  if (COPY[saved]) return saved;
+  const browser = String(navigator.language || "en").slice(0, 2).toLowerCase();
+  return COPY[browser] ? browser : "en";
+}
+function tr(key) { return (COPY[langCode()] || COPY.en)[key] ?? COPY.en[key] ?? key; }
+function make(tag, className = "", text = "") {
+  const el = document.createElement(tag);
+  if (className) el.className = className;
+  if (text !== "") el.textContent = text;
+  return el;
+}
+function field(label, type, value = "", placeholder = "") {
+  const wrap = make("label", "linka-field");
+  wrap.append(make("span", "", label));
+  const input = make("input", "linka-input");
+  input.type = type;
+  input.value = value || "";
+  input.placeholder = placeholder;
+  input.autocomplete = type === "email" ? "email" : type === "password" ? "current-password" : "off";
+  if (type === "number") { input.min = "1"; input.max = "120"; input.inputMode = "numeric"; }
+  wrap.append(input);
+  return { wrap, input };
+}
+function button(label, className = "linka-button") {
+  const b = make("button", className, label);
+  b.type = "button";
+  return b;
+}
+function setStatus(target, message, error = false) {
+  target.textContent = message;
+  target.dataset.state = error ? "error" : "normal";
+}
+function modal(titleText, subtitleText, options = {}) {
+  const layer = make("div", options.onboarding ? "modal-layer linka-onboarding-layer" : "modal-layer linka-modal-layer");
+  const panel = make("section", options.onboarding ? "modal linka-experience-panel" : "modal linka-experience-panel");
+  panel.setAttribute("role", "dialog");
+  panel.setAttribute("aria-modal", "true");
+  const head = make("div", "modal-head");
+  const logo = make("img", "modal-logo");
+  logo.src = "/linka-mark.svg";
+  logo.alt = "";
+  const copy = make("div", "linka-modal-copy");
+  copy.append(make("h2", "", titleText), make("p", "", subtitleText));
+  head.append(logo, copy);
+  panel.append(head);
+  layer.append(panel);
+  document.querySelector("#modal-root")?.replaceChildren(layer);
+  const close = () => {
+    layer.classList.add("closing");
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) layer.remove();
+    else setTimeout(() => layer.remove(), 180);
+  };
+  return { layer, panel, close };
+}
+function configForm(panel, config = getCloudConfig(), collapsed = true) {
+  const details = make("details", "linka-config");
+  details.open = !collapsed || !config.url || !config.key;
+  const summary = make("summary", "", tr("config"));
+  details.append(summary);
+  const form = make("div", "linka-form-stack");
+  const url = field(tr("projectUrl"), "url", config.url, "https://your-project.supabase.co");
+  const key = field(tr("publishableKey"), "text", config.key, "sb_publishable_…");
+  form.append(url.wrap, key.wrap);
+  const save = button(tr("saveConfig"), "linka-button linka-button-secondary");
+  const status = make("p", "linka-status");
+  save.addEventListener("click", () => {
+    try { saveCloudConfig(url.input.value, key.input.value); setStatus(status, tr("setupNeeded")); }
+    catch (error) { setStatus(status, error.message || tr("errors"), true); }
+  });
+  form.append(save, status);
+  details.append(form);
+  panel.append(details);
+  return { url: url.input, key: key.input, details };
+}
+function translateInterface() {
+  const language = langCode();
+  document.documentElement.lang = language;
+  const picker = document.querySelector("#linka-language");
+  if (picker && picker.value !== language) picker.value = language;
+  const privacy = document.querySelector(".privacy");
+  if (privacy?.lastChild) privacy.lastChild.textContent = tr("privacy");
+  const eyebrow = document.querySelector(".eyebrow");
+  if (eyebrow) eyebrow.textContent = tr("eyebrow");
+  const words = document.querySelectorAll(".hero h1 .word");
+  tr("hero").forEach((label, i) => { if (words[i]) words[i].textContent = label; });
+  const heroBody = document.querySelector(".hero > p:not(.hero-sub)");
+  if (heroBody) heroBody.textContent = tr("heroBody");
+  const heroSub = document.querySelector(".hero-sub");
+  if (heroSub) {
+    const dot = heroSub.querySelector(".dot");
+    heroSub.replaceChildren();
+    if (dot) heroSub.append(dot);
+    heroSub.append(document.createTextNode(language === "ru" ? "Сначала на устройстве  /  Облако по желанию" :
+      language === "az" ? "Əvvəlcə cihazda  /  Bulud istəyə bağlıdır" :
+      language === "tr" ? "Önce cihazda  /  Bulut isteğe bağlı" : "On-device first  /  Cloud sync is optional"));
+  }
+  const quick = document.querySelector("#compose-label");
+  if (quick) quick.textContent = tr("quick");
+  const subtitle = document.querySelector(".capture-subtitle");
+  if (subtitle) subtitle.textContent = tr("subtitle");
+  const draft = document.querySelector("#capture-text");
+  if (draft) { draft.placeholder = tr("placeholder"); draft.setAttribute("aria-label", tr("placeholder")); }
+  const hint = document.querySelector(".hint");
+  if (hint) hint.textContent = tr("hint");
+  const save = document.querySelector("#save-button");
+  if (save) {
+    const svg = save.querySelector("svg");
+    save.textContent = tr("save");
+    if (svg) save.append(svg);
+  }
+  const title = document.querySelector(".section-title");
+  if (title?.firstChild) title.firstChild.textContent = tr("inbox") + " ";
+  const exportButton = document.querySelector("#export-button");
+  const importButton = document.querySelector("#import-button");
+  if (exportButton) exportButton.textContent = tr("export");
+  if (importButton) importButton.textContent = tr("import");
+  document.querySelectorAll("[data-filter]").forEach((el, i) => { el.textContent = tr("filters")[i] || el.textContent; });
+  const footer = document.querySelector(".footer");
+  if (footer?.children[0]) footer.children[0].innerHTML = "<strong>linka</strong> · " + tr("footer");
+  if (footer?.children[1]) footer.children[1].textContent = tr("footerRight");
+  const accountButton = document.querySelector("#linka-account-button");
+  if (accountButton) { accountButton.title = tr("account"); accountButton.setAttribute("aria-label", tr("account")); }
+  const settingsButton = document.querySelector("#settings-button");
+  if (settingsButton) { settingsButton.title = tr("settings"); settingsButton.setAttribute("aria-label", tr("settings")); }
+}
+function addRevealAnimations() {
+  document.documentElement.classList.add("linka-enhanced");
+  const apply = () => {
+    document.querySelectorAll("#capture-list > article, #capture-list > .empty, .workspace, .toolbar, .filters").forEach((el, index) => {
+      if (el.dataset.linkaMotionApplied) return;
+      el.dataset.linkaMotionApplied = "true";
+      el.style.setProperty("--linka-stagger", String(Math.min(index % 7, 5)));
+      el.classList.add("linka-reveal");
+      if (matchMedia("(prefers-reduced-motion: reduce)").matches || document.documentElement.classList.contains("reduced-motion")) {
+        el.classList.add("linka-reveal-visible");
+      } else {
+        requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add("linka-reveal-visible")));
+      }
+    });
+  };
+  apply();
+  const list = document.querySelector("#capture-list");
+  if (list && "MutationObserver" in window) new MutationObserver(apply).observe(list, { childList: true });
+}
+function setLanguage(value) {
+  if (!COPY[value]) return;
+  localStorage.setItem(LANG_KEY, value);
+  translateInterface();
+  // Refresh the current experience modal so all labels match the chosen language.
+  document.querySelector("#linka-language")?.setAttribute("data-language-changed", String(Date.now()));
+}
+function isDesktopShell() {
+  return Boolean(window.__TAURI_INTERNALS__ || window.__TAURI__);
+}
+async function requestLinkaNotificationPermission() {
+  if (isDesktopShell()) {
+    const api = await import("@tauri-apps/plugin-notification");
+    let allowed = await api.isPermissionGranted();
+    if (!allowed) allowed = (await api.requestPermission()) === "granted";
+    return allowed;
+  }
+  if (!("Notification" in window)) return false;
+  return (Notification.permission === "granted" || await Notification.requestPermission() === "granted");
+}
+async function sendLinkaNotification(title, body, tag = "linka-notification") {
+  if (isDesktopShell()) {
+    try {
+      const api = await import("@tauri-apps/plugin-notification");
+      let allowed = await api.isPermissionGranted();
+      if (!allowed) allowed = (await api.requestPermission()) === "granted";
+      if (allowed) api.sendNotification({ title: String(title).slice(0, 100), body: String(body).slice(0, 240) });
+    } catch {
+      // Notifications should never interrupt saving or syncing library items.
+    }
+    return;
+  }
+  if ("Notification" in window && Notification.permission === "granted") {
+    try { new Notification(title, { body, tag }); } catch {}
+  }
+}
+function compareVersions(left, right) {
+  const a = String(left || "").match(/\d+/g)?.map(Number) || [];
+  const b = String(right || "").match(/\d+/g)?.map(Number) || [];
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const x = a[i] || 0, y = b[i] || 0;
+    if (x !== y) return x < y ? -1 : 1;
+  }
+  return 0;
+}
+async function installNativeUpdate(targetButton, statusElement) {
+  if (!isDesktopShell()) return false;
+  let update = pendingNativeUpdate;
+  if (!update) {
+    try {
+      const { check } = await import("@tauri-apps/plugin-updater");
+      update = await check();
+      pendingNativeUpdate = update;
+    } catch { return false; }
+  }
+  if (!update) return false;
+  if (targetButton) targetButton.disabled = true;
+  try {
+    if (statusElement) statusElement.textContent = tr("updateDownloading");
+    await update.downloadAndInstall(event => {
+      if (!statusElement) return;
+      if (event.event === "Started") statusElement.textContent = tr("updateDownloading");
+      else if (event.event === "Progress") statusElement.textContent = tr("updateDownloading") + "…";
+      else if (event.event === "Finished") statusElement.textContent = tr("updateInstalling");
+    });
+    pendingNativeUpdate = null;
+    if (statusElement) statusElement.textContent = tr("updateRestarting");
+    try {
+      const { relaunch } = await import("@tauri-apps/plugin-process");
+      await relaunch();
+    } catch {
+      if (statusElement) statusElement.textContent = tr("updateInstalled");
+    }
+    return true;
+  } catch (error) {
+    if (statusElement) statusElement.textContent = error?.message || tr("errors");
+    return false;
+  } finally {
+    if (targetButton) targetButton.disabled = false;
+  }
+}
+function releaseButton(target, label, url, statusElement = null) {
+  const item = button(label, "linka-button");
+  item.addEventListener("click", async () => {
+    if (isDesktopShell() && pendingNativeUpdate) {
+      const installed = await installNativeUpdate(item, statusElement);
+      if (installed) return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+  });
+  target.append(item);
+}
+async function checkForRelease({ notify = false } = {}) {
+  let nativeUpdate = null;
+  if (isDesktopShell()) {
+    try {
+      const { check } = await import("@tauri-apps/plugin-updater");
+      nativeUpdate = await check();
+      pendingNativeUpdate = nativeUpdate;
+    } catch {
+      // Signed updater is optional until the release key is configured.
+      pendingNativeUpdate = null;
+    }
+  }
+  try {
+    const response = await fetch(RELEASES_URL, { headers: { Accept: "application/vnd.github+json" }, cache: "no-store" });
+    if (!response.ok) throw new Error("Release metadata unavailable");
+    const release = await response.json();
+    if (!release?.tag_name || release.draft || release.prerelease) return;
+    updateRecord = release;
+    const latest = String(nativeUpdate?.version || release.tag_name).replace(/^v/i, "");
+    const releaseUrl = release.html_url || "https://github.com/anarabbasov2010-eng/Linka/releases/latest";
+    const versionIsOlder = Boolean(nativeUpdate) || Boolean(BUILD_VERSION && compareVersions(BUILD_VERSION, String(release.tag_name).replace(/^v/i, "")) < 0);
+    let banner = document.querySelector("#linka-update-banner");
+    if (!banner && versionIsOlder) {
+      banner = make("aside", "linka-update-banner");
+      banner.id = "linka-update-banner";
+      const copy = make("div", "linka-update-copy");
+      copy.append(make("strong", "", tr("updateTitle")), make("span", "", tr("updateReady") + " · " + latest));
+      const status = make("p", "linka-status");
+      banner.append(copy, status);
+      releaseButton(banner, tr("updateButton"), releaseUrl, status);
+      document.querySelector("#app")?.prepend(banner);
+    } else if (banner) {
+      const span = banner.querySelector("span");
+      if (span) span.textContent = tr("updateReady") + " · " + latest;
+      const action = banner.querySelector("button");
+      if (action) action.textContent = tr("updateButton");
+    }
+    if (notify && versionIsOlder && lastUpdateNotice !== latest &&
+      localStorage.getItem(NOTIFY_KEY) === "true" && "Notification" in window && Notification.permission === "granted") {
+      void sendLinkaNotification("Linka update", "Version " + latest + " is available.", "linka-update-" + latest);
+      lastUpdateNotice = latest;
+    }
+  } catch {
+    // A release feed problem never prevents access to the local inbox.
+  }
+}
+function showUpdateSettings(panel) {
+  const section = make("section", "linka-settings-block");
+  section.append(make("h3", "", tr("updateTitle")));
+  const detail = make("p", "linka-muted", tr("latest"));
+  const check = button("Check now", "linka-button linka-button-secondary");
+  check.addEventListener("click", async () => {
+    check.disabled = true;
+    detail.textContent = "Checking…";
+    await checkForRelease();
+    const latest = updateRecord?.tag_name?.replace(/^v/i, "");
+    detail.textContent = pendingNativeUpdate
+      ? tr("updateReady") + " " + (pendingNativeUpdate.version || latest || "")
+      : latest && BUILD_VERSION && compareVersions(BUILD_VERSION, latest) < 0
+        ? tr("updateReady") + " " + latest : tr("latest");
+    if (updateRecord) releaseButton(section, tr("updateButton"), updateRecord.html_url || RELEASES_URL, detail);
+    check.disabled = false;
+  });
+  section.append(detail, check);
+  panel.append(section);
+}
+function showNotificationSettings(panel) {
+  const section = make("section", "linka-settings-block");
+  section.append(make("h3", "", tr("notification")));
+  const detail = make("p", "linka-muted",
+    localStorage.getItem(NOTIFY_KEY) === "true" ? tr("notificationsOn") : "Linka can show update notices while the app is open.");
+  const toggle = button(localStorage.getItem(NOTIFY_KEY) === "true" ? tr("notificationsOn") : tr("enableNotifications"), "linka-button linka-button-secondary");
+  toggle.addEventListener("click", async () => {
+    toggle.disabled = true;
+    try {
+      const allowed = await requestLinkaNotificationPermission();
+      if (allowed) {
+        localStorage.setItem(NOTIFY_KEY, "true");
+        detail.textContent = tr("notificationsOn");
+        toggle.textContent = tr("notificationsOn");
+        await sendLinkaNotification("Linka", "Notifications are enabled.", "linka-notifications-test");
+      } else {
+        localStorage.setItem(NOTIFY_KEY, "false");
+        setStatus(detail, "Notifications are blocked by the operating system.", true);
+      }
+    } catch {
+      setStatus(detail, "Notifications are not available in this app environment.", true);
+    } finally { toggle.disabled = false; }
+  });
+  section.append(detail, toggle);
+  panel.append(section);
+}
+function openProfileEditor({ firstRun = false, close = () => {} } = {}) {
+  const dialog = modal(tr("profileTitle"), tr("profileBody"), { onboarding: firstRun });
+  const panel = dialog.panel;
+  const old = readLinkaProfile();
+  const name = field(tr("name"), "text", old?.displayName || "", "Anar");
+  name.input.maxLength = 48;
+  name.input.autocomplete = "nickname";
+  const age = field(tr("age"), "number", old?.age ?? "", "16");
+  age.input.min = "1"; age.input.max = "120";
+  const status = make("p", "linka-status");
+  const actions = make("div", "linka-actions");
+  const cancel = button(tr("cancel"), "linka-button linka-button-secondary");
+  cancel.addEventListener("click", () => {
+    if (firstRun) {
+      localStorage.setItem(ONBOARDED_KEY, "true");
+      dialog.close();
+    } else close();
+  });
+  const finish = button(tr("finish"));
+  finish.addEventListener("click", () => {
+    try {
+      const profile = saveLinkaProfile({ displayName: name.input.value, age: age.input.value });
+      localStorage.setItem(ONBOARDED_KEY, "true");
+      setStatus(status, tr("profileSaved"));
+      dialog.close();
+      if (firstRun) document.querySelector("#modal-root")?.replaceChildren();
+      if (getCloudSession()) window.dispatchEvent(new CustomEvent("linka:profile-saved", { detail: profile }));
+    } catch (error) { setStatus(status, error.message || tr("errors"), true); }
+  });
+  actions.append(cancel, finish);
+  const form = make("form", "linka-form-stack");
+  form.addEventListener("submit", event => { event.preventDefault(); finish.click(); });
+  form.append(name.wrap, age.wrap, status, actions);
+  panel.append(form);
+  name.input.focus();
+}
+function showQrPairing(panel, config, onSuccess) {
+  const section = make("section", "linka-settings-block");
+  section.append(make("h3", "", tr("qrLogin")), make("p", "linka-muted", tr("qrIntro")));
+  const content = make("div", "linka-qr-area");
+  const status = make("p", "linka-status", tr("waiting"));
+  const start = button(tr("qrLogin"), "linka-button linka-button-secondary");
+  start.addEventListener("click", async () => {
+    start.disabled = true;
+    content.replaceChildren();
+    setStatus(status, tr("waiting"));
+    try {
+      const challenge = await beginQrPairing(config);
+      const deepLink = `linka://pair?id=${encodeURIComponent(challenge.id)}&secret=${encodeURIComponent(challenge.secret)}`;
+      const image = make("img", "linka-qr-image");
+      image.alt = "Linka QR sign-in code";
+      image.src = await QRCode.toDataURL(deepLink, { width: 260, margin: 2, errorCorrectionLevel: "M", color: { dark: "#141418", light: "#ffffff" } });
+      content.append(image, make("p", "linka-muted", new Date(challenge.expiresAt).toLocaleTimeString()));
+      setStatus(status, tr("pairingReady"));
+      const expires = new Date(challenge.expiresAt).getTime();
+      while (Date.now() < expires && document.body.contains(image)) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        try {
+          const result = await claimQrPairing({ id: challenge.id, secret: challenge.secret, url: config.url, key: config.key });
+          if (result.session) {
+            setStatus(status, tr("connected"));
+            window.dispatchEvent(new CustomEvent("linka:authenticated"));
+            onSuccess?.();
+            return;
+          }
+        } catch (error) {
+          if (/not approved yet|waiting|202/i.test(String(error?.message || ""))) continue;
+          throw error;
+        }
+      }
+      setStatus(status, tr("expired"), true);
+    } catch (error) {
+      setStatus(status, error?.message || tr("qrUnavailable"), true);
+    } finally { start.disabled = false; }
+  });
+  section.append(start, content, status);
+  panel.append(section);
+}
+function showAccount({ firstRun = false } = {}) {
+  const session = getCloudSession();
+  if (session) {
+    const dialog = modal(tr("account"), (tr("signedIn") + (session.email || "Linka account")), { onboarding: firstRun });
+    const config = configForm(dialog.panel, getCloudConfig(), true);
+    const profile = readLinkaProfile();
+    const summary = make("p", "linka-muted", profile?.displayName ? `${profile.displayName}${profile.age ? " · " + profile.age : ""}` : tr("profileBody"));
+    const actions = make("div", "linka-actions");
+    const edit = button(tr("editProfile"), "linka-button linka-button-secondary");
+    edit.addEventListener("click", () => openProfileEditor({ firstRun: false, close: dialog.close }));
+    const sync = button(tr("syncNow"));
+    sync.addEventListener("click", () => { window.dispatchEvent(new CustomEvent("linka:authenticated")); setStatus(status, tr("waiting")); });
+    const signOut = button(tr("signOut"), "linka-button linka-button-danger");
+    signOut.addEventListener("click", () => {
+      disconnectCloud();
+      dialog.close();
+      setTimeout(() => showAccount(), 200);
+      document.dispatchEvent(new CustomEvent("linka:status", { detail: tr("signOutInfo") }));
+    });
+    actions.append(edit, sync, signOut);
+    const status = make("p", "linka-status");
+    dialog.panel.append(summary, actions);
+    showQrPairing(dialog.panel, { url: config.url.value, key: config.key.value }, () => { dialog.close(); setTimeout(() => showAccount(), 180); });
+    dialog.panel.append(status);
+    const close = button(tr("close"), "linka-button linka-button-secondary");
+    close.addEventListener("click", dialog.close);
+    dialog.panel.append(close);
+    return;
+  }
+
+  const dialog = modal(tr("startTitle"), tr("startBody"), { onboarding: firstRun });
+  const panel = dialog.panel;
+  const service = configForm(panel, getCloudConfig(), true);
+  const email = field(tr("email"), "email", "", "you@example.com");
+  const code = field(tr("code"), "text", "", "000000");
+  code.input.inputMode = "numeric";
+  code.input.autocomplete = "one-time-code";
+  code.input.maxLength = 6;
+  code.input.pattern = "[0-9]{6}";
+  code.wrap.hidden = true;
+  const status = make("p", "linka-status");
+  const sendCreate = button(tr("sendCreate"));
+  const sendLogin = button(tr("sendLogin"), "linka-button linka-button-secondary");
+  const verify = button(tr("verify"));
+  verify.hidden = true;
+  const offline = button(tr("continueOffline"), "linka-button linka-button-secondary");
+  const actions = make("div", "linka-actions");
+  actions.append(sendCreate, sendLogin, verify);
+  const form = make("form", "linka-form-stack");
+  form.addEventListener("submit", event => {
+    event.preventDefault();
+    if (verify.hidden) sendLogin.click(); else verify.click();
+  });
+  form.append(email.wrap, code.wrap, status, actions);
+  panel.append(form, offline);
+  showQrPairing(panel, { url: service.url.value, key: service.key.value }, () => {
+    dialog.close();
+    setTimeout(() => showAccount(), 180);
+  });
+  let sentAt = 0;
+  let expiryAt = 0;
+  let createUser = false;
+  let cooldownInterval = null;
+  const setBusy = busy => [sendCreate, sendLogin, verify, offline].forEach(b => b.disabled = busy);
+  const updateCountdown = () => {
+    const remaining = Math.max(0, expiryAt - Date.now());
+    if (remaining <= 0 && expiryAt) {
+      verify.disabled = true;
+      setStatus(status, tr("expired"), true);
+    } else if (sentAt) {
+      const wait = Math.max(0, getOtpCooldown(email.input.value));
+      sendCreate.disabled = sendLogin.disabled = wait > 0;
+      if (wait > 0) {
+        const count = Math.ceil(wait / 1000);
+        sendCreate.textContent = `${tr("sendCreate")} · ${count}s`;
+        sendLogin.textContent = `${tr("sendLogin")} · ${count}s`;
+      } else {
+        sendCreate.textContent = tr("sendCreate");
+        sendLogin.textContent = tr("sendLogin");
+      }
+    }
+  };
+  const send = async isCreate => {
+    createUser = isCreate;
+    setBusy(true);
+    try {
+      const config = saveCloudConfig(service.url.value, service.key.value);
+      const result = await requestEmailOtp({ url: config.url, key: config.key, email: email.input.value, createUser });
+      sentAt = Date.now();
+      expiryAt = sentAt + 120000;
+      code.wrap.hidden = false;
+      verify.hidden = false;
+      sendCreate.hidden = true;
+      sendLogin.hidden = true;
+      offline.hidden = true;
+      setStatus(status, tr("codeSent"));
+      code.input.focus();
+      clearInterval(cooldownInterval);
+      cooldownInterval = setInterval(updateCountdown, 1000);
+      updateCountdown();
+    } catch (error) { setStatus(status, error?.message || tr("errors"), true); }
+    finally { setBusy(false); updateCountdown(); }
+  };
+  sendCreate.addEventListener("click", () => send(true));
+  sendLogin.addEventListener("click", () => send(false));
+  verify.addEventListener("click", async () => {
+    if (Date.now() > expiryAt) { setStatus(status, tr("expired"), true); return; }
+    setBusy(true);
+    try {
+      const config = saveCloudConfig(service.url.value, service.key.value);
+      await verifyEmailOtp({ url: config.url, key: config.key, email: email.input.value, token: code.input.value });
+      clearInterval(cooldownInterval);
+      localStorage.removeItem(ONBOARDED_KEY);
+      dialog.close();
+      window.dispatchEvent(new CustomEvent("linka:authenticated"));
+      if (firstRun || !readLinkaProfile()) setTimeout(() => openProfileEditor({ firstRun: true }), 180);
+      else document.dispatchEvent(new CustomEvent("linka:status", { detail: tr("connected") }));
+    } catch (error) { setStatus(status, error?.message || tr("errors"), true); }
+    finally { setBusy(false); }
+  });
+  offline.addEventListener("click", () => {
+    clearInterval(cooldownInterval);
+    dialog.close();
+    openProfileEditor({ firstRun: true });
+  });
+  if (!service.url.value || !service.key.value) setStatus(status, tr("setupNeeded"));
+}
+function showSettings() {
+  const dialog = modal(tr("settings"), "Linka");
+  const pickerLabel = make("label", "linka-field");
+  pickerLabel.append(make("span", "", tr("language")));
+  const picker = make("select", "linka-select");
+  LANGUAGES.forEach(item => { const option=make("option","",item.label); option.value=item.value; picker.append(option); });
+  picker.value = langCode();
+  picker.addEventListener("change", () => { setLanguage(picker.value); dialog.close(); setTimeout(showSettings, 190); });
+  pickerLabel.append(picker);
+  dialog.panel.append(pickerLabel);
+
+  const themeLabel = make("label", "linka-field");
+  themeLabel.append(make("span", "", tr("theme")));
+  const themeSelect = make("select", "linka-select");
+  for (const [value, label] of [["dark", tr("dark")], ["light", tr("light")], ["system", tr("system")]]) {
+    const option = make("option", "", label); option.value = value; themeSelect.append(option);
+  }
+  themeSelect.value = localStorage.getItem("linka.theme") || "dark";
+  themeSelect.addEventListener("change", () => {
+    document.documentElement.dataset.theme = themeSelect.value;
+    localStorage.setItem("linka.theme", themeSelect.value);
+  });
+  themeLabel.append(themeSelect);
+  dialog.panel.append(themeLabel);
+
+  const motionSection = make("div", "linka-settings-block");
+  motionSection.append(make("h3", "", tr("reducedMotion")), make("p", "linka-muted", tr("reducedMotionBody")));
+  const motionToggle = button("", "linka-button linka-button-secondary");
+  const currentReducedMotion = () => localStorage.getItem("linka.reduceMotion") === "true";
+  const refreshMotionLabel = () => {
+    motionToggle.textContent = currentReducedMotion() ? "✓ " + tr("reducedMotion") : tr("reducedMotion");
+    motionToggle.setAttribute("aria-pressed", String(currentReducedMotion()));
+  };
+  refreshMotionLabel();
+  motionToggle.addEventListener("click", () => {
+    const next = !currentReducedMotion();
+    localStorage.setItem("linka.reduceMotion", String(next));
+    document.documentElement.classList.toggle("reduced-motion", next);
+    refreshMotionLabel();
+  });
+  motionSection.append(motionToggle);
+  dialog.panel.append(motionSection);
+
+  const account = button(tr("account"));
+  account.addEventListener("click", () => { dialog.close(); showAccount(); });
+  const profile = button(tr("editProfile"), "linka-button linka-button-secondary");
+  profile.addEventListener("click", () => { dialog.close(); openProfileEditor(); });
+  const actions = make("div", "linka-actions"); actions.append(account, profile);
+  dialog.panel.append(actions);
+  showNotificationSettings(dialog.panel);
+  showUpdateSettings(dialog.panel);
+  const close = button(tr("close"), "linka-button linka-button-secondary");
+  close.addEventListener("click", dialog.close);
+  dialog.panel.append(close);
+}
+function addAccountButton() {
+  const top = document.querySelector(".top-actions");
+  if (!top || document.querySelector("#linka-account-button")) return;
+  const account = button("", "icon-btn");
+  account.id = "linka-account-button";
+  account.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.3"/><path d="M5.5 20c.4-3.5 2.9-5.5 6.5-5.5s6.1 2 6.5 5.5"/></svg>';
+  account.addEventListener("click", () => showAccount());
+  const settings = document.querySelector("#settings-button");
+  top.insertBefore(account, settings || null);
+}
+function notificationForSavedCapture(event) {
+  const enabled = localStorage.getItem(NOTIFY_KEY) === "true";
+  if (!enabled || !("Notification" in window) || Notification.permission !== "granted") return;
+  const title = String(event?.detail?.title || "Saved to Linka").slice(0, 100);
+  const body = String(event?.detail?.body || "Your item is in your library.").slice(0, 180);
+  void sendLinkaNotification(title, body, "linka-capture");
+}
+function handleIncomingPairing() {
+  const params = new URLSearchParams(location.search);
+  const value = params.get("pair");
+  if (!value) return;
+  const [id, secret] = value.split(".");
+  if (!id || !secret) return;
+  try { history.replaceState({}, "", location.pathname + location.hash); } catch {}
+  const session = getCloudSession();
+  if (session) {
+    const config = getCloudConfig();
+    approveQrPairing({ id, secret, url: config.url, key: config.key, accessToken: session.accessToken, refreshToken: session.refreshToken })
+      .then(() => document.dispatchEvent(new CustomEvent("linka:status", { detail: "QR sign-in approved. Return to your other device." })))
+      .catch(error => document.dispatchEvent(new CustomEvent("linka:status", { detail: error?.message || tr("errors") })));
+  } else {
+    localStorage.setItem("linka.pending-pairing.v1", JSON.stringify({ id, secret }));
+    setTimeout(() => showAccount(), 350);
+  }
+}
+export function initLinkaExperience() {
+  const picker = document.querySelector("#linka-language");
+  if (picker) {
+    picker.value = langCode();
+    picker.addEventListener("change", () => setLanguage(picker.value));
+  }
+  addAccountButton();
+  translateInterface();
+  document.documentElement.dataset.theme = localStorage.getItem("linka.theme") || "dark";
+  document.documentElement.classList.toggle("reduced-motion", localStorage.getItem("linka.reduceMotion") === "true");
+  addRevealAnimations();
+  document.querySelector("#settings-button")?.addEventListener("click", event => {
+    // Keep the user's existing settings entry point while adding account, language and notification controls.
+    event.stopImmediatePropagation();
+    showSettings();
+  }, true);
+  document.addEventListener("linka:status", event => {
+    const status = document.querySelector("#status");
+    if (status) { status.textContent = String(event.detail || ""); status.style.opacity = "1"; }
+  });
+  document.addEventListener("linka:request-profile", () => openProfileEditor());
+  window.addEventListener("linka:capture-saved", notificationForSavedCapture);
+  window.addEventListener("linka:profile-saved", () => window.dispatchEvent(new CustomEvent("linka:authenticated")));
+  window.addEventListener("linka:authenticated", () => {
+    const pending = localStorage.getItem("linka.pending-pairing.v1");
+    if (pending) {
+      try {
+        const pair = JSON.parse(pending), session = getCloudSession(), config = getCloudConfig();
+        approveQrPairing({ id: pair.id, secret: pair.secret, url: config.url, key: config.key, accessToken: session?.accessToken, refreshToken: session?.refreshToken })
+          .then(() => localStorage.removeItem("linka.pending-pairing.v1"))
+          .catch(error => document.dispatchEvent(new CustomEvent("linka:status", { detail: error?.message || tr("errors") })));
+      } catch {}
+    }
+  });
+  checkForRelease();
+  clearInterval(updateTimer);
+  updateTimer = setInterval(() => checkForRelease({ notify: true }), 15 * 60 * 1000);
+  handleIncomingPairing();
+  if (localStorage.getItem("linka.termsAccepted") === "2026-10-23-v2") {
+    if (!localStorage.getItem(ONBOARDED_KEY)) {
+      const session = getCloudSession();
+      if (session && readLinkaProfile()) localStorage.setItem(ONBOARDED_KEY, "true");
+      else setTimeout(() => showAccount({ firstRun: true }), 240);
+    }
+  } else {
+    window.addEventListener("linka:agreement-accepted", () => {
+      if (!localStorage.getItem(ONBOARDED_KEY)) setTimeout(() => showAccount({ firstRun: true }), 240);
+    }, { once: true });
+  }
+}
