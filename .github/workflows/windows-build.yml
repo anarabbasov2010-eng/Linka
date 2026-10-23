@@ -54,6 +54,20 @@ jobs:
           $config = Get-Content -Raw $configPath | ConvertFrom-Json
           $config.version = $version
           $config | ConvertTo-Json -Depth 100 | Set-Content -Encoding utf8 $configPath
+      - name: Inject public cloud endpoint when configured
+        shell: pwsh
+        env:
+          LINKA_SUPABASE_URL: ${{ vars.LINKA_SUPABASE_URL }}
+          LINKA_SUPABASE_PUBLISHABLE_KEY: ${{ vars.LINKA_SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          $config = Join-Path $env:GITHUB_WORKSPACE "apps/web/public/linka-config.js"
+          if ($env:LINKA_SUPABASE_URL -and $env:LINKA_SUPABASE_PUBLISHABLE_KEY) {
+            $json = @{ projectUrl = $env:LINKA_SUPABASE_URL.TrimEnd('/'); publishableKey = $env:LINKA_SUPABASE_PUBLISHABLE_KEY } | ConvertTo-Json -Compress
+            "globalThis.LINKA_CONFIG = Object.freeze($json);" | Set-Content -Path $config -Encoding utf8
+            Write-Host "Configured the public Linka cloud endpoint."
+          } else {
+            Write-Warning "Linka cloud endpoint is not configured. Local-only mode remains available."
+          }
       - name: Install web dependencies
         working-directory: apps/web
         run: npm install --no-audit --no-fund
