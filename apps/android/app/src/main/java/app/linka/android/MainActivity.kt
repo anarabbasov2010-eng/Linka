@@ -895,7 +895,7 @@ private fun LinkaApp(
                 }
             },
             confirmButton = {
-                Button(onClick = { updatePromptDismissed = true; openUpdate(updateInfo.downloadUrl) },
+                Button(onClick = { updatePromptDismissed = true; openUpdate(updateInfo) },
                     shape = RoundedCornerShape(13.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = main, contentColor = bg)) {
                     Text(tr(lang, "updateNow"), fontSize = 12.sp)
