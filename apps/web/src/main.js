@@ -38,6 +38,16 @@ bulkToolbar.className = "bulk-toolbar";
 bulkToolbar.hidden = true;
 list.parentElement.insertBefore(bulkToolbar, list);
 search.title = "Search operators: type:link, type:note, is:pinned, is:later, tag:design, in:research, site:example.com, before:YYYY-MM-DD, after:YYYY-MM-DD";
+function captureUiText(key) {
+  const language = (() => { try { return localStorage.getItem("linka.language.v1") || "en"; } catch { return "en"; } })();
+  const copy = {
+    en: { later: "Read later", removeLater: "Remove later", tagSearch: "Search this tag", collectionSearch: "Show this collection", savedLater: "Saved for later", removedLater: "Removed from read later", readLater: "Read later" },
+    ru: { later: "Сохранить на потом", removeLater: "Убрать из отложенного", tagSearch: "Найти этот тег", collectionSearch: "Открыть коллекцию", savedLater: "Добавлено в «Сохранить на потом»", removedLater: "Убрано из отложенного", readLater: "Отложено" },
+    az: { later: "Sonra oxu", removeLater: "Sonra oxumaqdan çıxar", tagSearch: "Bu teqi axtar", collectionSearch: "Kolleksiyanı göstər", savedLater: "Sonra oxumaq üçün saxlanıldı", removedLater: "Sonra oxumaq siyahısından çıxarıldı", readLater: "Sonra oxu" },
+    tr: { later: "Daha sonra oku", removeLater: "Sonradan oku listesinden çıkar", tagSearch: "Bu etiketi ara", collectionSearch: "Bu koleksiyonu göster", savedLater: "Daha sonra okumak için kaydedildi", removedLater: "Sonradan oku listesinden kaldırıldı", readLater: "Daha sonra oku" }
+  };
+  return (copy[language] || copy.en)[key] || copy.en[key] || key;
+}
 const TERMS_VERSION = "2026-10-23-v2";
 const TERMS_TEXT = `
 Linka is a personal inbox for saving text and links on the device or browser profile where you use it.
@@ -336,7 +346,7 @@ function render() {
     card.style.setProperty("--index", String(index));
     const head = document.createElement("div"); head.className = "item-head";
     const kind = document.createElement("span"); kind.className = "kind";
-    kind.textContent = item.pinned ? "Pinned" : (item.readLater ? "Read later" : (isLink(item.text) ? "Link" : "Note"));
+    kind.textContent = item.pinned ? "Pinned" : (item.readLater ? captureUiText("readLater") : (isLink(item.text) ? "Link" : "Note"));
     if (selectionMode) {
       const selectItem = makeAction(selectedIds.has(item.id) ? "✓ Selected" : "Select", "select", item.id);
       selectItem.setAttribute("aria-pressed", String(selectedIds.has(item.id)));
@@ -370,7 +380,7 @@ function render() {
       for (const tag of item.tags || []) {
         const tagButton = document.createElement("button");
         tagButton.type = "button"; tagButton.className = "item-tag"; tagButton.textContent = "#" + tag;
-        tagButton.title = "Search this tag";
+        tagButton.title = captureUiText("tagSearch");
         tagButton.addEventListener("click", () => {
           search.value = "tag:" + tag; activeFilter = "all";
           filters.forEach(filter => filter.classList.toggle("active", filter.dataset.filter === activeFilter));
@@ -381,7 +391,7 @@ function render() {
       if (item.collection) {
         const collectionButton = document.createElement("button");
         collectionButton.type = "button"; collectionButton.className = "item-collection"; collectionButton.textContent = item.collection;
-        collectionButton.title = "Show this collection";
+        collectionButton.title = captureUiText("collectionSearch");
         collectionButton.addEventListener("click", () => {
           search.value = "in:" + item.collection; activeFilter = "all";
           filters.forEach(filter => filter.classList.toggle("active", filter.dataset.filter === activeFilter));
@@ -393,7 +403,7 @@ function render() {
     const foot = document.createElement("div"); foot.className = "item-foot";
     const date = document.createElement("span"); date.className = "date"; date.textContent = formatDate(item.updatedAt || item.createdAt);
     const actions = document.createElement("div"); actions.className = "actions";
-    actions.append(makeAction("Copy", "copy", item.id), makeAction(item.readLater ? "Remove later" : "Read later", "later", item.id), makeAction("Edit", "edit", item.id), makeAction("Delete", "delete", item.id));
+    actions.append(makeAction("Copy", "copy", item.id), makeAction(item.readLater ? captureUiText("removeLater") : captureUiText("later"), "later", item.id), makeAction("Edit", "edit", item.id), makeAction("Delete", "delete", item.id));
     if (item.text.length > 240) {
       const expand = makeAction(expandedCards.has(item.id) ? "Show less" : "Read more", "expand", item.id);
       expand.setAttribute("aria-expanded", String(expandedCards.has(item.id)));
@@ -898,7 +908,7 @@ list.addEventListener("click",async event=>{
   const item=captures.find(entry=>entry.id===id);if(!item)return;
   if(action==="expand"){if(expandedCards.has(id))expandedCards.delete(id);else expandedCards.add(id);render();}
   else if(action==="pin"){captures=captures.map(entry=>entry.id===id?{...entry,pinned:!entry.pinned,updatedAt:Date.now()}:entry);if(!persist()){render();return;}render();say(item.pinned?"Откреплено":"Закреплено");}
-  else if(action==="later"){captures=captures.map(entry=>entry.id===id?{...entry,readLater:!entry.readLater,updatedAt:Date.now()}:entry);if(!persist()){render();return;}render();say(item.readLater?"Removed from read later":"Saved for later");}
+  else if(action==="later"){captures=captures.map(entry=>entry.id===id?{...entry,readLater:!entry.readLater,updatedAt:Date.now()}:entry);if(!persist()){render();return;}render();say(item.readLater?captureUiText("removedLater"):captureUiText("savedLater"));}
   else if(action==="delete"){
     captures=captures.filter(entry=>entry.id!==id);
     if (!persist()) { render(); return; }
