@@ -1491,6 +1491,10 @@ private fun LinkaApp(
         cloudBusy = false
     }
     val visible = filterCaptures(captures, filter, if (tab == 2) query else "")
+    LaunchedEffect(captures) {
+        val validIds = captures.map { it.id }.toSet()
+        selectedCaptureIds = selectedCaptureIds.intersect(validIds)
+    }
     val oldCaptures = captures.filter { it.updatedAt < System.currentTimeMillis() - 7L * 24L * 60L * 60L * 1000L }
     val resurfaced = if (oldCaptures.isEmpty()) null else oldCaptures[LocalDate.now().dayOfYear % oldCaptures.size]
     LaunchedEffect(tab, filter, query) { visibleLimit = 30 }
