@@ -22,10 +22,11 @@ tauriConfig.version = version;
 writeFileSync(tauriConfigPath, JSON.stringify(tauriConfig, null, 2) + "\n", "utf8");
 
 const cargoManifest = readFileSync(cargoManifestPath, "utf8");
-const syncedCargo = cargoManifest.replace(/^(version\s*=\s*")[^"]+(")/m, `$1${version}$2`);
-if (syncedCargo === cargoManifest) {
+const cargoVersionPattern = /^(version\s*=\s*")[^"]+(")/m;
+if (!cargoVersionPattern.test(cargoManifest)) {
   throw new Error("Could not find [package].version in apps/desktop/src-tauri/Cargo.toml");
 }
+const syncedCargo = cargoManifest.replace(cargoVersionPattern, (_match, prefix, suffix) => prefix + version + suffix);
 writeFileSync(cargoManifestPath, syncedCargo, "utf8");
 
 console.log(`Synchronized Linka desktop/Rust manifests to ${version} from apps/web/package.json.`);
