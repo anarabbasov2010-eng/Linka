@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { loadCaptures, saveCaptures, makeCapture, visibleCaptures, STORAGE_KEY } from "./store.js";
+import { loadCaptures, saveCaptures, makeCapture, visibleCaptures, STORAGE_KEY, RECOVERY_KEY, getCaptureRecovery, startFreshCaptureLibrary } from "./store.js";
 
 function memoryStorage() {
   const data = new Map();
@@ -18,10 +18,20 @@ test("saving and loading captures keeps normalized text", () => {
   assert.ok(storage.getItem(STORAGE_KEY));
 });
 
-test("invalid stored JSON safely returns an empty inbox", () => {
+test("invalid stored JSON is preserved and blocks writes until the user chooses recovery", () => {
   const storage = memoryStorage();
-  storage.setItem(STORAGE_KEY, "{");
+  storage.setItem(STORAGE_KEY, "{broken source");
   assert.deepEqual(loadCaptures(storage), []);
+  assert.equal(storage.getItem(STORAGE_KEY), "{broken source");
+  assert.equal(getCaptureRecovery(storage).raw, "{broken source");
+  assert.equal(JSON.parse(storage.getItem(RECOVERY_KEY)).raw, "{broken source");
+  assert.equal(saveCaptures([makeCapture("new data")], storage), false);
+  assert.equal(storage.getItem(STORAGE_KEY), "{broken source");
+  assert.equal(startFreshCaptureLibrary(storage), true);
+  assert.deepEqual(loadCaptures(storage), []);
+  assert.equal(getCaptureRecovery(storage).acknowledged, true);
+  assert.equal(saveCaptures([makeCapture("new data")], storage), true);
+  assert.equal(loadCaptures(storage)[0].text, "new data");
 });
 
 test("filters links, notes, pinned items and search query", () => {
@@ -59,4 +69,14 @@ test("search supports type, pinned, site and date operators", () => {
   assert.deepEqual(visibleCaptures(items, "all", "before:2026-02-01").map(item => item.id), ["a"]);
   assert.deepEqual(visibleCaptures(items, "all", "after:2026-02-01").map(item => item.id), ["c", "b"]);
   assert.deepEqual(visibleCaptures(items, "all", 'type:link "Guide"').map(item => item.id), ["a"]);
+});
+
+
+test("local storage does not silently truncate libraries above the former 1000-item cap", () => {
+  const storage = memoryStorage();
+  const items = Array.from({ length: 5000 }, (_, index) =>
+    makeCapture("capture " + index, { id: "capture-" + index, createdAt: index + 1 })
+  );
+  assert.equal(saveCaptures(items, storage), true);
+  assert.equal(loadCaptures(storage).length, 5000);
 });
