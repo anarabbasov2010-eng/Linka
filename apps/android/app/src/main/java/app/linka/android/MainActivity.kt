@@ -14,7 +14,9 @@ import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
 import android.media.MediaPlayer
-import android.widget.VideoView
+import android.graphics.SurfaceTexture
+import android.view.Surface
+import android.view.TextureView
 import android.provider.OpenableColumns
 import android.os.Build
 import android.os.Bundle
@@ -227,6 +229,90 @@ internal data class Capture(
 )
 private data class AtmosphereTrack(val id: String, val name: String, val uri: String, val builtin: Boolean = false)
 private data class LinkPreview(val title: String, val description: String, val imageUrl: String)
+
+private class LinkaAmbientVideoView(context: Context) : TextureView(context), TextureView.SurfaceTextureListener {
+    private var source: String? = null
+    private var wantedPlaying = false
+    private var prepared = false
+    private var player: MediaPlayer? = null
+    private var videoSurface: Surface? = null
+
+    init {
+        isOpaque = false
+        surfaceTextureListener = this
+    }
+
+    fun configure(uri: String, shouldPlay: Boolean) {
+        wantedPlaying = shouldPlay
+        if (source != uri) {
+            source = uri
+            releasePlayer()
+            if (isAvailable) preparePlayer()
+            return
+        }
+        updatePlayback()
+    }
+
+    private fun preparePlayer() {
+        val texture = surfaceTexture ?: return
+        val uri = source ?: return
+        releasePlayer()
+        try {
+            val surface = Surface(texture)
+            videoSurface = surface
+            val media = MediaPlayer()
+            player = media
+            media.setSurface(surface)
+            media.isLooping = true
+            media.setVolume(0f, 0f)
+            media.setOnPreparedListener { preparedMedia ->
+                prepared = true
+                if (wantedPlaying) runCatching { preparedMedia.start() }
+            }
+            media.setOnErrorListener { _, _, _ ->
+                prepared = false
+                true
+            }
+            media.setDataSource(context, Uri.parse(uri))
+            media.prepareAsync()
+        } catch (_: Exception) {
+            releasePlayer()
+        }
+    }
+
+    private fun updatePlayback() {
+        val media = player ?: return
+        if (!prepared) return
+        runCatching {
+            if (wantedPlaying && !media.isPlaying) media.start()
+            else if (!wantedPlaying && media.isPlaying) media.pause()
+        }
+    }
+
+    private fun releasePlayer() {
+        prepared = false
+        runCatching { player?.setOnPreparedListener(null) }
+        runCatching { player?.setOnErrorListener(null) }
+        runCatching { player?.release() }
+        player = null
+        runCatching { videoSurface?.release() }
+        videoSurface = null
+    }
+
+    override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
+        preparePlayer()
+    }
+    override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) = Unit
+    override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
+        releasePlayer()
+        return true
+    }
+    override fun onSurfaceTextureUpdated(surface: SurfaceTexture) = Unit
+    override fun onDetachedFromWindow() {
+        releasePlayer()
+        super.onDetachedFromWindow()
+    }
+}
 private data class UpdateInfo(val version: String, val downloadUrl: String, val releaseUrl: String, val changes: String)
 
 internal fun filterCaptures(captures: List<Capture>, filter: String, query: String): List<Capture> = captures.filter { c ->
@@ -1648,29 +1734,10 @@ private fun LinkaApp(
             } else {
                 AndroidView(
                     modifier = Modifier.fillMaxSize().graphicsLayer { alpha = .24f },
-                    factory = { viewContext ->
-                        VideoView(viewContext).apply {
-                            tag = backgroundSource
-                            setVideoURI(Uri.parse(backgroundSource))
-                            setOnPreparedListener { media ->
-                                media.isLooping = true
-                                media.setVolume(0f, 0f)
-                                if (appInForeground) start()
-                            }
-                        }
-                    },
+                    factory = { viewContext -> LinkaAmbientVideoView(viewContext).apply { tag = backgroundSource; configure(backgroundSource, appInForeground) } },
                     update = { view ->
-                        if (view.tag != backgroundSource) {
-                            view.tag = backgroundSource
-                            view.setVideoURI(Uri.parse(backgroundSource))
-                            view.setOnPreparedListener { media ->
-                                media.isLooping = true
-                                media.setVolume(0f, 0f)
-                                if (appInForeground) view.start()
-                            }
-                        }
-                        if (!appInForeground && view.isPlaying) view.pause()
-                        else if (appInForeground && !view.isPlaying) runCatching { view.start() }
+                        view.tag = backgroundSource
+                        view.configure(backgroundSource, appInForeground)
                     }
                 )
             }
