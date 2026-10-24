@@ -8,6 +8,16 @@
 - **Windows:** Tauri 2 desktop app using the same web inbox UI, with NSIS EXE and MSI installer targets.
 - **Android:** Kotlin + Jetpack Compose, share-intent capture, search and filters, pin/edit/delete/copy/open, link previews, configurable cloud sync, update notifications and a guarded APK updater that checks package ID, version code and signing certificate before installation.
 
+## Text documents
+
+Linka includes a separate text editor for personal documents with local autosave, gentle per-character typing and erasing effects, recent drafts, and portable `.linka` files. A standalone document does not become an inbox capture and is not uploaded by Cloud Sync.
+
+- **Web / Windows:** create or open documents from the document icon in the top bar. The Windows NSIS installer registers `.linka` files so opening one from Explorer can launch the editor.
+- **Android:** open the editor from Settings, or open a `.linka` file from a compatible file manager. Use **Save .linka** to export a portable file through Android's document picker.
+- **Portable format:** UTF-8 JSON, schema version 1. The fields and limits are documented in [Linka document format](docs/LINKA-DOCUMENT-FORMAT.md).
+
+Background media and music are configured independently on each device. Pick a personal photo/video or audio file in Atmosphere settings; the bundled forest scene remains the default visual backdrop, but Linka does not autoplay a preselected music track.
+
 ## Build downloads
 
 - [Android APK workflow](https://github.com/anarabbasov2010-eng/Linka/actions/workflows/android-apk.yml)

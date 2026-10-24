@@ -35,7 +35,39 @@
     "category": "Productivity",
     "shortDescription": "A private local-first inbox",
     "longDescription": "Save, search and organise links, thoughts and text locally.",
-    "createUpdaterArtifacts": false
+    "createUpdaterArtifacts": false,
+    "fileAssociations": [
+      {
+        "ext": [
+          "linka"
+        ],
+        "name": "Linka document",
+        "description": "Linka text document",
+        "mimeType": "application/vnd.linka.document+json",
+        "role": "Editor",
+        "exportedType": {
+          "identifier": "app.linka.document",
+          "conformsTo": [
+            "public.data",
+            "public.json",
+            "public.plain-text"
+          ]
+        }
+      }
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "displayLanguageSelector": true,
+        "languages": [
+          "English",
+          "Russian"
+        ],
+        "installerIcon": "icons/icon.ico",
+        "uninstallerIcon": "icons/icon.ico",
+        "startMenuFolder": "Linka"
+      }
+    }
   },
   "plugins": {
     "deep-link": {

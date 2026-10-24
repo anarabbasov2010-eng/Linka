@@ -801,20 +801,6 @@ function showSettings() {
   pickerLabel.append(picker);
   dialog.panel.append(pickerLabel);
 
-  const themeLabel = make("label", "linka-field");
-  themeLabel.append(make("span", "", tr("theme")));
-  const themeSelect = make("select", "linka-select");
-  for (const [value, label] of [["dark", tr("dark")], ["light", tr("light")], ["system", tr("system")]]) {
-    const option = make("option", "", label); option.value = value; themeSelect.append(option);
-  }
-  themeSelect.value = localStorage.getItem("linka.theme") || "dark";
-  themeSelect.addEventListener("change", () => {
-    document.documentElement.dataset.theme = themeSelect.value;
-    localStorage.setItem("linka.theme", themeSelect.value);
-  });
-  themeLabel.append(themeSelect);
-  dialog.panel.append(themeLabel);
-
   const soundSection = make("div", "linka-settings-block");
   soundSection.append(make("h3", "", tr("ambientSound")), make("p", "linka-muted", tr("ambientSoundBody")));
   const soundToggle = button("", "linka-button linka-button-secondary");

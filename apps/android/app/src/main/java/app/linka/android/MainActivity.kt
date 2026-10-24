@@ -165,22 +165,24 @@ import java.util.UUID
 import java.time.LocalDate
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withContext
 import coil.compose.AsyncImage
 
-private val DB = Color(0xFF09090B)
-private val DS = Color(0xFF111114)
-private val DR = Color(0xFF1B1B21)
-private val DBR = Color(0xFF303039)
-private val DT = Color(0xFFEDEDF2)
-private val DM = Color(0xFF9696A3)
-private val LB = Color(0xFFF5F4F1)
-private val LS = Color(0xFFFFFEFC)
-private val LR = Color(0xFFF0EEE9)
-private val LBR = Color(0xFFDFDDD8)
-private val LT = Color(0xFF1A191F)
-private val LM = Color(0xFF73717D)
+private val DB = Color(0xFF0B120D)
+private val DS = Color(0xFF121C14)
+private val DR = Color(0xFF1B291D)
+private val DBR = Color(0xFF394938)
+private val DT = Color(0xFFE8DFC8)
+private val DM = Color(0xFFB3BDA9)
+private val LB = Color(0xFF0B120D)
+private val LS = Color(0xFF121C14)
+private val LR = Color(0xFF1B291D)
+private val LBR = Color(0xFF394938)
+private val LT = Color(0xFFE8DFC8)
+private val LM = Color(0xFFB3BDA9)
 private const val PREFS = "linka_local_v3"
 private const val CAPTURES_KEY = "captures"
 private const val THEME_KEY = "theme"
@@ -217,7 +219,14 @@ private val FOREST_VIDEO_CANDIDATES = listOf(
     "https://videos.pexels.com/video-files/36928736/36928736-hd_1920_1080_30fps.mp4",
     "https://videos.pexels.com/video-files/37426477/37426477-hd_1920_1080_30fps.mp4"
 )
-private const val DEFAULT_MUSIC_URL = "https://d2ol7oe51mr4n9.cloudfront.net/user_3JmiwECXBUAWkApdn0zWkiZ506q/b0a0c0c2-d5e6-4e44-8ffd-90a08e8319f3.mp3"
+private const val DEFAULT_MUSIC_URL = ""
+private const val LINKA_DOCUMENT_FORMAT = "linka-document"
+private const val LINKA_DOCUMENT_MAX_CHARS = 5_000_000
+private fun linkaDocumentFilename(value: String): String {
+    val safe = value.trim().replace(Regex("""[\\/:*?"<>|]"""), "-")
+        .trimEnd('.', ' ').take(100).ifBlank { "Linka document" }
+    return if (safe.endsWith(".linka", ignoreCase = true)) safe else "$safe.linka"
+}
 private const val ATMOSPHERE_BACKGROUND_URI_KEY = "atmosphere_background_uri"
 private const val ATMOSPHERE_BACKGROUND_TYPE_KEY = "atmosphere_background_type"
 private const val ATMOSPHERE_BACKGROUND_ENABLED_KEY = "atmosphere_background_enabled"
@@ -779,6 +788,9 @@ private object AmbientAudioEngine {
 class MainActivity : ComponentActivity() {
     private var incomingSharedText by mutableStateOf("")
     private var incomingSharedToken by mutableIntStateOf(0)
+    private var incomingLinkaDocumentText by mutableStateOf("")
+    private var incomingLinkaDocumentTitle by mutableStateOf("")
+    private var incomingLinkaDocumentToken by mutableIntStateOf(0)
     private var incomingPairingToken by mutableIntStateOf(0)
     private var incomingOAuthToken by mutableIntStateOf(0)
     private var updateInfo by mutableStateOf<UpdateInfo?>(null)
@@ -882,6 +894,34 @@ class MainActivity : ComponentActivity() {
         prefs().edit().putString(CAPTURES_KEY, array.toString()).apply()
     }
     private fun openExternal(value: String) { runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(value.trim()))) } }
+    private fun rememberLinkaDocumentIntent(value: Intent?) {
+        if (value?.action != Intent.ACTION_VIEW) return
+        val uri = value.data ?: return
+        val name = runCatching {
+            contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) else null
+            }
+        }.getOrNull().orEmpty()
+        val mime = value.type ?: runCatching { contentResolver.getType(uri) }.getOrNull().orEmpty()
+        if (!name.endsWith(".linka", ignoreCase = true) && mime != "application/vnd.linka.document+json") return
+        val raw = runCatching {
+            val reader = contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8) ?: return
+            reader.use {
+                val builder = StringBuilder()
+                val buffer = CharArray(8192)
+                while (true) {
+                    val count = it.read(buffer)
+                    if (count < 0) break
+                    if (builder.length + count > LINKA_DOCUMENT_MAX_CHARS) throw IllegalArgumentException("Документ превышает лимит 5 МБ текста.")
+                    builder.append(buffer, 0, count)
+                }
+                builder.toString()
+            }
+        }.getOrNull() ?: return
+        incomingLinkaDocumentTitle = name.substringBeforeLast('.', name).ifBlank { "Документ Linka" }.take(180)
+        incomingLinkaDocumentText = raw
+        incomingLinkaDocumentToken++
+    }
     private fun copyText(value: String) {
         (getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("Linka", value))
     }
@@ -929,11 +969,12 @@ class MainActivity : ComponentActivity() {
         scheduleUpdateChecks()
         incomingSharedText = extractSharedText(intent)
         incomingSharedToken = 1
+        rememberLinkaDocumentIntent(intent)
         rememberPairingIntent(intent)
         checkForUpdate(true)
         setContent {
-            var theme by remember { mutableStateOf("dark") }
-            var accent by remember { mutableStateOf("violet") }
+            var theme by remember { mutableStateOf("forest") }
+            var accent by remember { mutableStateOf("forest") }
             var language by remember { mutableStateOf(prefs().getString(LANGUAGE_KEY, "") ?: "") }
             var accepted by remember { mutableStateOf(prefs().getString(TERMS_KEY, "") == TERMS_VERSION) }
             var animations by remember { mutableStateOf(prefs().getBoolean(ANIMATIONS_KEY, true) && !android.provider.Settings.Global.getFloat(contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f).equals(0f)) }
@@ -944,22 +985,17 @@ class MainActivity : ComponentActivity() {
             var alerts by remember { mutableStateOf(prefs().getBoolean(UPDATE_ALERTS_KEY, true)) }
             var autoDownload by remember { mutableStateOf(prefs().getBoolean(AUTO_DOWNLOAD_KEY, false)) }
             LaunchedEffect(Unit) {
-                prefs().edit().putString(THEME_KEY, "dark").putString(ACCENT_KEY, "violet")
+                prefs().edit().putString(THEME_KEY, "forest").putString(ACCENT_KEY, "forest")
                     .putString(EFFECTS_KEY, "atmosphere").putBoolean(AMBIENT_AUDIO_KEY, false).apply()
                 AmbientAudioEngine.stop()
             }
             val darkSystem = androidx.compose.foundation.isSystemInDarkTheme()
-            val dark = theme == "dark" || theme == "oled" || (theme == "system" && darkSystem)
-            val accentColor = when (accent) {
-                "blue" -> if (dark) Color(0xFF9CC5FF) else Color(0xFF356BB4)
-                "mint" -> if (dark) Color(0xFF8FE3CF) else Color(0xFF237A68)
-                "rose" -> if (dark) Color(0xFFFFB6D2) else Color(0xFFB14E78)
-                else -> if (dark) Color(0xFFC9C0FF) else Color(0xFF6554A6)
-            }
-            val backgroundColor = if (theme == "oled") Color.Black else DB
-            val surfaceColor = if (theme == "oled") Color(0xFF050507) else DS
-            val raisedColor = if (theme == "oled") Color(0xFF111116) else DR
-            val outlineColor = if (theme == "oled") Color(0xFF26242D) else DBR
+            val dark = true
+            val accentColor = Color(0xFFB59A69)
+            val backgroundColor = DB
+            val surfaceColor = DS
+            val raisedColor = DR
+            val outlineColor = DBR
             MaterialTheme(colorScheme = if (dark) darkColorScheme(
                 background = backgroundColor, surface = surfaceColor, primary = accentColor, onPrimary = Color(0xFF171323), onBackground = DT, onSurface = DT, surfaceVariant = raisedColor, outline = outlineColor
             ) else lightColorScheme(
@@ -967,6 +1003,7 @@ class MainActivity : ComponentActivity() {
             )) {
                 LinkaApp(
                     sharedText = incomingSharedText, sharedTrigger = incomingSharedToken, pairingTrigger = incomingPairingToken, oauthTrigger = incomingOAuthToken,
+                    externalDocumentText = incomingLinkaDocumentText, externalDocumentTitle = incomingLinkaDocumentTitle, externalDocumentTrigger = incomingLinkaDocumentToken,
                     load = { loadCaptures() }, save = { saveCaptures(it) },
                     copy = { copyText(it) }, open = { openExternal(it) },
                     theme = theme, setTheme = { },
@@ -1017,6 +1054,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         rememberPairingIntent(intent)
+        rememberLinkaDocumentIntent(intent)
         incomingSharedText = extractSharedText(intent)
         incomingSharedToken++
     }
@@ -1317,7 +1355,9 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun LinkaApp(
-    sharedText: String, sharedTrigger: Int, pairingTrigger: Int, oauthTrigger: Int, load: () -> List<Capture>, save: (List<Capture>) -> Unit, copy: (String) -> Unit, open: (String) -> Unit,
+    sharedText: String, sharedTrigger: Int, pairingTrigger: Int, oauthTrigger: Int,
+    externalDocumentText: String, externalDocumentTitle: String, externalDocumentTrigger: Int,
+    load: () -> List<Capture>, save: (List<Capture>) -> Unit, copy: (String) -> Unit, open: (String) -> Unit,
     theme: String, setTheme: (String) -> Unit, accent: String, setAccent: (String) -> Unit, language: String, setLanguage: (String) -> Unit,
     animations: Boolean, setAnimations: (Boolean) -> Unit, ambientAudio: Boolean, setAmbientAudio: (Boolean) -> Unit, density: String, setDensity: (String) -> Unit, effects: String, setEffects: (String) -> Unit, fontScale: Float, setFontScale: (Float) -> Unit,
     alerts: Boolean, notificationPermissionGranted: Boolean, openNotificationSettings: () -> Unit, sendTestNotification: () -> Unit, setAlerts: (Boolean) -> Unit, updateInfo: UpdateInfo?, updateStatus: String, checking: Boolean,
@@ -1367,15 +1407,22 @@ private fun LinkaApp(
     var profileDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    var linkaDocumentDialog by remember { mutableStateOf(false) }
+    var linkaDocumentTitle by remember { mutableStateOf(if (lang == "ru") "Новый документ" else "New document") }
+    var linkaDocumentText by remember { mutableStateOf("") }
+    var linkaDocumentId by remember { mutableStateOf(UUID.randomUUID().toString()) }
+    var linkaDocumentCreatedAt by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var pendingLinkaDocumentJson by remember { mutableStateOf("") }
+    var linkaDraftRestored by remember { mutableStateOf(false) }
     val atmospherePrefsMigrated = prefs.getBoolean("atmosphere_theme_v2_migrated", false)
     var atmosphereBackgroundUri by remember { mutableStateOf(prefs.getString(ATMOSPHERE_BACKGROUND_URI_KEY, "") ?: "") }
     var atmosphereBackgroundType by remember { mutableStateOf(prefs.getString(ATMOSPHERE_BACKGROUND_TYPE_KEY, "") ?: "") }
     var atmosphereBackgroundEnabled by remember { mutableStateOf(if (atmospherePrefsMigrated) prefs.getBoolean(ATMOSPHERE_BACKGROUND_ENABLED_KEY, true) else true) }
     var atmosphereGrainEnabled by remember { mutableStateOf(prefs.getBoolean(ATMOSPHERE_GRAIN_ENABLED_KEY, true)) }
-    var musicEnabled by remember { mutableStateOf(if (atmospherePrefsMigrated) prefs.getBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true) else true) }
+    var musicEnabled by remember { mutableStateOf(if (atmospherePrefsMigrated) prefs.getBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, false) else false) }
     var playerExpanded by remember { mutableStateOf(false) }
     var musicVolume by remember { mutableFloatStateOf(prefs.getFloat(ATMOSPHERE_MUSIC_VOLUME_KEY, .14f).coerceIn(0f, 1f)) }
-    val defaultAtmosphereTrack = remember { AtmosphereTrack("linka-default", "как всё заебало..", DEFAULT_MUSIC_URL, true) }
+    val defaultAtmosphereTrack = remember { AtmosphereTrack("linka-default", "Выбери свой трек", DEFAULT_MUSIC_URL, true) }
     val restoredMusicTracks = remember {
         runCatching {
             val array = JSONArray(prefs.getString(ATMOSPHERE_MUSIC_PLAYLIST_KEY, "[]") ?: "[]")
@@ -1399,7 +1446,7 @@ private fun LinkaApp(
         if (!atmospherePrefsMigrated) {
             prefs.edit().putBoolean("atmosphere_theme_v2_migrated", true)
                 .putBoolean(ATMOSPHERE_BACKGROUND_ENABLED_KEY, true)
-                .putBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true)
+                .putBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, false)
                 .putBoolean(ATMOSPHERE_GRAIN_ENABLED_KEY, true)
                 .putInt(ATMOSPHERE_MUSIC_INDEX_KEY, 0)
                 .putBoolean(AMBIENT_AUDIO_KEY, false)
@@ -1523,6 +1570,93 @@ private fun LinkaApp(
         }
     }
 
+    val linkaDocumentOpenLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching {
+                val raw = context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
+                    ?: error("Не удалось прочитать файл")
+                require(raw.length <= LINKA_DOCUMENT_MAX_CHARS) { "Файл больше 5 МБ текста и не может быть открыт в редакторе." }
+                val displayName = runCatching {
+                    context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                        if (cursor.moveToFirst()) cursor.getString(0) else null
+                    }
+                }.getOrNull().orEmpty()
+                val fallbackTitle = displayName.substringBeforeLast('.', displayName).ifBlank {
+                    if (lang == "ru") "Открытый документ" else "Opened document"
+                }
+                val parsed = runCatching { JSONObject(raw) }.getOrNull()
+                if (raw.trimStart().startsWith("[") || parsed?.has("captures") == true) {
+                    error(if (lang == "ru") "Это резервная копия Linka, а не текстовый документ .linka." else "This is a Linka backup, not a .linka text document.")
+                }
+                if (parsed?.has("format") == true && parsed.optString("format") != LINKA_DOCUMENT_FORMAT) {
+                    error(if (lang == "ru") "Неизвестный формат документа Linka." else "Unknown Linka document format.")
+                }
+                if (parsed?.optString("format") == LINKA_DOCUMENT_FORMAT) {
+                    require(parsed.optInt("version", 1) == 1) { "Эта версия документа не поддерживается." }
+                    linkaDocumentId = parsed.optString("id").ifBlank { UUID.randomUUID().toString() }
+                    linkaDocumentTitle = parsed.optString("title").ifBlank { fallbackTitle }.take(180)
+                    linkaDocumentText = parsed.optString("text", "").take(LINKA_DOCUMENT_MAX_CHARS)
+                    linkaDocumentCreatedAt = parsed.optLong("createdAt", System.currentTimeMillis())
+                } else {
+                    linkaDocumentId = UUID.randomUUID().toString()
+                    linkaDocumentTitle = fallbackTitle.take(180)
+                    linkaDocumentText = raw
+                    linkaDocumentCreatedAt = System.currentTimeMillis()
+                }
+                linkaDocumentDialog = true
+                message = if (lang == "ru") "Документ открыт" else "Document opened"
+            }.onFailure {
+                message = it.message ?: if (lang == "ru") "Не удалось открыть документ" else "Could not open document"
+            }
+        }
+    }
+    val linkaDocumentSaveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/vnd.linka.document+json")) { uri ->
+        if (uri != null) {
+            runCatching {
+                require(pendingLinkaDocumentJson.isNotBlank()) { "Нет данных для сохранения." }
+                val output = context.contentResolver.openOutputStream(uri) ?: error("Не удалось открыть файл для записи")
+                output.bufferedWriter(Charsets.UTF_8).use { it.write(pendingLinkaDocumentJson) }
+                message = if (lang == "ru") "Файл .linka сохранён" else "Saved .linka document"
+                linkaDocumentDialog = false
+            }.onFailure {
+                message = it.message ?: if (lang == "ru") "Не удалось сохранить .linka" else "Could not save .linka"
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        val rawDraft = withContext(Dispatchers.IO) {
+            runCatching {
+                File(context.filesDir, "linka-document-draft.json").takeIf { it.isFile && it.length() <= 6_000_000L }?.readText(Charsets.UTF_8)
+            }.getOrNull()
+        }
+        if (!rawDraft.isNullOrBlank()) {
+            runCatching {
+                val draftJson = JSONObject(rawDraft)
+                if (draftJson.optString("format") == LINKA_DOCUMENT_FORMAT && draftJson.optInt("version", 1) == 1) {
+                    linkaDocumentId = draftJson.optString("id").ifBlank { UUID.randomUUID().toString() }
+                    linkaDocumentTitle = draftJson.optString("title").ifBlank { if (lang == "ru") "Новый документ" else "New document" }.take(180)
+                    linkaDocumentText = draftJson.optString("text", "").take(LINKA_DOCUMENT_MAX_CHARS)
+                    linkaDocumentCreatedAt = draftJson.optLong("createdAt", System.currentTimeMillis())
+                }
+            }
+        }
+        linkaDraftRestored = true
+    }
+    LaunchedEffect(linkaDocumentDialog, linkaDocumentId, linkaDocumentTitle, linkaDocumentText, linkaDocumentCreatedAt, linkaDraftRestored) {
+        if (!linkaDocumentDialog || !linkaDraftRestored) return@LaunchedEffect
+        delay(420L)
+        val snapshot = runCatching {
+            JSONObject().put("format", LINKA_DOCUMENT_FORMAT).put("version", 1)
+                .put("id", linkaDocumentId).put("title", linkaDocumentTitle.ifBlank { "Linka document" }.take(180))
+                .put("text", linkaDocumentText.take(LINKA_DOCUMENT_MAX_CHARS))
+                .put("createdAt", linkaDocumentCreatedAt).put("updatedAt", System.currentTimeMillis()).toString(2)
+        }.getOrDefault("")
+        if (snapshot.isNotBlank()) withContext(Dispatchers.IO) {
+            runCatching { File(context.filesDir, "linka-document-draft.json").writeText(snapshot, Charsets.UTF_8) }
+        }
+    }
+
     val backgroundPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
@@ -1596,7 +1730,7 @@ private fun LinkaApp(
         runCatching { musicPlayer?.release() }
         musicPlayer = null
         musicPlaying = false
-        if (!accepted || language.isBlank() || !musicEnabled || !appInForeground) return@LaunchedEffect
+        if (!accepted || language.isBlank() || !musicEnabled || !appInForeground || activeMusicTrack.uri.isBlank()) return@LaunchedEffect
         try {
             val player = MediaPlayer()
             musicPlayer = player
@@ -1643,6 +1777,32 @@ private fun LinkaApp(
             cloudDialog = true
         }
     }
+    LaunchedEffect(externalDocumentTrigger) {
+        if (externalDocumentTrigger <= 0) return@LaunchedEffect
+        while (!linkaDraftRestored) delay(20L)
+        runCatching {
+            require(externalDocumentText.length <= LINKA_DOCUMENT_MAX_CHARS) { "Документ превышает лимит 5 МБ текста." }
+            val parsed = runCatching { JSONObject(externalDocumentText) }.getOrNull()
+            if (parsed?.optString("format") == LINKA_DOCUMENT_FORMAT) {
+                require(parsed.optInt("version", 1) == 1) { "Эта версия документа .linka не поддерживается." }
+                linkaDocumentId = parsed.optString("id").ifBlank { UUID.randomUUID().toString() }
+                linkaDocumentTitle = parsed.optString("title").ifBlank { externalDocumentTitle.ifBlank { "Документ Linka" } }.take(180)
+                linkaDocumentText = parsed.optString("text", "").take(LINKA_DOCUMENT_MAX_CHARS)
+                linkaDocumentCreatedAt = parsed.optLong("createdAt", System.currentTimeMillis())
+            } else {
+                require(!externalDocumentText.trimStart().startsWith("[") && parsed?.has("captures") != true) { "Это резервная копия Linka, а не текстовый документ .linka." }
+                linkaDocumentId = UUID.randomUUID().toString()
+                linkaDocumentTitle = externalDocumentTitle.ifBlank { "Документ Linka" }.take(180)
+                linkaDocumentText = externalDocumentText
+                linkaDocumentCreatedAt = System.currentTimeMillis()
+            }
+            linkaDocumentDialog = true
+            message = if (lang == "ru") "Документ .linka открыт" else "Opened .linka document"
+        }.onFailure {
+            message = it.message ?: if (lang == "ru") "Не удалось открыть .linka" else "Could not open .linka"
+        }
+    }
+
     LaunchedEffect(sharedText, sharedTrigger) {
         val incoming = sharedText.trim().take(MAX_CAPTURE_CHARS)
         if (incoming.isNotBlank()) {
@@ -1851,7 +2011,8 @@ private fun LinkaApp(
                             fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 5.dp, bottom = 1.dp))
                         Column(verticalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.padding(bottom = 5.dp)) {
                             Text(tr(lang, "hero"), color = main, fontSize = 33.sp * fontScale, lineHeight = 38.sp * fontScale,
-                                fontWeight = FontWeight.SemiBold, letterSpacing = (-1.7).sp)
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+                                fontWeight = FontWeight.Medium, letterSpacing = (-1.1).sp)
                             Text(tr(lang, "heroBody"), color = muted, fontSize = 13.sp * fontScale, lineHeight = 19.sp * fontScale)
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -1867,16 +2028,16 @@ private fun LinkaApp(
                                 Box(Modifier.fillMaxWidth()) {
                                     OutlinedTextField(value = draft, onValueChange = { draft = it.take(MAX_CAPTURE_CHARS); typingTick++ }, modifier = Modifier.fillMaxWidth(),
                                         placeholder = { Text(tr(lang, "placeholder"), color = muted, fontSize = 13.sp * fontScale) },
-                                        textStyle = TextStyle(color = Color.Transparent, fontSize = 14.sp * fontScale, lineHeight = 20.sp * fontScale),
+                                        textStyle = TextStyle(color = Color.Transparent, fontFamily = androidx.compose.ui.text.font.FontFamily.Serif, fontSize = 14.sp * fontScale, lineHeight = 22.sp * fontScale),
                                         minLines = 3, maxLines = 7, shape = RoundedCornerShape(18.dp), colors = fieldColors(bg, border, main, muted))
                                     if (draft.isNotEmpty()) {
                                         val animatedDraft = androidx.compose.ui.text.buildAnnotatedString {
                                             append(draft.dropLast(1))
-                                            pushStyle(androidx.compose.ui.text.SpanStyle(color = main.copy(alpha = animatedInkAlpha)))
+                                            pushStyle(androidx.compose.ui.text.SpanStyle(color = main.copy(alpha = animatedInkAlpha), fontFamily = androidx.compose.ui.text.font.FontFamily.Serif))
                                             append(draft.last())
                                             pop()
                                         }
-                                        Text(animatedDraft, color = main, fontSize = 14.sp * fontScale, lineHeight = 20.sp * fontScale,
+                                        Text(animatedDraft, color = main, fontFamily = androidx.compose.ui.text.font.FontFamily.Serif, fontSize = 14.sp * fontScale, lineHeight = 22.sp * fontScale,
                                             maxLines = 7, overflow = TextOverflow.Clip,
                                             modifier = Modifier.matchParentSize().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 12.dp))
                                     }
@@ -2063,7 +2224,7 @@ private fun LinkaApp(
                                 Text(if (lang == "ru") "Громкость музыки" else "Music volume", color = main, fontSize = 12.sp, modifier = Modifier.weight(1f))
                                 Text((musicVolume * 100).toInt().toString() + "%", color = muted, fontSize = 10.sp)
                             }
-                            Slider(value = musicVolume, onValueChange = { volume -> musicVolume = volume.coerceIn(0f, .4f) }, valueRange = 0f..0.4f)
+                            Slider(value = musicVolume, onValueChange = { volume -> musicVolume = volume.coerceIn(0f, 1f) }, valueRange = 0f..1f)
                             Button(onClick = { playerExpanded = true }, modifier = Modifier.fillMaxWidth().height(44.dp),
                                 shape = RoundedCornerShape(13.dp), colors = ButtonDefaults.buttonColors(containerColor = raised, contentColor = main)) {
                                 Text(if (lang == "ru") "Открыть музыкальный плеер" else "Open music player", fontSize = 12.sp)
@@ -2071,6 +2232,25 @@ private fun LinkaApp(
                             TextButton(onClick = { musicPicker.launch(arrayOf("audio/*")) }, modifier = Modifier.align(Alignment.Start)) {
                                 Text(if (lang == "ru") "Добавить треки с устройства" else "Add tracks from this device", color = muted, fontSize = 11.sp)
                             }
+                        }
+                        SettingsGroup(if (lang == "ru") "Документы Linka · .linka" else if (lang == "az") "Linka sənədləri · .linka" else if (lang == "tr") "Linka belgeleri · .linka" else "Linka documents · .linka", panel, border, main) {
+                            SettingLine(Icons.Outlined.NoteAlt,
+                                if (lang == "ru") "Создать текстовый документ" else if (lang == "az") "Mətn sənədi yarat" else if (lang == "tr") "Metin belgesi oluştur" else "Create text document",
+                                if (lang == "ru") "Редактор с локальным автосохранением" else "Editor with local autosave",
+                                main, muted) {
+                                linkaDocumentId = UUID.randomUUID().toString()
+                                linkaDocumentCreatedAt = System.currentTimeMillis()
+                                linkaDocumentTitle = if (lang == "ru") "Новый документ" else "New document"
+                                linkaDocumentText = ""
+                                linkaDocumentDialog = true
+                            }
+                            SettingLine(Icons.Outlined.Inbox,
+                                if (lang == "ru") "Открыть файл .linka" else if (lang == "az") ".linka faylını aç" else if (lang == "tr") ".linka dosyasını aç" else "Open .linka file",
+                                if (lang == "ru") "Также можно открыть обычный текстовый файл" else "Plain-text files can also be opened",
+                                main, muted) {
+                                linkaDocumentOpenLauncher.launch(arrayOf("application/vnd.linka.document+json", "application/json", "text/plain", "text/*", "application/octet-stream"))
+                            }
+                            Text(if (lang == "ru") "Документы хранятся отдельно от библиотеки ссылок. Формат .linka можно переносить между устройствами." else "Documents are separate from your link inbox and can be moved between devices as .linka files.", color = muted, fontSize = 10.sp, lineHeight = 15.sp)
                         }
                         SettingsGroup(tr(lang, "updates"), panel, border, main) {
                             SettingSwitch(tr(lang, "updateAlerts"), alerts, setAlerts, main, muted, tr(lang, "updateAlertsBody"))
@@ -2169,14 +2349,16 @@ private fun LinkaApp(
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(activeMusicTrack.name, color = main, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
-                    Text(if (musicPlaying) "Linka · играет" else if (musicEnabled) "Тихий плейлист" else "Музыка выключена",
+                    Text(if (musicPlaying) "Linka · играет" else if (activeMusicTrack.uri.isBlank()) "Добавь свою музыку" else if (musicEnabled) "Тихий плейлист" else "Музыка выключена",
                         color = muted, fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 IconButton(onClick = { changeMusicTrack(-1) }, modifier = Modifier.size(25.dp)) {
                     Text("‹", color = muted, fontSize = 18.sp)
                 }
                 IconButton(onClick = {
-                    if (!musicEnabled) {
+                    if (activeMusicTrack.uri.isBlank()) {
+                        musicPicker.launch(arrayOf("audio/*"))
+                    } else if (!musicEnabled) {
                         musicEnabled = true
                         prefs.edit().putBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true).apply()
                     } else if (musicPlaying) {
@@ -2208,7 +2390,8 @@ private fun LinkaApp(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = { changeMusicTrack(-1) }) { Text("‹", color = main, fontSize = 24.sp) }
                     Button(onClick = {
-                        if (!musicEnabled) { musicEnabled = true; prefs.edit().putBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true).apply() }
+                        if (activeMusicTrack.uri.isBlank()) musicPicker.launch(arrayOf("audio/*"))
+                        else if (!musicEnabled) { musicEnabled = true; prefs.edit().putBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true).apply() }
                         else if (musicPlaying) { runCatching { musicPlayer?.pause() }; musicPlaying = false }
                         else { runCatching { musicPlayer?.start(); musicPlaying = true } }
                     }, shape = RoundedCornerShape(15.dp), colors = ButtonDefaults.buttonColors(containerColor = main, contentColor = bg)) {
@@ -2220,7 +2403,7 @@ private fun LinkaApp(
                     Text(if (lang == "ru") "Громкость" else "Volume", color = muted, fontSize = 11.sp, modifier = Modifier.weight(1f))
                     Text((musicVolume * 100).toInt().toString() + "%", color = muted, fontSize = 10.sp)
                 }
-                Slider(value = musicVolume, onValueChange = { musicVolume = it.coerceIn(0f, .4f) }, valueRange = 0f..0.4f)
+                Slider(value = musicVolume, onValueChange = { musicVolume = it.coerceIn(0f, 1f) }, valueRange = 0f..1f)
                 Text(if (lang == "ru") "ПЛЕЙЛИСТ" else "PLAYLIST", color = muted, fontSize = 10.sp, letterSpacing = 1.2.sp)
                 musicTracks.forEachIndexed { index, item ->
                     TextButton(onClick = { musicIndex = index; prefs.edit().putInt(ATMOSPHERE_MUSIC_INDEX_KEY, index).putBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true).apply(); musicEnabled = true }, modifier = Modifier.fillMaxWidth()) {
@@ -2236,6 +2419,73 @@ private fun LinkaApp(
             }
         },
         confirmButton = { TextButton(onClick = { playerExpanded = false }) { Text(tr(lang, "done"), color = main) } }
+    )
+
+    if (linkaDocumentDialog) AlertDialog(
+        onDismissRequest = { linkaDocumentDialog = false },
+        containerColor = panel,
+        shape = RoundedCornerShape(24.dp),
+        title = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(if (lang == "ru") "Текстовый документ" else "Text document",
+                    color = main, fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+                    fontWeight = FontWeight.Medium, fontSize = 21.sp)
+                Text(".linka · " + if (lang == "ru") "автосохранение на устройстве" else "local autosave",
+                    color = muted, fontSize = 10.sp)
+            }
+        },
+        text = {
+            Column(Modifier.heightIn(max = 490.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = linkaDocumentTitle,
+                    onValueChange = { linkaDocumentTitle = it.take(180) },
+                    label = { Text(if (lang == "ru") "Название файла" else "Document title") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    textStyle = TextStyle(color = main, fontFamily = androidx.compose.ui.text.font.FontFamily.Serif, fontSize = 16.sp),
+                    colors = fieldColors(bg, border, main, muted)
+                )
+                OutlinedTextField(
+                    value = linkaDocumentText,
+                    onValueChange = { linkaDocumentText = it.take(LINKA_DOCUMENT_MAX_CHARS) },
+                    label = { Text(if (lang == "ru") "Текст" else "Text") },
+                    placeholder = { Text(if (lang == "ru") "Начни писать…" else "Start writing…") },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 200.dp),
+                    minLines = 8,
+                    maxLines = 14,
+                    shape = RoundedCornerShape(15.dp),
+                    textStyle = TextStyle(color = main, fontFamily = androidx.compose.ui.text.font.FontFamily.Serif, fontSize = 14.sp * fontScale, lineHeight = 22.sp * fontScale),
+                    colors = fieldColors(bg, border, main, muted)
+                )
+                Text(if (lang == "ru") "Черновик сохраняется локально. Для передачи на компьютер нажми «Сохранить .linka»." else "Draft autosaves locally. Choose Save .linka to move it to a computer or another device.",
+                    color = muted, fontSize = 10.sp, lineHeight = 15.sp)
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val now = System.currentTimeMillis()
+                    val title = linkaDocumentTitle.trim().ifBlank { if (lang == "ru") "Документ Linka" else "Linka document" }.take(180)
+                    pendingLinkaDocumentJson = JSONObject()
+                        .put("format", LINKA_DOCUMENT_FORMAT)
+                        .put("version", 1)
+                        .put("id", linkaDocumentId)
+                        .put("title", title)
+                        .put("text", linkaDocumentText.take(LINKA_DOCUMENT_MAX_CHARS))
+                        .put("createdAt", linkaDocumentCreatedAt)
+                        .put("updatedAt", now).toString(2) + "\n"
+                    linkaDocumentSaveLauncher.launch(linkaDocumentFilename(title))
+                },
+                shape = RoundedCornerShape(13.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = main, contentColor = bg)
+            ) { Text(if (lang == "ru") "Сохранить .linka" else "Save .linka", fontSize = 12.sp) }
+        },
+        dismissButton = {
+            TextButton(onClick = { linkaDocumentDialog = false }) {
+                Text(if (lang == "ru") "Закрыть" else "Close", color = muted, fontSize = 12.sp)
+            }
+        }
     )
 
     if (accepted && updateInfo != null && !updatePromptDismissed) {
@@ -2564,7 +2814,7 @@ private fun Header(lang: String, main: Color, muted: Color, panel: Color, border
             androidx.compose.foundation.Image(painterResource(R.drawable.linka_mark), "Linka logo", Modifier.size(47.dp).padding(4.dp))
         }
         Column {
-            Text("linka", color = main, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-1.4).sp)
+            Text("linka", color = main, fontSize = 22.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Serif, fontWeight = FontWeight.Medium, letterSpacing = (-.6).sp)
             Text(tr(lang, "tagline"), color = muted, fontSize = 8.sp, letterSpacing = 1.2.sp)
         }
         Spacer(Modifier.weight(1f))
@@ -2604,7 +2854,7 @@ private fun InlineNotice(message: String, panel: Color, border: Color, main: Col
 
 @Composable
 private fun SectionTitle(title: String, main: Color, modifier: Modifier = Modifier) {
-    Text(title, modifier = modifier, color = main, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+    Text(title, modifier = modifier, color = main, fontFamily = androidx.compose.ui.text.font.FontFamily.Serif, fontSize = 16.sp, fontWeight = FontWeight.Medium)
 }
 @Composable
 private fun FilterRow(lang: String, selected: String, onSelected: (String) -> Unit) {
@@ -2733,7 +2983,7 @@ private fun SettingsGroup(title: String, panel: Color, border: Color, main: Colo
                 Surface(color = MaterialTheme.colorScheme.primary.copy(alpha = .14f), shape = RoundedCornerShape(6.dp)) {
                     Box(Modifier.size(width = 4.dp, height = 18.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(6.dp)))
                 }
-                Text(title, color = main, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-.2).sp)
+                Text(title, color = main, fontFamily = androidx.compose.ui.text.font.FontFamily.Serif, fontSize = 15.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.sp)
             }
             content()
         }
