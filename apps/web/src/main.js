@@ -61,7 +61,7 @@ let cloudSyncStatus = "";
 let lastCloudRefreshAt = 0;
 const expandedCards = new Set();
 const desktopBuildVersion = String(import.meta.env.VITE_LINKA_DESKTOP_VERSION || "").trim();
-let themeMode = localStorage.getItem("linka.theme") || "dark";
+let themeMode = "dark";
 let reduceMotion = localStorage.getItem("linka.reduceMotion") === "true" || (localStorage.getItem("linka.reduceMotion") === null && (() => { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } })());
 
 function say(message) {
@@ -112,12 +112,11 @@ function compareVersions(a, b) {
   }
   return 0;
 }
-function applyTheme(mode = themeMode) {
-  if (!["dark", "oled", "light", "system"].includes(mode)) mode = "dark";
-  themeMode = mode;
-  document.documentElement.dataset.theme = mode;
-  localStorage.setItem("linka.theme", mode);
-  window.dispatchEvent(new CustomEvent("linka:theme-changed", { detail: { theme: mode } }));
+function applyTheme() {
+  themeMode = "dark";
+  document.documentElement.dataset.theme = "dark";
+  try { localStorage.setItem("linka.theme", "dark"); } catch {}
+  window.dispatchEvent(new CustomEvent("linka:theme-changed", { detail: { theme: "dark" } }));
 }
 applyTheme();
 
@@ -597,16 +596,6 @@ function showНастройки() {
   const logo=document.createElement("img"); logo.className="modal-logo"; logo.src="/linka-mark.svg"; logo.alt="";
   const meta=document.createElement("div"); const title=document.createElement("h2"); title.textContent="Настройки";
   const sub=document.createElement("p"); sub.textContent="Настрой Linka под себя"; meta.append(title,sub); head.append(logo,meta); content.append(head);
-  const themeRow=document.createElement("div"); themeRow.className="setting-row visual-theme-row";
-  const themeMeta=document.createElement("div"); const themeTitle=document.createElement("strong"); themeTitle.textContent="Appearance";
-  const themeDesc=document.createElement("p"); themeDesc.textContent="Выбери удобную цветовую тему"; themeMeta.append(themeTitle,themeDesc);
-  const choices=document.createElement("div"); choices.className="theme-options"; choices.setAttribute("aria-label","Theme");
-  [["dark","Тёмная"],["oled","OLED чёрная"],["light","Светлая"],["system","Системная"]].forEach(([value,label])=>{
-    const b=document.createElement("button"); b.type="button"; b.className="theme-option"+(themeMode===value?" active":""); b.textContent=label;
-    b.addEventListener("click",()=>{applyTheme(value);choices.querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b));});
-    choices.append(b);
-  });
-  themeRow.append(themeMeta,choices); content.append(themeRow);
   function addChoiceSetting(titleText, descriptionText, options, selectedValue, onSelect, ariaLabel) {
     const row = document.createElement("div"); row.className = "setting-row visual-setting-row";
     const meta = document.createElement("div");
@@ -628,22 +617,11 @@ function showНастройки() {
     });
     row.append(meta, group); content.append(row);
   }
-  addChoiceSetting("Акцентный цвет", "Выбери фирменный цвет интерфейса", [
-    {value:"violet",label:"Violet",color:"#A99AFF"},
-    {value:"blue",label:"Blue",color:"#8CB8FF"},
-    {value:"mint",label:"Mint",color:"#8FE3CF"},
-    {value:"rose",label:"Rose",color:"#FFB6D2"}
-  ], localStorage.getItem("linka.accent") || "violet", setLinkaAccent, "Accent color");
   addChoiceSetting("Плотность интерфейса", "Больше пространства или больше содержимого", [
     {value:"compact",label:"Компактно"},
     {value:"standard",label:"Стандарт"},
     {value:"spacious",label:"Свободно"}
   ], localStorage.getItem("linka.density") || "standard", setLinkaDensity, "Interface density");
-  addChoiceSetting("Интенсивность эффектов", "От спокойного режима до глубины и параллакса", [
-    {value:"quiet",label:"Тихо"},
-    {value:"balanced",label:"Баланс"},
-    {value:"atmosphere",label:"Атмосфера"}
-  ], localStorage.getItem("linka.effects") || "balanced", setLinkaEffects, "Visual effects intensity");
   const motionRow=document.createElement("div"); motionRow.className="setting-row";
   const motionMeta=document.createElement("div"); const mt=document.createElement("strong"); mt.textContent="Меньше анимации";
   const md=document.createElement("p"); md.textContent="Уменьшает движение и переходы интерфейса"; motionMeta.append(mt,md);

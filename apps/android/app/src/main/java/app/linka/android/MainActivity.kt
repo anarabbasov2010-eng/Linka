@@ -67,6 +67,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -207,7 +208,16 @@ internal const val MAX_CAPTURES = 500
 private const val RELEASES_API = "https://api.github.com/repos/anarabbasov2010-eng/Linka/releases/latest"
 private const val NOTIFICATION_CHANNEL = "linka_updates"
 private const val DEFAULT_FOREST_VIDEO = "https://videos.pexels.com/video-files/36928855/36928855-hd_1920_1080_30fps.mp4"
-private const val DEFAULT_MUSIC_URL = "https://d2ol7oe51mr4n9.cloudfront.net/user_3JmiwECXBUAWkApdn0zWkiZ506q/0990a53d-b19a-4abf-98fe-599af0e82bbf.mp3"
+private const val DEFAULT_FOREST_POSTER = "https://images.pexels.com/videos/36928855/free-video-36928855.jpg?fit=crop&w=1920&h=1080&auto=compress&cs=tinysrgb"
+private val FOREST_VIDEO_CANDIDATES = listOf(
+    DEFAULT_FOREST_VIDEO,
+    "https://videos.pexels.com/video-files/30312149/30312149-hd_1920_1080_30fps.mp4",
+    "https://videos.pexels.com/video-files/34381048/34381048-hd_1920_1080_30fps.mp4",
+    "https://videos.pexels.com/video-files/30312148/30312148-hd_1920_1080_30fps.mp4",
+    "https://videos.pexels.com/video-files/36928736/36928736-hd_1920_1080_30fps.mp4",
+    "https://videos.pexels.com/video-files/37426477/37426477-hd_1920_1080_30fps.mp4"
+)
+private const val DEFAULT_MUSIC_URL = "https://d2ol7oe51mr4n9.cloudfront.net/user_3JmiwECXBUAWkApdn0zWkiZ506q/b0a0c0c2-d5e6-4e44-8ffd-90a08e8319f3.mp3"
 private const val ATMOSPHERE_BACKGROUND_URI_KEY = "atmosphere_background_uri"
 private const val ATMOSPHERE_BACKGROUND_TYPE_KEY = "atmosphere_background_type"
 private const val ATMOSPHERE_BACKGROUND_ENABLED_KEY = "atmosphere_background_enabled"
@@ -233,6 +243,7 @@ private data class LinkPreview(val title: String, val description: String, val i
 private class LinkaAmbientVideoView(context: Context) : TextureView(context), TextureView.SurfaceTextureListener {
     private var source: String? = null
     private var wantedPlaying = false
+    private var candidateIndex = 0
     private var prepared = false
     private var player: MediaPlayer? = null
     private var videoSurface: Surface? = null
@@ -246,6 +257,7 @@ private class LinkaAmbientVideoView(context: Context) : TextureView(context), Te
         wantedPlaying = shouldPlay
         if (source != uri) {
             source = uri
+            candidateIndex = 0
             releasePlayer()
             if (isAvailable) preparePlayer()
             return
@@ -255,7 +267,8 @@ private class LinkaAmbientVideoView(context: Context) : TextureView(context), Te
 
     private fun preparePlayer() {
         val texture = surfaceTexture ?: return
-        val uri = source ?: return
+        val requestedUri = source ?: return
+        val uri = if (requestedUri == DEFAULT_FOREST_VIDEO) FOREST_VIDEO_CANDIDATES[candidateIndex.coerceIn(0, FOREST_VIDEO_CANDIDATES.lastIndex)] else requestedUri
         releasePlayer()
         try {
             val surface = Surface(texture)
@@ -271,12 +284,21 @@ private class LinkaAmbientVideoView(context: Context) : TextureView(context), Te
             }
             media.setOnErrorListener { _, _, _ ->
                 prepared = false
+                if (requestedUri == DEFAULT_FOREST_VIDEO && candidateIndex < FOREST_VIDEO_CANDIDATES.lastIndex) {
+                    candidateIndex += 1
+                    releasePlayer()
+                    post { if (source == requestedUri && isAvailable) preparePlayer() }
+                }
                 true
             }
             media.setDataSource(context, Uri.parse(uri))
             media.prepareAsync()
         } catch (_: Exception) {
             releasePlayer()
+            if (requestedUri == DEFAULT_FOREST_VIDEO && candidateIndex < FOREST_VIDEO_CANDIDATES.lastIndex) {
+                candidateIndex += 1
+                post { if (source == requestedUri && isAvailable) preparePlayer() }
+            }
         }
     }
 
@@ -910,17 +932,22 @@ class MainActivity : ComponentActivity() {
         rememberPairingIntent(intent)
         checkForUpdate(true)
         setContent {
-            var theme by remember { mutableStateOf(prefs().getString(THEME_KEY, "dark") ?: "dark") }
-            var accent by remember { mutableStateOf(prefs().getString(ACCENT_KEY, "violet") ?: "violet") }
+            var theme by remember { mutableStateOf("dark") }
+            var accent by remember { mutableStateOf("violet") }
             var language by remember { mutableStateOf(prefs().getString(LANGUAGE_KEY, "") ?: "") }
             var accepted by remember { mutableStateOf(prefs().getString(TERMS_KEY, "") == TERMS_VERSION) }
             var animations by remember { mutableStateOf(prefs().getBoolean(ANIMATIONS_KEY, true) && !android.provider.Settings.Global.getFloat(contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f).equals(0f)) }
-            var ambientAudio by remember { mutableStateOf(prefs().getBoolean(AMBIENT_AUDIO_KEY, false)) }
+            var ambientAudio by remember { mutableStateOf(false) }
             var density by remember { mutableStateOf(prefs().getString(DENSITY_KEY, "standard") ?: "standard") }
-            var effects by remember { mutableStateOf(prefs().getString(EFFECTS_KEY, "balanced") ?: "balanced") }
+            var effects by remember { mutableStateOf("atmosphere") }
             var fontScale by remember { mutableFloatStateOf(prefs().getFloat(FONT_SCALE_KEY, 1f).coerceIn(.9f, 1.2f)) }
             var alerts by remember { mutableStateOf(prefs().getBoolean(UPDATE_ALERTS_KEY, true)) }
             var autoDownload by remember { mutableStateOf(prefs().getBoolean(AUTO_DOWNLOAD_KEY, false)) }
+            LaunchedEffect(Unit) {
+                prefs().edit().putString(THEME_KEY, "dark").putString(ACCENT_KEY, "violet")
+                    .putString(EFFECTS_KEY, "atmosphere").putBoolean(AMBIENT_AUDIO_KEY, false).apply()
+                AmbientAudioEngine.stop()
+            }
             val darkSystem = androidx.compose.foundation.isSystemInDarkTheme()
             val dark = theme == "dark" || theme == "oled" || (theme == "system" && darkSystem)
             val accentColor = when (accent) {
@@ -942,13 +969,13 @@ class MainActivity : ComponentActivity() {
                     sharedText = incomingSharedText, sharedTrigger = incomingSharedToken, pairingTrigger = incomingPairingToken, oauthTrigger = incomingOAuthToken,
                     load = { loadCaptures() }, save = { saveCaptures(it) },
                     copy = { copyText(it) }, open = { openExternal(it) },
-                    theme = theme, setTheme = { theme = it; prefs().edit().putString(THEME_KEY, it).apply() },
-                    accent = accent, setAccent = { accent = it; prefs().edit().putString(ACCENT_KEY, it).apply() },
+                    theme = theme, setTheme = { },
+                    accent = accent, setAccent = { },
                     language = language, setLanguage = { language = it; prefs().edit().putString(LANGUAGE_KEY, it).apply() },
                     animations = animations, setAnimations = { animations = it; prefs().edit().putBoolean(ANIMATIONS_KEY, it).apply() },
-                    ambientAudio = ambientAudio, setAmbientAudio = { ambientAudio = it; prefs().edit().putBoolean(AMBIENT_AUDIO_KEY, it).apply() },
+                    ambientAudio = ambientAudio, setAmbientAudio = { },
                     density = density, setDensity = { density = it; prefs().edit().putString(DENSITY_KEY, it).apply() },
-                    effects = effects, setEffects = { effects = it; prefs().edit().putString(EFFECTS_KEY, it).apply() },
+                    effects = effects, setEffects = { },
                     fontScale = fontScale, setFontScale = { fontScale = it; prefs().edit().putFloat(FONT_SCALE_KEY, it).apply() },
                     alerts = alerts, notificationPermissionGranted = notificationsAllowed, openNotificationSettings = { openNotificationSettings() }, sendTestNotification = { sendTestNotification() }, setAlerts = { enabled ->
                         if (enabled && Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -1308,12 +1335,11 @@ private fun LinkaApp(
     val main = if (dark) DT else LT
     val muted = if (dark) DM else LM
     val context = LocalContext.current
-    val sphereAccent = MaterialTheme.colorScheme.primary
-    LaunchedEffect(ambientAudio) { if (ambientAudio) AmbientAudioEngine.start() else AmbientAudioEngine.stop() }
+    val linkaAccent = MaterialTheme.colorScheme.primary
+    LaunchedEffect(ambientAudio) { AmbientAudioEngine.stop() }
     DisposableEffect(Unit) { onDispose { AmbientAudioEngine.stop() } }
-    val ambientTransition = rememberInfiniteTransition(label = "linka-sphere")
-    val ambientPulse by ambientTransition.animateFloat(initialValue = 0f, targetValue = 1f, animationSpec = infiniteRepeatable(animation = tween(durationMillis = 15_000, easing = LinearEasing), repeatMode = RepeatMode.Reverse), label = "sphere-pulse")
-    val ambientOrbit by ambientTransition.animateFloat(initialValue = 0f, targetValue = 1f, animationSpec = infiniteRepeatable(animation = tween(durationMillis = 32_000, easing = LinearEasing), repeatMode = RepeatMode.Restart), label = "sphere-orbit")
+    val grainTransition = rememberInfiniteTransition(label = "film-grain-drift")
+    val grainDrift by grainTransition.animateFloat(initialValue = 0f, targetValue = 1f, animationSpec = infiniteRepeatable(animation = tween(durationMillis = 48_000, easing = LinearEasing), repeatMode = RepeatMode.Restart), label = "film-grain-motion")
     var captures by remember { mutableStateOf(load()) }
     var draft by remember { mutableStateOf(sharedText) }
     var typingTick by remember { mutableIntStateOf(0) }
@@ -1341,11 +1367,12 @@ private fun LinkaApp(
     var profileDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    val atmospherePrefsMigrated = prefs.getBoolean("atmosphere_theme_v2_migrated", false)
     var atmosphereBackgroundUri by remember { mutableStateOf(prefs.getString(ATMOSPHERE_BACKGROUND_URI_KEY, "") ?: "") }
     var atmosphereBackgroundType by remember { mutableStateOf(prefs.getString(ATMOSPHERE_BACKGROUND_TYPE_KEY, "") ?: "") }
-    var atmosphereBackgroundEnabled by remember { mutableStateOf(prefs.getBoolean(ATMOSPHERE_BACKGROUND_ENABLED_KEY, true)) }
+    var atmosphereBackgroundEnabled by remember { mutableStateOf(if (atmospherePrefsMigrated) prefs.getBoolean(ATMOSPHERE_BACKGROUND_ENABLED_KEY, true) else true) }
     var atmosphereGrainEnabled by remember { mutableStateOf(prefs.getBoolean(ATMOSPHERE_GRAIN_ENABLED_KEY, true)) }
-    var musicEnabled by remember { mutableStateOf(prefs.getBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true)) }
+    var musicEnabled by remember { mutableStateOf(if (atmospherePrefsMigrated) prefs.getBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true) else true) }
     var playerExpanded by remember { mutableStateOf(false) }
     var musicVolume by remember { mutableFloatStateOf(prefs.getFloat(ATMOSPHERE_MUSIC_VOLUME_KEY, .14f).coerceIn(0f, 1f)) }
     val defaultAtmosphereTrack = remember { AtmosphereTrack("linka-default", "как всё заебало..", DEFAULT_MUSIC_URL, true) }
@@ -1363,12 +1390,23 @@ private fun LinkaApp(
         }.getOrDefault(emptyList())
     }
     var musicTracks by remember {
-        mutableStateOf(if (restoredMusicTracks.any { it.id == defaultAtmosphereTrack.id }) restoredMusicTracks
-            else listOf(defaultAtmosphereTrack) + restoredMusicTracks.filterNot { it.builtin })
+        mutableStateOf(listOf(defaultAtmosphereTrack) + restoredMusicTracks.filterNot { it.id == defaultAtmosphereTrack.id || it.builtin })
     }
-    var musicIndex by remember { mutableIntStateOf(prefs.getInt(ATMOSPHERE_MUSIC_INDEX_KEY, 0).coerceAtLeast(0)) }
+    var musicIndex by remember { mutableIntStateOf(if (atmospherePrefsMigrated) prefs.getInt(ATMOSPHERE_MUSIC_INDEX_KEY, 0).coerceAtLeast(0) else 0) }
     var musicPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
     var musicPlaying by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (!atmospherePrefsMigrated) {
+            prefs.edit().putBoolean("atmosphere_theme_v2_migrated", true)
+                .putBoolean(ATMOSPHERE_BACKGROUND_ENABLED_KEY, true)
+                .putBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true)
+                .putBoolean(ATMOSPHERE_GRAIN_ENABLED_KEY, true)
+                .putInt(ATMOSPHERE_MUSIC_INDEX_KEY, 0)
+                .putBoolean(AMBIENT_AUDIO_KEY, false)
+                .apply()
+            AmbientAudioEngine.stop()
+        }
+    }
     val activeMusicTrack = musicTracks.getOrElse(musicIndex.coerceIn(0, musicTracks.lastIndex)) { musicTracks.first() }
     val backgroundSource = atmosphereBackgroundUri.ifBlank { DEFAULT_FOREST_VIDEO }
     fun persistMusicTracks(tracks: List<AtmosphereTrack>) {
@@ -1376,6 +1414,7 @@ private fun LinkaApp(
         tracks.forEach { array.put(JSONObject().put("id", it.id).put("name", it.name).put("uri", it.uri).put("builtin", it.builtin)) }
         prefs.edit().putString(ATMOSPHERE_MUSIC_PLAYLIST_KEY, array.toString()).apply()
     }
+    LaunchedEffect(musicTracks) { persistMusicTracks(musicTracks) }
     fun changeMusicTrack(step: Int) {
         if (musicTracks.size <= 1) {
             runCatching { musicPlayer?.seekTo(0); musicPlayer?.start(); musicPlaying = true }
@@ -1727,13 +1766,17 @@ private fun LinkaApp(
     }
 
     Box(Modifier.fillMaxSize()) {
-        if (atmosphereBackgroundEnabled && theme != "oled") {
+        if (atmosphereBackgroundEnabled) {
             if (atmosphereBackgroundUri.isNotBlank() && atmosphereBackgroundType.startsWith("image/")) {
                 AsyncImage(model = Uri.parse(atmosphereBackgroundUri), contentDescription = null, contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().graphicsLayer { alpha = .25f })
+                    modifier = Modifier.fillMaxSize().graphicsLayer { alpha = .72f })
             } else {
+                if (atmosphereBackgroundUri.isBlank()) {
+                    AsyncImage(model = Uri.parse(DEFAULT_FOREST_POSTER), contentDescription = null, contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().graphicsLayer { alpha = .78f })
+                }
                 AndroidView(
-                    modifier = Modifier.fillMaxSize().graphicsLayer { alpha = .24f },
+                    modifier = Modifier.fillMaxSize().graphicsLayer { alpha = .68f },
                     factory = { viewContext -> LinkaAmbientVideoView(viewContext).apply { tag = backgroundSource; configure(backgroundSource, appInForeground) } },
                     update = { view ->
                         view.tag = backgroundSource
@@ -1742,13 +1785,13 @@ private fun LinkaApp(
                 )
             }
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(
-                Color.Black.copy(alpha = .34f), Color.Black.copy(alpha = .58f), Color.Black.copy(alpha = .88f)
+                Color.Black.copy(alpha = .16f), Color.Black.copy(alpha = .34f), Color.Black.copy(alpha = .62f)
             ))))
             if (atmosphereGrainEnabled && effects != "quiet") {
                 Box(Modifier.fillMaxSize().drawBehind {
                     for (i in 0 until 180) {
-                        val x = (((i * 97) % 997) / 997f) * size.width + ambientOrbit * 12f
-                        val y = (((i * 193) % 991) / 991f) * size.height - ambientOrbit * 5f
+                        val x = (((i * 97) % 997) / 997f) * size.width + grainDrift * 12f
+                        val y = (((i * 193) % 991) / 991f) * size.height - grainDrift * 5f
                         drawCircle(Color.White.copy(alpha = .022f), radius = (i % 3 + 1) * .24f, center = Offset(x % size.width, y.mod(size.height)))
                     }
                 })
@@ -1758,43 +1801,6 @@ private fun LinkaApp(
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets.statusBars,
         bottomBar = {
-            Column(Modifier.fillMaxWidth()) {
-                if (musicTracks.isNotEmpty()) {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-                        color = panel.copy(alpha = .88f),
-                        shape = RoundedCornerShape(18.dp),
-                        border = BorderStroke(1.dp, border.copy(alpha = .75f)),
-                        tonalElevation = 1.dp
-                    ) {
-                        Row(Modifier.fillMaxWidth().clickable { playerExpanded = true }.padding(start = 12.dp, end = 5.dp, top = 7.dp, bottom = 7.dp),
-                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                            Surface(color = sphereAccent.copy(alpha = .14f), shape = RoundedCornerShape(11.dp)) {
-                                Icon(Icons.Outlined.Tune, null, tint = sphereAccent, modifier = Modifier.padding(9.dp).size(18.dp))
-                            }
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                Text(activeMusicTrack.name, color = main, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
-                                Text(if (musicPlaying) "Linka · играет" else if (musicEnabled) "Linka · готово к воспроизведению" else "Linka · музыка выключена",
-                                    color = muted, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                            TextButton(onClick = { changeMusicTrack(-1) }, contentPadding = PaddingValues(horizontal = 5.dp, vertical = 0.dp)) { Text("‹", color = muted, fontSize = 20.sp) }
-                            TextButton(onClick = {
-                                if (!musicEnabled) {
-                                    musicEnabled = true
-                                    prefs.edit().putBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true).apply()
-                                } else if (musicPlaying) {
-                                    runCatching { musicPlayer?.pause() }
-                                    musicPlaying = false
-                                } else {
-                                    runCatching { musicPlayer?.start(); musicPlaying = true }
-                                }
-                            }, contentPadding = PaddingValues(horizontal = 5.dp, vertical = 0.dp)) {
-                                Text(if (musicPlaying) "Ⅱ" else "▶", color = main, fontSize = 14.sp)
-                            }
-                            TextButton(onClick = { changeMusicTrack(1) }, contentPadding = PaddingValues(horizontal = 5.dp, vertical = 0.dp)) { Text("›", color = muted, fontSize = 20.sp) }
-                        }
-                    }
-                }
                 NavigationBar(modifier = Modifier.background(Brush.verticalGradient(listOf(Color.Transparent, panel.copy(alpha = .76f)))), containerColor = Color.Transparent, tonalElevation = 0.dp, windowInsets = WindowInsets.navigationBars) {
                 val items = listOf(
                     Triple(0, Icons.Outlined.Home, tr(lang, "home")),
@@ -1807,14 +1813,13 @@ private fun LinkaApp(
                     val iconScale by androidx.compose.animation.core.animateFloatAsState(targetValue = if (selected) 1.08f else 1f, animationSpec = spring(dampingRatio = .58f, stiffness = 520f), label = "nav-impact-$id")
                     NavigationBarItem(selected = selected, onClick = { tab = id },
                         icon = {
-                            Box(Modifier.size(44.dp, 30.dp).graphicsLayer { scaleX = iconScale; scaleY = iconScale }.background(if (selected) sphereAccent.copy(alpha = .20f) else Color.Transparent, CircleShape), contentAlignment = Alignment.Center) {
+                            Box(Modifier.size(44.dp, 30.dp).graphicsLayer { scaleX = iconScale; scaleY = iconScale }.background(if (selected) linkaAccent.copy(alpha = .20f) else Color.Transparent, CircleShape), contentAlignment = Alignment.Center) {
                                 Icon(icon, contentDescription = label, modifier = Modifier.size(21.dp))
                             }
                         },
                         label = { Text(label, fontSize = 10.sp * fontScale, maxLines = 1) }, alwaysShowLabel = true,
-                        colors = androidx.compose.material3.NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent, selectedIconColor = sphereAccent, unselectedIconColor = muted, selectedTextColor = main, unselectedTextColor = muted))
+                        colors = androidx.compose.material3.NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent, selectedIconColor = linkaAccent, unselectedIconColor = muted, selectedTextColor = main, unselectedTextColor = muted))
                 }
-            }
             }
         }
     ) { padding ->
@@ -1836,52 +1841,8 @@ private fun LinkaApp(
                 } else fadeIn(tween(durationMillis = 90)) togetherWith fadeOut(tween(durationMillis = 90))
             }, label = "linka-page"
         ) { page ->
-            Column(Modifier.fillMaxSize().background(Color.Transparent).drawBehind {
-                if (theme != "oled" && effects != "quiet" && animations) {
-                    val orbitAngle = ambientOrbit * (2.0 * Math.PI)
-                    val center = Offset(
-                        size.width * (.52f + .018f * kotlin.math.sin(orbitAngle).toFloat()),
-                        size.height * (.13f + .009f * kotlin.math.cos(orbitAngle).toFloat())
-                    )
-                    val radius = size.width * (.265f + .014f * ambientPulse)
-                    val strength = if (effects == "atmosphere") .19f else .10f
-                    val glowRadius = radius * 1.85f
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            listOf(sphereAccent.copy(alpha = strength * .68f), Color(0xFF7564B5).copy(alpha = strength * .34f), Color.Transparent),
-                            center = center, radius = glowRadius
-                        ), radius = glowRadius, center = center
-                    )
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            listOf(sphereAccent.copy(alpha = strength + .025f * ambientPulse), Color(0xFF4B3A7A).copy(alpha = strength * .74f), Color(0xFF181321).copy(alpha = strength * .35f), Color.Transparent),
-                            center = center, radius = radius
-                        ), radius = radius, center = center
-                    )
-                    val highlight = Offset(center.x - radius * .32f, center.y - radius * .34f)
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            listOf(Color.White.copy(alpha = .075f), sphereAccent.copy(alpha = .035f), Color.Transparent),
-                            center = highlight, radius = radius * .62f
-                        ), radius = radius * .62f, center = highlight
-                    )
-                    if (effects == "atmosphere") {
-                        drawCircle(
-                            color = sphereAccent.copy(alpha = .055f + .012f * ambientPulse),
-                            radius = radius * 1.15f,
-                            center = center,
-                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.1.dp.toPx())
-                        )
-                        drawCircle(
-                            color = Color.White.copy(alpha = .018f),
-                            radius = radius * .91f,
-                            center = center,
-                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = .7.dp.toPx())
-                        )
-                    }
-                }
-            }.verticalScroll(rememberScrollState()).imePadding()
-                .padding(horizontal = 18.dp).padding(top = 14.dp, bottom = 28.dp),
+            Column(Modifier.fillMaxSize().background(Color.Transparent).verticalScroll(rememberScrollState()).imePadding()
+                .padding(horizontal = 18.dp).padding(top = 14.dp, bottom = 100.dp),
                 verticalArrangement = Arrangement.spacedBy(when (density) { "compact" -> 10.dp; "spacious" -> 19.dp; else -> 14.dp })) {
                 Header(lang, main, muted, panel, border) { tab = 3 }
                 when (page) {
@@ -2055,31 +2016,16 @@ private fun LinkaApp(
                     else -> {
                         Text(tr(lang, "settings"), color = main, fontSize = 28.sp * fontScale, fontWeight = FontWeight.Medium, letterSpacing = (-1).sp)
                         Text(tr(lang, "manage"), color = muted, fontSize = 12.sp * fontScale)
-                        SettingsGroup(tr(lang, "appearance"), panel, border, main) {
-                            Text(tr(lang, "appearance"), color = main, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                            Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                                listOf("dark" to tr(lang, "themeDark"), "oled" to "OLED Black", "light" to tr(lang, "themeLight"), "system" to tr(lang, "themeSystem")).forEach { (v, label) ->
-                                    FilterChip(selected = theme == v, onClick = { setTheme(v) }, label = { Text(label, fontSize = 11.sp) })
-                                }
-                            }
-                            Text(if (lang == "ru") "Акцентный цвет" else if (lang == "az") "Vurğu rəngi" else if (lang == "tr") "Vurgu rengi" else "Accent color", color = muted, fontSize = 11.sp)
-                            Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                listOf("violet" to "Violet", "blue" to "Blue", "mint" to "Mint", "rose" to "Rose").forEach { (v, label) ->
-                                    FilterChip(selected = accent == v, onClick = { setAccent(v) }, label = { Text(label, fontSize = 10.sp) })
-                                }
-                            }
+                        SettingsGroup(if (lang == "ru") "Основные параметры" else if (lang == "az") "Əsas parametrlər" else if (lang == "tr") "Temel ayarlar" else "General settings", panel, border, main) {
                             SettingLine(Icons.Outlined.Language, tr(lang, "language"), languages.first { it.first == lang }.second, main, muted) { languageDialog = true }
                             SettingSwitch(tr(lang, "animations"), animations, setAnimations, main, muted)
-                            SettingSwitch(tr(lang, "ambientAudio"), ambientAudio, setAmbientAudio, main, muted)
-                            Text(if (lang == "ru") "Интенсивность эффектов" else if (lang == "az") "Effektlərin intensivliyi" else if (lang == "tr") "Efekt yoğunluğu" else "Visual effects", color = muted, fontSize = 11.sp)
-                            Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                listOf("quiet" to (if (lang == "ru") "Тихо" else if (lang == "az") "Sakit" else if (lang == "tr") "Sakin" else "Quiet"), "balanced" to (if (lang == "ru") "Баланс" else if (lang == "az") "Balans" else if (lang == "tr") "Dengeli" else "Balanced"), "atmosphere" to (if (lang == "ru") "Атмосфера" else if (lang == "az") "Atmosfer" else if (lang == "tr") "Atmosfer" else "Atmosphere")).forEach { (v, label) ->
-                                    FilterChip(selected = effects == v, onClick = { setEffects(v) }, label = { Text(label, fontSize = 10.sp) })
-                                }
-                            }
                             Text(if (lang == "ru") "Плотность интерфейса" else if (lang == "az") "İnterfeys sıxlığı" else if (lang == "tr") "Arayüz yoğunluğu" else "Interface density", color = muted, fontSize = 11.sp)
                             Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                listOf("compact" to (if (lang == "ru") "Компактно" else if (lang == "az") "Yığcam" else if (lang == "tr") "Kompakt" else "Compact"), "standard" to (if (lang == "ru") "Стандарт" else if (lang == "az") "Standart" else if (lang == "tr") "Standart" else "Standard"), "spacious" to (if (lang == "ru") "Свободно" else if (lang == "az") "Geniş" else if (lang == "tr") "Geniş" else "Spacious")).forEach { (v, label) ->
+                                listOf(
+                                    "compact" to (if (lang == "ru") "Компактно" else if (lang == "az") "Yığcam" else if (lang == "tr") "Kompakt" else "Compact"),
+                                    "standard" to (if (lang == "ru") "Стандарт" else if (lang == "az") "Standart" else if (lang == "tr") "Standart" else "Standard"),
+                                    "spacious" to (if (lang == "ru") "Свободно" else if (lang == "az") "Geniş" else if (lang == "tr") "Geniş" else "Spacious")
+                                ).forEach { (v, label) ->
                                     FilterChip(selected = density == v, onClick = { setDensity(v) }, label = { Text(label, fontSize = 10.sp) })
                                 }
                             }
@@ -2205,6 +2151,49 @@ private fun LinkaApp(
             }
         }
     }
+    if (musicTracks.isNotEmpty()) {
+        Surface(
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 10.dp, bottom = 82.dp).widthIn(max = 240.dp),
+            color = panel.copy(alpha = .94f),
+            shape = RoundedCornerShape(17.dp),
+            border = BorderStroke(1.dp, border.copy(alpha = .88f)),
+            shadowElevation = 8.dp
+        ) {
+            Row(
+                Modifier.fillMaxWidth().clickable { playerExpanded = true }.padding(start = 8.dp, end = 4.dp, top = 5.dp, bottom = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Surface(color = linkaAccent.copy(alpha = .15f), shape = RoundedCornerShape(9.dp)) {
+                    Icon(Icons.Outlined.Tune, null, tint = linkaAccent, modifier = Modifier.padding(7.dp).size(16.dp))
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(activeMusicTrack.name, color = main, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
+                    Text(if (musicPlaying) "Linka · играет" else if (musicEnabled) "Тихий плейлист" else "Музыка выключена",
+                        color = muted, fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                IconButton(onClick = { changeMusicTrack(-1) }, modifier = Modifier.size(25.dp)) {
+                    Text("‹", color = muted, fontSize = 18.sp)
+                }
+                IconButton(onClick = {
+                    if (!musicEnabled) {
+                        musicEnabled = true
+                        prefs.edit().putBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true).apply()
+                    } else if (musicPlaying) {
+                        runCatching { musicPlayer?.pause() }
+                        musicPlaying = false
+                    } else {
+                        runCatching { musicPlayer?.start(); musicPlaying = true }
+                    }
+                }, modifier = Modifier.size(27.dp)) {
+                    Text(if (musicPlaying) "Ⅱ" else "▶", color = main, fontSize = 12.sp)
+                }
+                IconButton(onClick = { changeMusicTrack(1) }, modifier = Modifier.size(25.dp)) {
+                    Text("›", color = muted, fontSize = 18.sp)
+                }
+            }
+        }
+    }
     }
 
     if (playerExpanded) AlertDialog(
@@ -2235,7 +2224,7 @@ private fun LinkaApp(
                 Text(if (lang == "ru") "ПЛЕЙЛИСТ" else "PLAYLIST", color = muted, fontSize = 10.sp, letterSpacing = 1.2.sp)
                 musicTracks.forEachIndexed { index, item ->
                     TextButton(onClick = { musicIndex = index; prefs.edit().putInt(ATMOSPHERE_MUSIC_INDEX_KEY, index).putBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true).apply(); musicEnabled = true }, modifier = Modifier.fillMaxWidth()) {
-                        Text((if (index == musicIndex) "♫  " else (index + 1).toString() + "  ") + item.name, color = if (index == musicIndex) sphereAccent else muted,
+                        Text((if (index == musicIndex) "♫  " else (index + 1).toString() + "  ") + item.name, color = if (index == musicIndex) linkaAccent else muted,
                             fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }

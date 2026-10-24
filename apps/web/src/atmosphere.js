@@ -1,5 +1,14 @@
-const DEFAULT_TRACK={id:"linka-provided-track",name:"как всё заебало..",artist:"Твой трек",src:"https://d2ol7oe51mr4n9.cloudfront.net/user_3JmiwECXBUAWkApdn0zWkiZ506q/0990a53d-b19a-4abf-98fe-599af0e82bbf.mp3"};
+const DEFAULT_TRACK={id:"linka-provided-track",name:"как всё заебало..",artist:"Твой MP3",src:"https://d2ol7oe51mr4n9.cloudfront.net/user_3JmiwECXBUAWkApdn0zWkiZ506q/b0a0c0c2-d5e6-4e44-8ffd-90a08e8319f3.mp3"};
 const DEFAULT_VIDEO="https://videos.pexels.com/video-files/36928855/36928855-hd_1920_1080_30fps.mp4";
+const FOREST_VIDEO_CANDIDATES=[
+  DEFAULT_VIDEO,
+  "https://videos.pexels.com/video-files/30312149/30312149-hd_1920_1080_30fps.mp4",
+  "https://videos.pexels.com/video-files/34381048/34381048-hd_1920_1080_30fps.mp4",
+  "https://videos.pexels.com/video-files/30312148/30312148-hd_1920_1080_30fps.mp4",
+  "https://videos.pexels.com/video-files/36928736/36928736-hd_1920_1080_30fps.mp4",
+  "https://videos.pexels.com/video-files/37426477/37426477-hd_1920_1080_30fps.mp4"
+];
+const DEFAULT_FOREST_POSTER="https://images.pexels.com/videos/36928855/free-video-36928855.jpg?fit=crop&w=1920&h=1080&auto=compress&cs=tinysrgb";
 const DB_NAME="linka-atmosphere-v1", STORE="media", PREFIX="linka.atmosphere.";
 const $=(s,r=document)=>r.querySelector(s);
 const read=(k,d)=>{try{const v=localStorage.getItem(PREFIX+k);return v==null?d:JSON.parse(v)}catch{return d}};
@@ -16,11 +25,11 @@ function addStyles(){if($("#linka-atmosphere-styles"))return;const s=document.cr
 '#linka-atmosphere{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;background:#09090d;isolation:isolate}',
 '#linka-atmosphere video,#linka-atmosphere img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transform:scale(1.04);filter:saturate(.72) contrast(1.04);transition:opacity 1.8s ease;animation:linka-forest 78s ease-in-out infinite alternate}',
 '#linka-atmosphere img{display:none}',
-'#linka-atmosphere .veil{position:absolute;inset:0;background:linear-gradient(180deg,rgba(7,6,13,.48),rgba(6,6,10,.73) 48%,rgba(4,4,7,.94)),radial-gradient(ellipse at 50% 15%,rgba(174,145,201,.16),transparent 50%)}',
+'#linka-atmosphere .veil{position:absolute;inset:0;background:linear-gradient(180deg,rgba(7,6,13,.20),rgba(6,6,10,.36) 48%,rgba(4,4,7,.62)),radial-gradient(ellipse at 52% 14%,rgba(188,151,128,.075),transparent 55%)}',
 '#linka-atmosphere .grain{position:absolute;inset:-40%;opacity:.026;background-image:url("data:image/svg+xml,%3Csvg viewBox=%270 0 180 180%27 xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cfilter id=%27n%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.8%27 numOctaves=%273%27 stitchTiles=%27stitch%27/%3E%3C/filter%3E%3Crect width=%27100%25%27 height=%27100%25%27 filter=%27url(%23n)%27 opacity=%27.8%27/%3E%3C/svg%3E");animation:linka-grain .24s steps(2) infinite}',
 '#linka-atmosphere .wind{position:absolute;inset:-15%;opacity:.23;background:radial-gradient(ellipse at 20% 45%,rgba(153,157,186,.09),transparent 50%),radial-gradient(ellipse at 85% 60%,rgba(135,112,169,.08),transparent 45%);animation:linka-wind 52s ease-in-out infinite alternate}',
-'#linka-atmosphere .ready{opacity:.66}#linka-atmosphere.disabled video,#linka-atmosphere.disabled img{opacity:0!important}#linka-atmosphere.no-grain .grain{display:none}',
-'.shell{position:relative;z-index:1}',
+'#linka-atmosphere .ready{opacity:.78!important}#linka-atmosphere.disabled video,#linka-atmosphere.disabled img{opacity:0!important}#linka-atmosphere.no-grain .grain{display:none}',
+'.shell{position:relative;z-index:1;background:transparent}html,body{background:#09090b!important;color-scheme:dark!important}body{isolation:isolate!important}body::before,body::after,.ambient,.orb{display:none!important;content:none!important}',
 '.linka-player-dock{position:fixed;z-index:42;right:20px;bottom:20px;display:flex;align-items:center;gap:9px;width:min(294px,calc(100vw - 26px));padding:9px 10px;border:1px solid rgba(240,235,255,.15);border-radius:18px;background:rgba(17,16,23,.8);box-shadow:0 16px 48px #0004,inset 0 1px #fff0a;backdrop-filter:blur(24px);color:#f5f3fa;transition:transform .45s cubic-bezier(.2,.8,.2,1),background .35s;cursor:pointer}',
 '.linka-player-dock:hover{transform:translateY(-3px);background:rgba(23,21,31,.92)}.linka-player-art{width:38px;height:38px;flex:0 0 38px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(145deg,#bca8ff3b,#40364d70);color:#d9d0ff}.linka-player-art svg{width:20px;height:20px}',
 '.linka-player-track{min-width:0;flex:1;display:grid;gap:3px;text-align:left}.linka-player-track strong{font-size:11px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.linka-player-track span{font-size:9px;color:#a8a3b2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
@@ -39,7 +48,46 @@ function addStyles(){if($("#linka-atmosphere-styles"))return;const s=document.cr
 '@media(max-width:700px){.linka-player-dock{right:12px;bottom:82px;width:min(270px,calc(100vw - 24px));padding:8px}.linka-player-art{width:34px;height:34px;flex-basis:34px}.linka-player-window,.linka-atmosphere-settings{padding:15px}.linka-player-panel{padding:8px}}@media(prefers-reduced-motion:reduce){#linka-atmosphere *, .linka-player-dock,.linka-player-panel,.linka-player-window,.linka-player-disc,.linka-type-letter{animation:none!important;transition:none!important;filter:none!important}.linka-player-dock,.linka-player-panel,.linka-player-window{transform:none!important}}'
 ].join("\n");document.head.append(s)}
 function buildBackground(){const layer=document.createElement("div");layer.id="linka-atmosphere";layer.setAttribute("aria-hidden","true");layer.innerHTML='<video class="linka-atmosphere-video" playsinline muted loop preload="metadata"></video><img class="linka-atmosphere-image" alt=""><div class="veil"></div><div class="grain"></div><div class="wind"></div>';document.body.prepend(layer);return layer}
-async function loadBackground(){const layer=$("#linka-atmosphere"),video=$("video",layer),image=$("img",layer),saved=read("background",null);function defaultForest(){layer.classList.remove("custom");image.removeAttribute("src");image.style.display="none";image.classList.remove("ready");video.style.display="block";video.src=DEFAULT_VIDEO;video.oncanplay=()=>video.classList.add("ready");video.onerror=()=>video.classList.remove("ready");video.play().catch(()=>{})}if(saved?.id){const rec=await getMedia(saved.id);if(rec?.blob){const url=URL.createObjectURL(rec.blob);state.background={...saved,url};layer.classList.add("custom");if((rec.type||"").startsWith("image/")){video.pause();video.style.display="none";image.style.display="block";image.src=url;image.onload=()=>image.classList.add("ready")}else{image.style.display="none";video.style.display="block";video.src=url;video.oncanplay=()=>video.classList.add("ready");video.play().catch(()=>{})}return}}defaultForest()}
+async function loadBackground(){
+  const layer=$("#linka-atmosphere"),video=$("video",layer),image=$("img",layer),saved=read("background",null);
+  function defaultForest(){
+    layer.classList.remove("custom");
+    image.removeAttribute("src");image.style.display="none";image.classList.remove("ready");
+    video.style.display="block";video.muted=true;video.loop=true;video.playsInline=true;video.preload="auto";
+    let attempt=0;
+    const useNextVideo=()=>{
+      video.classList.remove("ready");
+      video.onerror=()=>{
+        attempt++;
+        if(attempt<FOREST_VIDEO_CANDIDATES.length){useNextVideo();return}
+        video.pause();video.removeAttribute("src");video.style.display="none";
+        image.style.display="block";image.src=DEFAULT_FOREST_POSTER;
+        image.onload=()=>image.classList.add("ready");
+        image.onerror=()=>{image.classList.remove("ready");layer.classList.add("poster-unavailable")};
+      };
+      video.onloadeddata=()=>{video.classList.add("ready");image.style.display="none"};
+      video.oncanplay=()=>{video.classList.add("ready");image.style.display="none"};
+      video.src=FOREST_VIDEO_CANDIDATES[attempt];video.load();
+      video.play().catch(()=>{});
+    };
+    useNextVideo();
+  }
+  if(saved?.id){
+    const rec=await getMedia(saved.id);
+    if(rec?.blob){
+      const url=URL.createObjectURL(rec.blob);state.background={...saved,url};layer.classList.add("custom");
+      if((rec.type||"").startsWith("image/")){
+        video.pause();video.removeAttribute("src");video.style.display="none";
+        image.style.display="block";image.src=url;image.onload=()=>image.classList.add("ready");
+      }else{
+        image.style.display="none";video.style.display="block";video.muted=true;video.loop=true;video.preload="auto";video.src=url;
+        video.oncanplay=()=>video.classList.add("ready");video.onloadeddata=()=>video.classList.add("ready");video.onerror=()=>video.classList.remove("ready");video.load();video.play().catch(()=>{});
+      }
+      return;
+    }
+  }
+  defaultForest();
+}
 function track(){return state.playlist[state.index]||DEFAULT_TRACK}
 function source(t){return t?.localId?(state.urls.get(t.localId)||""):t?.src||""}
 function time(n){if(!Number.isFinite(n)||n<0)return"0:00";return Math.floor(n/60)+":"+String(Math.floor(n%60)).padStart(2,"0")}
@@ -56,6 +104,58 @@ const panel=document.createElement("div");panel.className="linka-player-panel";p
 function openSettings(){const layer=document.createElement("div");layer.className="linka-player-panel open";layer.style.zIndex="60";const panel=document.createElement("section");panel.className="linka-atmosphere-settings";panel.setAttribute("role","dialog");panel.setAttribute("aria-modal","true");panel.innerHTML='<div class="linka-atmosphere-title-row"><div><h2>Атмосфера Linka</h2><small>Сумеречный лес, ветер и плёночное зерно.</small></div><button class="linka-player-button" data-close type="button" aria-label="Закрыть">'+icon("close")+'</button></div><p>Фон и музыка настраиваются отдельно на каждом устройстве. Сохранённые записи остаются нетронутыми.</p><div class="linka-atmosphere-setting"><div class="linka-atmosphere-setting-copy"><strong>Лесное видео</strong><span>Медленное движение и затемнение для читаемости.</span></div><button class="linka-atmosphere-toggle" data-toggle="video" type="button"><i></i></button></div><div class="linka-atmosphere-setting"><div class="linka-atmosphere-setting-copy"><strong>Едва заметное зерно</strong><span>Мягкая плёночная текстура без резких помех.</span></div><button class="linka-atmosphere-toggle" data-toggle="grain" type="button"><i></i></button></div><div class="linka-atmosphere-setting"><div class="linka-atmosphere-setting-copy"><strong>Музыка</strong><span>Твой трек по умолчанию. Громкость можно менять в плеере.</span></div><button class="linka-atmosphere-toggle" data-toggle="music" type="button"><i></i></button></div><div class="linka-atmosphere-actions"><button data-pick>Выбрать фото или видео</button><button data-reset>Вернуть лес</button><button data-player>Плеер и плейлист</button></div><div class="linka-atmosphere-state" role="status"></div><input data-bg-picker type="file" accept="image/*,video/mp4,video/webm,video/quicktime" hidden></section>';layer.append(panel);document.body.append(layer);const close=()=>layer.remove();layer.addEventListener("click",e=>{if(e.target===layer||e.target.closest("[data-close]"))close()});panel.querySelectorAll("[data-toggle]").forEach(b=>{const key=b.dataset.toggle;const val=key==="video"?state.video:key==="grain"?state.grain:state.music;b.setAttribute("aria-pressed",String(val));b.addEventListener("click",()=>{const next=!(key==="video"?state.video:key==="grain"?state.grain:state.music);if(key==="video"){state.video=next;write("video",next);$("#linka-atmosphere")?.classList.toggle("disabled",!next);if(next)$("#linka-atmosphere video")?.play().catch(()=>{});else $("#linka-atmosphere video")?.pause()}else if(key==="grain"){state.grain=next;write("grain",next);$("#linka-atmosphere")?.classList.toggle("no-grain",!next)}else{state.music=next;write("music",next);if(!next){state.audio.pause();playing(false)}else{void togglePlay()}}b.setAttribute("aria-pressed",String(next))})});$("[data-pick]",panel).addEventListener("click",()=>$("[data-bg-picker]",panel).click());$("[data-player]",panel).addEventListener("click",openPlayer);$("[data-reset]",panel).addEventListener("click",async()=>{if(state.background?.url)URL.revokeObjectURL(state.background.url);state.background=null;write("background",null);try{await db("background","readwrite",s=>s.delete("background"))}catch{}await loadBackground();$(".linka-atmosphere-state",panel).textContent="Вернул лес на закате."});$("[data-bg-picker]",panel).addEventListener("change",async e=>{const file=e.target.files?.[0];if(!file)return;const status=$(".linka-atmosphere-state",panel);try{if(!file.type.startsWith("image/")&&!file.type.startsWith("video/"))throw new Error("Выбери фото или видео.");await putMedia("background",file,"background");write("background",{id:"background",name:file.name,type:file.type});if(state.background?.url)URL.revokeObjectURL(state.background.url);state.background={id:"background",name:file.name,type:file.type};await loadBackground();status.textContent="Фон сохранён локально на этом устройстве."}catch(err){status.textContent=err.message||"Не удалось сохранить фон."}finally{e.target.value=""}})}
 function settingsTrigger(){const s=$("#settings-button");if(!s||$("#linka-atmosphere-settings-trigger"))return;const b=btn("Настройки атмосферы","music");b.id="linka-atmosphere-settings-trigger";b.style.width="38px";b.style.height="38px";b.addEventListener("click",openSettings);s.insertAdjacentElement("beforebegin",b)}
 function typingAnimation(){const ta=$("#capture-text");if(!ta||ta.dataset.linkaTyping)return;ta.dataset.linkaTyping="true";const wrap=document.createElement("div");wrap.className="linka-type-stage";ta.parentNode.insertBefore(wrap,ta);wrap.append(ta);const mirror=document.createElement("div");mirror.className="linka-type-mirror";mirror.setAttribute("aria-hidden","true");const computed=getComputedStyle(ta);["fontFamily","fontSize","fontWeight","fontStyle","lineHeight","letterSpacing","textAlign","textIndent","paddingTop","paddingRight","paddingBottom","paddingLeft","boxSizing"].forEach(key=>mirror.style[key]=computed[key]);wrap.prepend(mirror);let previous="";const render=(from)=>{mirror.replaceChildren();if(!ta.value){mirror.style.opacity="0";return}mirror.style.opacity="";const f=document.createDocumentFragment();[...ta.value].forEach((ch,i)=>{const sp=document.createElement("span");sp.textContent=ch;if(i>=from){sp.className="linka-type-letter";sp.style.animationDelay=Math.min((i-from)*8,100)+"ms"}f.append(sp)});mirror.append(f);mirror.scrollTop=ta.scrollTop};ta.addEventListener("input",()=>{if(!ta.value){wrap.classList.remove("is-typing");mirror.style.opacity="0";previous="";return}wrap.classList.add("is-typing");let common=0;while(common<Math.min(previous.length,ta.value.length)&&previous[common]===ta.value[common])common++;const from=ta.value.length>=previous.length?common:ta.value.length;render(from);previous=ta.value});ta.addEventListener("focus",()=>{if(ta.value){wrap.classList.add("is-typing");render(ta.value.length)}});ta.addEventListener("blur",()=>wrap.classList.remove("is-typing"));ta.addEventListener("scroll",()=>mirror.scrollTop=ta.scrollTop)}
-async function initAudio(){state.audio=document.createElement("audio");state.audio.preload="metadata";state.audio.addEventListener("play",()=>playing(true));state.audio.addEventListener("pause",()=>playing(false));state.audio.addEventListener("ended",()=>void loadTrack(state.index+1,true));state.audio.addEventListener("timeupdate",renderPlayer);state.audio.addEventListener("loadedmetadata",renderPlayer);state.volume=Number(read("volume",.14));if(!Number.isFinite(state.volume))state.volume=.14;state.playlist=read("playlist",[DEFAULT_TRACK]);if(!Array.isArray(state.playlist)||!state.playlist.length)state.playlist=[DEFAULT_TRACK];if(!state.playlist.some(t=>t.id===DEFAULT_TRACK.id))state.playlist.unshift(DEFAULT_TRACK);state.index=Math.max(0,Math.min(Number(read("index",0))||0,state.playlist.length-1));for(const t of state.playlist){if(t.localId&&!state.urls.has(t.localId)){const rec=await getMedia(t.localId);if(rec?.blob)state.urls.set(t.localId,URL.createObjectURL(rec.blob))}}const input=document.createElement("input");input.type="file";input.accept="audio/*";input.multiple=true;input.hidden=true;input.id="linka-atmosphere-audio-picker";input.addEventListener("change",async e=>{const files=Array.from(e.target.files||[]);try{let added=0;for(const f of files){if(!f.type.startsWith("audio/"))continue;const id=uid(),localId="track:"+id;await putMedia(localId,f,"audio");state.urls.set(localId,URL.createObjectURL(f));state.playlist.push({id,localId,name:f.name.replace(/\.[a-z0-9]{1,5}$/i,""),artist:"Локальный файл"});added++}write("playlist",state.playlist);renderPlayer();toast("Добавлено треков: "+added)}catch(err){toast(err.message||"Не удалось добавить треки")}finally{e.target.value=""}});document.body.append(input);await loadTrack(state.index,state.music)}
+async function initAudio(){
+  state.audio=document.createElement("audio");
+  state.audio.preload="metadata";
+  
+  state.audio.addEventListener("play",()=>playing(true));
+  state.audio.addEventListener("pause",()=>playing(false));
+  state.audio.addEventListener("ended",()=>void loadTrack(state.index+1,true));
+  state.audio.addEventListener("timeupdate",renderPlayer);
+  state.audio.addEventListener("loadedmetadata",renderPlayer);
+  state.audio.addEventListener("error",()=>{playing(false);toast("Не удалось загрузить музыку. Добавь MP3 с устройства или проверь соединение.")});
+  state.volume=Number(read("volume",.14));if(!Number.isFinite(state.volume))state.volume=.14;
+  const savedPlaylist=read("playlist",[]);
+  const userTracks=Array.isArray(savedPlaylist)?savedPlaylist.filter(t=>t&&t.id!==DEFAULT_TRACK.id):[];
+  state.playlist=[DEFAULT_TRACK,...userTracks];
+  state.index=0;
+  write("playlist",state.playlist);write("index",0);
+  for(const t of state.playlist){
+    if(t.localId&&!state.urls.has(t.localId)){const rec=await getMedia(t.localId);if(rec?.blob)state.urls.set(t.localId,URL.createObjectURL(rec.blob))}
+  }
+  const input=document.createElement("input");input.type="file";input.accept="audio/*";input.multiple=true;input.hidden=true;input.id="linka-atmosphere-audio-picker";
+  input.addEventListener("change",async e=>{
+    const files=Array.from(e.target.files||[]);
+    try{
+      let added=0;
+      for(const file of files){
+        if(!file.type.startsWith("audio/"))continue;
+        const id=uid(),localId="track:"+id;
+        await putMedia(localId,file,"audio");state.urls.set(localId,URL.createObjectURL(file));
+        state.playlist.push({id,localId,name:file.name.replace(/\.[a-z0-9]{1,5}$/i,""),artist:"Локальный файл"});added++;
+      }
+      write("playlist",state.playlist);renderPlayer();toast("Добавлено треков: "+added);
+    }catch(err){toast(err.message||"Не удалось добавить треки")}
+    finally{e.target.value=""}
+  });
+  document.body.append(input);
+  await loadTrack(state.index,false);
+}
+function armMusicStart(){
+  const tryStart=()=>{
+    if(!state.music||state.playing||!state.audio||!state.audio.src)return;
+    state.audio.play().then(()=>playing(true)).catch(()=>{});
+  };
+  const onGesture=event=>{
+    document.removeEventListener("pointerdown",onGesture,true);
+    document.removeEventListener("keydown",onGesture,true);
+    if(event.target?.closest?.(".linka-player-dock,.linka-player-panel,.linka-atmosphere-settings"))return;
+    tryStart();
+  };
+  document.addEventListener("pointerdown",onGesture,true);
+  document.addEventListener("keydown",onGesture,true);
+}
 export function openAtmosphereSettings(){openSettings()}
-export async function initLinkaAtmosphere(){if(state.initialized)return;state.initialized=true;addStyles();state.reduced=matchMedia?.("(prefers-reduced-motion: reduce)")?.matches||false;state.video=read("video",true)!==false;state.grain=read("grain",true)!==false;state.music=read("music",true)!==false;state.db=await openDb();buildBackground();$("#linka-atmosphere").classList.toggle("disabled",!state.video);$("#linka-atmosphere").classList.toggle("no-grain",!state.grain);await loadBackground();createPlayer();await initAudio();settingsTrigger();typingAnimation();document.addEventListener("visibilitychange",()=>{const v=$("#linka-atmosphere video");if(document.hidden){v?.pause();state.audio?.pause()}else if(state.video&&!state.reduced)v?.play().catch(()=>{})});window.addEventListener("linka:atmosphere-open",openSettings);document.addEventListener("keydown",e=>{if(e.key==="Escape")closePlayer()});window.addEventListener("beforeunload",()=>{state.audio?.pause();state.urls.forEach(u=>URL.revokeObjectURL(u));if(state.background?.url)URL.revokeObjectURL(state.background.url)});renderPlayer()}
+export async function initLinkaAtmosphere(){if(state.initialized)return;state.initialized=true;addStyles();state.reduced=matchMedia?.("(prefers-reduced-motion: reduce)")?.matches||false;const storedThemeVersion=read("themeVersion","");
+  if(storedThemeVersion!=="twilight-v2"){write("video",true);write("music",true);write("themeVersion","twilight-v2")}
+  state.video=read("video",true)!==false;state.grain=read("grain",true)!==false;state.music=read("music",true)!==false;state.db=await openDb();buildBackground();$("#linka-atmosphere").classList.toggle("disabled",!state.video);$("#linka-atmosphere").classList.toggle("no-grain",!state.grain);await loadBackground();createPlayer();await initAudio();armMusicStart();settingsTrigger();typingAnimation();document.addEventListener("visibilitychange",()=>{const v=$("#linka-atmosphere video");if(document.hidden){v?.pause();state.audio?.pause()}else if(state.video&&!state.reduced)v?.play().catch(()=>{})});window.addEventListener("linka:atmosphere-open",openSettings);document.addEventListener("keydown",e=>{if(e.key==="Escape")closePlayer()});window.addEventListener("beforeunload",()=>{state.audio?.pause();state.urls.forEach(u=>URL.revokeObjectURL(u));if(state.background?.url)URL.revokeObjectURL(state.background.url)});renderPlayer()}

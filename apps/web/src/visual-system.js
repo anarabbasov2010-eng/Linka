@@ -6,7 +6,6 @@ const ACCENTS = {
   mint:   { dark: "#8FE3CF", light: "#237A68", glowDark: "rgba(92,220,188,.11)", glowLight: "rgba(35,122,104,.08)" },
   rose:   { dark: "#FFB6D2", light: "#B14E78", glowDark: "rgba(255,145,191,.11)", glowLight: "rgba(177,78,120,.08)" }
 };
-const THEMES = ["dark", "oled", "light", "system"];
 const DENSITIES = ["compact", "standard", "spacious"];
 const EFFECTS = ["quiet", "balanced", "atmosphere"];
 
@@ -25,7 +24,7 @@ function lightTheme(root = document.documentElement) {
 }
 
 export function setLinkaAccent(value = "violet") {
-  const key = Object.hasOwn(ACCENTS, value) ? value : "violet";
+  const key = "violet";
   const root = document.documentElement;
   root.dataset.accent = key;
   storageSet("linka.accent", key);
@@ -47,7 +46,7 @@ export function setLinkaDensity(value = "standard") {
 }
 
 export function setLinkaEffects(value = "balanced") {
-  const key = EFFECTS.includes(value) ? value : "balanced";
+  const key = "atmosphere";
   document.documentElement.dataset.effects = key;
   storageSet("linka.effects", key);
   window.dispatchEvent(new CustomEvent("linka:effects-changed", { detail: { effects: key } }));
@@ -67,9 +66,11 @@ export function initVisualSystem() {
   if (root.dataset.visualSystemReady === "true") return;
   root.dataset.visualSystemReady = "true";
 
-  setLinkaAccent(storageGet("linka.accent", "violet"));
+  setLinkaAccent("violet");
   setLinkaDensity(storageGet("linka.density", "standard"));
-  setLinkaEffects(storageGet("linka.effects", "balanced"));
+  setLinkaEffects("atmosphere");
+  storageSet("linka.accent", "violet");
+  storageSet("linka.effects", "atmosphere");
 
   const savedMotion = storageGet("linka.reduceMotion", "");
   let reducedMotion = savedMotion === "true";
@@ -164,10 +165,6 @@ export function initVisualSystem() {
   let activeIndex = 0;
   let previousFocus = null;
 
-  const updateTheme = mode => {
-    if (!THEMES.includes(mode)) return;
-    window.dispatchEvent(new CustomEvent("linka:appearance-theme", { detail: { theme: mode } }));
-  };
   const notify = text => toast(text);
   const commands = [
     { title: "New capture", detail: "Write a thought or save a link", keywords: "note create save capture", shortcut: "N", run: () => {
@@ -178,18 +175,7 @@ export function initVisualSystem() {
       const input = document.querySelector("#search");
       if (input) { input.focus(); input.scrollIntoView({ block: "center", behavior: reducedMotion ? "auto" : "smooth" }); }
     }},
-    { title: "Appearance settings", detail: "Theme, accent color, density and motion", keywords: "theme style settings colors appearance", shortcut: "", run: () => document.querySelector("#settings-button")?.click() },
-    { title: "Switch theme", detail: "Cycle Dark, OLED Black, Light and System", keywords: "dark light oled system theme", shortcut: "T", run: () => {
-      const current = root.dataset.theme || "dark";
-      updateTheme(THEMES[(THEMES.indexOf(current) + 1) % THEMES.length]);
-      notify("Theme changed");
-    }},
-    { title: "Cycle accent color", detail: "Violet, Blue, Mint or Rose", keywords: "accent color violet blue mint rose", shortcut: "A", run: () => {
-      const values = Object.keys(ACCENTS);
-      const current = root.dataset.accent || "violet";
-      setLinkaAccent(values[(values.indexOf(current) + 1) % values.length]);
-      notify("Accent: " + (root.dataset.accent || "violet"));
-    }},
+    { title: "Appearance settings", detail: "Linka twilight theme, atmosphere, density and motion", keywords: "style settings appearance atmosphere", shortcut: "", run: () => document.querySelector("#settings-button")?.click() },
     { title: "Change interface density", detail: "Compact, Standard or Spacious", keywords: "density compact standard spacious", shortcut: "D", run: () => {
       const current = root.dataset.density || "standard";
       setLinkaDensity(DENSITIES[(DENSITIES.indexOf(current) + 1) % DENSITIES.length]);

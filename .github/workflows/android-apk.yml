@@ -107,19 +107,15 @@ jobs:
           tag_name: v0.4.${{ github.run_number }}
           name: Linka Android v0.4.${{ github.run_number }}
           body: |
-            IMPORTANT — migration from Linka 0.4.72:
-            - The signing key for the legacy 0.4.72 package was not preserved by CI, so Android cannot replace that installation in place.
-            - This recovery build uses the separate package app.linka.android.next and installs alongside the old app. Keep the old app installed until data migration is verified.
-            - In old Linka, open Settings → Your data → Export backup and save/share the JSON backup. In Linka Next, open Settings → Your data → Import backup. Verify your saved items before uninstalling the old app.
-            What's new in this Linka update:
-            - Added a slowly pulsing ambient sphere with a restrained violet-to-graphite gradient.
-            - Transparent navigation now uses a smooth spring-like active pill instead of a jumping selection.
-            - Added optional low-volume ambient sound, generated locally and disabled by default.
-            - Update notifications now use the selected app language and point to real release notes.
-            - Release notes in the update prompt are translated for English, Russian, Azerbaijani and Turkish.
-            - Preserved local-first storage, existing captures, export/import and existing account flows.
-            - Improved transition continuity and notification/status feedback.
-            - Install the APK on Android 8.0 or newer. Android may ask you to confirm installation.
+            What's new in Linka ${{ github.run_number }}:
+            - Replaced the ambient sphere and generated background sound with one unified Linka twilight-forest theme.
+            - Added a slowly moving dusk-forest video, subtle wind-like motion, and delicate film grain behind the interface.
+            - Set the exact soundtrack supplied by the user, “как всё заебало..”, as the default track; migrated stored playlists to select it first while keeping personal tracks.
+            - Added a compact bottom-right player and expanded playlist with play/pause, previous/next, volume, and local track import.
+            - Users can choose a personal photo or video background; personal media remains on-device and is not included in Linka capture sync.
+            - Removed alternate theme and accent selectors so the same twilight appearance is used across Android, Web, and Windows.
+            - Kept animated text entry, local-first capture storage, backup import/export, and existing account/sync flows.
+            - Install on Android 8.0 or newer. Android may ask you to confirm installation.
           files: apps/android/app/build/outputs/apk/release/Linka-Android-*.apk
           draft: false
           prerelease: false
