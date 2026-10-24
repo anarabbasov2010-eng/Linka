@@ -76,12 +76,16 @@ function ensureStyles() {
       border-color:var(--line-strong) !important;
       box-shadow:var(--shadow) !important;
     }
-    html[data-theme="paper"] .linka-doc-title,
-    html[data-theme="paper"] .linka-doc-body,
-    html[data-theme="paper"] .linka-doc-type-mirror {
+    html[data-theme="paper"] .linka-doc-title {
       color:var(--text) !important;
       -webkit-text-fill-color:var(--text) !important;
       background:var(--panel) !important;
+    }
+    html[data-theme="paper"] .linka-doc-body,
+    html[data-theme="paper"] .linka-doc-type-mirror { background:var(--panel) !important; }
+    html[data-theme="paper"] .linka-doc-body.linka-doc-plain-text {
+      color:var(--text) !important;
+      -webkit-text-fill-color:var(--text) !important;
     }
     .linka-glass-opacity-row { display:flex; align-items:center; gap:12px; }
     .linka-glass-opacity { width:100%; accent-color:var(--accent); }
