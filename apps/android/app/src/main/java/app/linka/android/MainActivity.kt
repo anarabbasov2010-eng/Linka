@@ -2028,16 +2028,16 @@ private fun LinkaApp(
                                 Box(Modifier.fillMaxWidth()) {
                                     OutlinedTextField(value = draft, onValueChange = { draft = it.take(MAX_CAPTURE_CHARS); typingTick++ }, modifier = Modifier.fillMaxWidth(),
                                         placeholder = { Text(tr(lang, "placeholder"), color = muted, fontSize = 13.sp * fontScale) },
-                                        textStyle = TextStyle(color = Color.Transparent, fontSize = 14.sp * fontScale, lineHeight = 20.sp * fontScale),
+                                        textStyle = TextStyle(color = Color.Transparent, fontFamily = androidx.compose.ui.text.font.FontFamily.Serif, fontSize = 14.sp * fontScale, lineHeight = 22.sp * fontScale),
                                         minLines = 3, maxLines = 7, shape = RoundedCornerShape(18.dp), colors = fieldColors(bg, border, main, muted))
                                     if (draft.isNotEmpty()) {
                                         val animatedDraft = androidx.compose.ui.text.buildAnnotatedString {
                                             append(draft.dropLast(1))
-                                            pushStyle(androidx.compose.ui.text.SpanStyle(color = main.copy(alpha = animatedInkAlpha)))
+                                            pushStyle(androidx.compose.ui.text.SpanStyle(color = main.copy(alpha = animatedInkAlpha), fontFamily = androidx.compose.ui.text.font.FontFamily.Serif))
                                             append(draft.last())
                                             pop()
                                         }
-                                        Text(animatedDraft, color = main, fontSize = 14.sp * fontScale, lineHeight = 20.sp * fontScale,
+                                        Text(animatedDraft, color = main, fontFamily = androidx.compose.ui.text.font.FontFamily.Serif, fontSize = 14.sp * fontScale, lineHeight = 22.sp * fontScale,
                                             maxLines = 7, overflow = TextOverflow.Clip,
                                             modifier = Modifier.matchParentSize().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 12.dp))
                                     }
