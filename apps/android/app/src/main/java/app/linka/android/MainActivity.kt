@@ -264,7 +264,8 @@ private class LinkaAmbientVideoView(context: Context) : TextureView(context), Te
 
     private fun preparePlayer() {
         val texture = surfaceTexture ?: return
-        val uri = source ?: return
+        val requestedUri = source ?: return
+        val uri = if (requestedUri == DEFAULT_FOREST_VIDEO) FOREST_VIDEO_CANDIDATES[candidateIndex.coerceIn(0, FOREST_VIDEO_CANDIDATES.lastIndex)] else requestedUri
         releasePlayer()
         try {
             val surface = Surface(texture)
@@ -280,12 +281,21 @@ private class LinkaAmbientVideoView(context: Context) : TextureView(context), Te
             }
             media.setOnErrorListener { _, _, _ ->
                 prepared = false
+                if (requestedUri == DEFAULT_FOREST_VIDEO && candidateIndex < FOREST_VIDEO_CANDIDATES.lastIndex) {
+                    candidateIndex += 1
+                    releasePlayer()
+                    post { if (source == requestedUri && isAvailable) preparePlayer() }
+                }
                 true
             }
             media.setDataSource(context, Uri.parse(uri))
             media.prepareAsync()
         } catch (_: Exception) {
             releasePlayer()
+            if (requestedUri == DEFAULT_FOREST_VIDEO && candidateIndex < FOREST_VIDEO_CANDIDATES.lastIndex) {
+                candidateIndex += 1
+                post { if (source == requestedUri && isAvailable) preparePlayer() }
+            }
         }
     }
 
