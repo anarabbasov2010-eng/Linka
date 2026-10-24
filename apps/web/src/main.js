@@ -15,6 +15,8 @@ import QRCode from "qrcode";
 const $ = selector => document.querySelector(selector);
 const form = $("#capture-form");
 const draft = $("#capture-text");
+const tagsDraft = $("#capture-tags");
+const collectionDraft = $("#capture-collection");
 const saveButton = $("#save-button");
 const list = $("#capture-list");
 const search = $("#search");
@@ -35,7 +37,7 @@ const bulkToolbar = document.createElement("div");
 bulkToolbar.className = "bulk-toolbar";
 bulkToolbar.hidden = true;
 list.parentElement.insertBefore(bulkToolbar, list);
-search.title = "Search operators: type:link, type:note, is:pinned, site:example.com, before:YYYY-MM-DD, after:YYYY-MM-DD";
+search.title = "Search operators: type:link, type:note, is:pinned, is:later, tag:design, in:research, site:example.com, before:YYYY-MM-DD, after:YYYY-MM-DD";
 const TERMS_VERSION = "2026-10-23-v2";
 const TERMS_TEXT = `
 Linka is a personal inbox for saving text and links on the device or browser profile where you use it.
@@ -56,12 +58,27 @@ By selecting “I agree”, you confirm that you have read these terms and under
 let captures = loadCaptures();
 let persistedCaptures = captures.map(item => ({ ...item }));
 const QUICK_DRAFT_KEY = "linka.captureDraft.v1";
+const QUICK_DRAFT_TAGS_KEY = "linka.captureDraft.tags.v1";
+const QUICK_DRAFT_COLLECTION_KEY = "linka.captureDraft.collection.v1";
+function parseTagInput(value) {
+  return String(value || "").split(/[,;\n]+/).map(tag => tag.trim().replace(/^#+/, "").replace(/\s+/g, " ").slice(0, 40)).filter(Boolean).slice(0, 24);
+}
+function saveCaptureMetadataDraft() {
+  try {
+    if (tagsDraft.value) localStorage.setItem(QUICK_DRAFT_TAGS_KEY, tagsDraft.value);
+    else localStorage.removeItem(QUICK_DRAFT_TAGS_KEY);
+    if (collectionDraft.value) localStorage.setItem(QUICK_DRAFT_COLLECTION_KEY, collectionDraft.value);
+    else localStorage.removeItem(QUICK_DRAFT_COLLECTION_KEY);
+  } catch {}
+}
 try {
   const savedDraft = localStorage.getItem(QUICK_DRAFT_KEY);
-  if (savedDraft && !draft.value) {
-    draft.value = savedDraft;
-    saveButton.disabled = !savedDraft.trim();
-  }
+  const savedTags = localStorage.getItem(QUICK_DRAFT_TAGS_KEY);
+  const savedCollection = localStorage.getItem(QUICK_DRAFT_COLLECTION_KEY);
+  if (savedDraft && !draft.value) draft.value = savedDraft;
+  if (savedTags && !tagsDraft.value) tagsDraft.value = savedTags;
+  if (savedCollection && !collectionDraft.value) collectionDraft.value = savedCollection;
+  saveButton.disabled = !draft.value.trim();
 } catch {}
 let activeFilter = "all";
 let editingId = null;
@@ -415,8 +432,12 @@ function makeAction(label, action, id) {
   return button;
 }
 function resetEditor() {
-  editingId = null; draft.value = ""; composeLabel.textContent = "Quick capture";
-  try { localStorage.removeItem(QUICK_DRAFT_KEY); } catch {}
+  editingId = null; draft.value = ""; tagsDraft.value = ""; collectionDraft.value = ""; composeLabel.textContent = "Quick capture";
+  try {
+    localStorage.removeItem(QUICK_DRAFT_KEY);
+    localStorage.removeItem(QUICK_DRAFT_TAGS_KEY);
+    localStorage.removeItem(QUICK_DRAFT_COLLECTION_KEY);
+  } catch {}
   saveButton.innerHTML = 'Save to inbox <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg>';
   saveButton.disabled = true;
 }
@@ -735,15 +756,25 @@ draft.addEventListener("input",()=>{
     else localStorage.removeItem(QUICK_DRAFT_KEY);
   } catch {}
 });
+tagsDraft.addEventListener("input", saveCaptureMetadataDraft);
+collectionDraft.addEventListener("input", saveCaptureMetadataDraft);
 draft.addEventListener("keydown",event=>{if((event.ctrlKey||event.metaKey)&&event.key==="Enter"&&draft.value.trim()){event.preventDefault();form.requestSubmit();}});
 form.addEventListener("submit",event=>{
-  event.preventDefault();const text=draft.value.trim();if(!text)return;
+  event.preventDefault();
+  const text=draft.value.trim();
+  if(!text)return;
+  const metadata = { tags: parseTagInput(tagsDraft.value), collection: collectionDraft.value.trim().slice(0,80) };
   const existing=editingId?captures.find(item=>item.id===editingId):null;
-  if(existing){captures=captures.map(item=>item.id===editingId?{...item,text:text.slice(0,100000),updatedAt:Date.now()}:item);say("Запись обновлена");}
-  else{captures.unshift(makeCapture(text));say("Сохранено на этом устройстве");window.dispatchEvent(new CustomEvent("linka:capture-saved",{detail:{title:"Saved to Linka",body:text.slice(0,140)}}));}
+  if(existing){
+    captures=captures.map(item=>item.id===editingId?{...item,...metadata,text:text.slice(0,100000),updatedAt:Date.now()}:item);
+    say("Запись обновлена");
+  } else {
+    captures.unshift(makeCapture(text, metadata));
+    say("Сохранено на этом устройстве");
+    window.dispatchEvent(new CustomEvent("linka:capture-saved",{detail:{title:"Saved to Linka",body:text.slice(0,140)}}));
+  }
   if (!persist()) { render(); return; }
   resetEditor();
-  try { localStorage.removeItem(QUICK_DRAFT_KEY); } catch {}
   render();
 });
 search.addEventListener("input",render);
@@ -856,7 +887,7 @@ list.addEventListener("click",async event=>{
       }
     }}));
   }
-  else if(action==="edit"){editingId=id;draft.value=item.text;composeLabel.textContent="Edit capture";saveButton.textContent="Save changes ↗";saveButton.disabled=false;draft.focus();window.scrollTo({top:0,behavior:"smooth"});}
+  else if(action==="edit"){editingId=id;draft.value=item.text;tagsDraft.value=(item.tags||[]).join(", ");collectionDraft.value=item.collection||"";composeLabel.textContent="Edit capture";saveButton.textContent="Save changes ↗";saveButton.disabled=false;saveCaptureMetadataDraft();draft.focus();window.scrollTo({top:0,behavior:"smooth"});}
   else if(action==="copy"){try{await navigator.clipboard.writeText(item.text);say("Скопировано");}catch{draft.value=item.text;draft.focus();draft.select();say("Text selected for manual copying");}}
 });
 $("#export-button").addEventListener("click",()=>{
