@@ -82,6 +82,32 @@ function addStyles() {
     html.reduced-motion .linka-doc-overlay,html.reduced-motion .linka-doc-window,html.reduced-motion .linka-doc-btn { transition:none!important; }
     html.reduced-motion .linka-doc-letter,html.reduced-motion .linka-doc-gone { animation:none!important; }
     .top-actions #linka-document-button { border-color:rgba(181,154,105,.28); }
+    :root[data-color-scheme="light"] .linka-doc-window {
+      color:var(--text)!important;background:var(--panel-solid)!important;border-color:var(--line-strong)!important;
+      box-shadow:0 28px 90px rgba(35,31,24,.16),inset 0 1px rgba(255,255,255,.85)!important;
+    }
+    :root[data-color-scheme="light"] .linka-doc-headcopy p,
+    :root[data-color-scheme="light"] .linka-doc-label,
+    :root[data-color-scheme="light"] .linka-doc-footer,
+    :root[data-color-scheme="light"] .linka-doc-recent h3 { color:var(--muted)!important; }
+    :root[data-color-scheme="light"] .linka-doc-title,
+    :root[data-color-scheme="light"] .linka-doc-body-wrap,
+    :root[data-color-scheme="light"] .linka-doc-recent-item {
+      color:var(--text)!important;background:color-mix(in srgb,var(--bg) 62%,var(--panel-solid))!important;
+      border-color:var(--line)!important;
+    }
+    :root[data-color-scheme="light"] .linka-doc-title { -webkit-text-fill-color:var(--text)!important; }
+    :root[data-color-scheme="light"] .linka-doc-body { caret-color:var(--accent)!important; }
+    :root[data-color-scheme="light"] .linka-doc-type-mirror { color:var(--text)!important; }
+    :root[data-color-scheme="light"] .linka-doc-body-wrap.plain-text-mode .linka-doc-body {
+      color:var(--text)!important;-webkit-text-fill-color:var(--text)!important;
+    }
+    :root[data-color-scheme="light"] .linka-doc-btn {
+      color:var(--text)!important;background:var(--panel-raised)!important;border-color:var(--line-strong)!important;
+    }
+    :root[data-color-scheme="light"] .linka-doc-btn.primary {
+      color:var(--accent-text)!important;background:var(--accent)!important;border-color:transparent!important;
+    }
   `;
   document.head.append(style);
 }
