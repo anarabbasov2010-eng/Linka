@@ -378,3 +378,13 @@ body { text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; 
 .item-tag:hover, .item-collection:hover { border-color: var(--line-strong); color: var(--text); }
 .item-collection { color: var(--accent); }
 @media (max-width: 600px) { .capture-meta { grid-template-columns: minmax(0,1fr); } }
+
+
+.search-section-heading {
+  padding: 10px 12px 6px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
