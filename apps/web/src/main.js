@@ -424,7 +424,6 @@ function showTagEditor(item) {
   const save = document.createElement("button"); save.type = "button"; save.className = "primary"; save.textContent = "Save tags";
   save.addEventListener("click", () => {
     const tags = [...new Set(input.value.split(",").map(tag => tag.trim().toLocaleLowerCase().replace(/\s+/g, "-").slice(0, 40)).filter(Boolean))].slice(0, 50);
-    const previous = captures;
     const next = captures.map(entry => entry.id === item.id ? { ...entry, tags, updatedAt: Date.now() } : entry);
     if (!saveCaptures(next)) { say("Could not save tags. Your library was left unchanged."); return; }
     captures = next;
