@@ -1,9 +1,9 @@
 const TOKENS = {
   bg: "#0B120D",
-  panel: "rgba(18,28,20,.88)",
-  panelSolid: "#121C14",
-  panelRaised: "#1B291D",
-  line: "rgba(232,223,200,.105)",
+  panel: "rgba(18,28,20,.62)",
+  panelSolid: "rgba(15,23,17,.84)",
+  panelRaised: "rgba(29,41,31,.64)",
+  line: "rgba(232,223,200,.14)",
   lineStrong: "rgba(181,154,105,.30)",
   text: "#E8DFC8",
   muted: "#B3BDA9",
