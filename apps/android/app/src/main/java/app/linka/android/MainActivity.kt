@@ -13,6 +13,9 @@ import android.net.Uri
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
+import android.media.MediaPlayer
+import android.widget.VideoView
+import android.provider.OpenableColumns
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -127,6 +130,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
@@ -200,6 +204,16 @@ internal const val MAX_CAPTURE_CHARS = 100_000
 internal const val MAX_CAPTURES = 500
 private const val RELEASES_API = "https://api.github.com/repos/anarabbasov2010-eng/Linka/releases/latest"
 private const val NOTIFICATION_CHANNEL = "linka_updates"
+private const val DEFAULT_FOREST_VIDEO = "https://videos.pexels.com/video-files/36928855/36928855-hd_1920_1080_30fps.mp4"
+private const val DEFAULT_MUSIC_URL = "https://d2ol7oe51mr4n9.cloudfront.net/user_3JmiwECXBUAWkApdn0zWkiZ506q/0990a53d-b19a-4abf-98fe-599af0e82bbf.mp3"
+private const val ATMOSPHERE_BACKGROUND_URI_KEY = "atmosphere_background_uri"
+private const val ATMOSPHERE_BACKGROUND_TYPE_KEY = "atmosphere_background_type"
+private const val ATMOSPHERE_BACKGROUND_ENABLED_KEY = "atmosphere_background_enabled"
+private const val ATMOSPHERE_GRAIN_ENABLED_KEY = "atmosphere_grain_enabled"
+private const val ATMOSPHERE_MUSIC_ENABLED_KEY = "atmosphere_music_enabled"
+private const val ATMOSPHERE_MUSIC_PLAYLIST_KEY = "atmosphere_music_playlist"
+private const val ATMOSPHERE_MUSIC_INDEX_KEY = "atmosphere_music_index"
+private const val ATMOSPHERE_MUSIC_VOLUME_KEY = "atmosphere_music_volume"
 
 internal data class Capture(
     val id: String,
@@ -211,6 +225,7 @@ internal data class Capture(
     val previewDescription: String = "",
     val previewImageUrl: String = ""
 )
+private data class AtmosphereTrack(val id: String, val name: String, val uri: String, val builtin: Boolean = false)
 private data class LinkPreview(val title: String, val description: String, val imageUrl: String)
 private data class UpdateInfo(val version: String, val downloadUrl: String, val releaseUrl: String, val changes: String)
 
