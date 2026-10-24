@@ -1337,9 +1337,8 @@ private fun LinkaApp(
     val linkaAccent = MaterialTheme.colorScheme.primary
     LaunchedEffect(ambientAudio) { AmbientAudioEngine.stop() }
     DisposableEffect(Unit) { onDispose { AmbientAudioEngine.stop() } }
-    val ambientTransition = rememberInfiniteTransition(label = "linka-sphere")
-    val ambientPulse by ambientTransition.animateFloat(initialValue = 0f, targetValue = 1f, animationSpec = infiniteRepeatable(animation = tween(durationMillis = 15_000, easing = LinearEasing), repeatMode = RepeatMode.Reverse), label = "sphere-pulse")
-    val ambientOrbit by ambientTransition.animateFloat(initialValue = 0f, targetValue = 1f, animationSpec = infiniteRepeatable(animation = tween(durationMillis = 32_000, easing = LinearEasing), repeatMode = RepeatMode.Restart), label = "sphere-orbit")
+    val grainTransition = rememberInfiniteTransition(label = "film-grain-drift")
+    val grainDrift by grainTransition.animateFloat(initialValue = 0f, targetValue = 1f, animationSpec = infiniteRepeatable(animation = tween(durationMillis = 48_000, easing = LinearEasing), repeatMode = RepeatMode.Restart), label = "film-grain-motion")
     var captures by remember { mutableStateOf(load()) }
     var draft by remember { mutableStateOf(sharedText) }
     var typingTick by remember { mutableIntStateOf(0) }
@@ -1766,7 +1765,7 @@ private fun LinkaApp(
     }
 
     Box(Modifier.fillMaxSize()) {
-        if (atmosphereBackgroundEnabled && theme != "oled") {
+        if (atmosphereBackgroundEnabled) {
             if (atmosphereBackgroundUri.isNotBlank() && atmosphereBackgroundType.startsWith("image/")) {
                 AsyncImage(model = Uri.parse(atmosphereBackgroundUri), contentDescription = null, contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize().graphicsLayer { alpha = .72f })
@@ -1790,8 +1789,8 @@ private fun LinkaApp(
             if (atmosphereGrainEnabled && effects != "quiet") {
                 Box(Modifier.fillMaxSize().drawBehind {
                     for (i in 0 until 180) {
-                        val x = (((i * 97) % 997) / 997f) * size.width + ambientOrbit * 12f
-                        val y = (((i * 193) % 991) / 991f) * size.height - ambientOrbit * 5f
+                        val x = (((i * 97) % 997) / 997f) * size.width + grainDrift * 12f
+                        val y = (((i * 193) % 991) / 991f) * size.height - grainDrift * 5f
                         drawCircle(Color.White.copy(alpha = .022f), radius = (i % 3 + 1) * .24f, center = Offset(x % size.width, y.mod(size.height)))
                     }
                 })
