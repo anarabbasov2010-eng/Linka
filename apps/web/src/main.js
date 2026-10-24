@@ -324,7 +324,13 @@ function render() {
     bulkButton("Unpin", "unpin");
     bulkButton("Copy", "copy");
     bulkButton("Export", "export");
-    bulkButton("Delete", "delete", true);
+    if (activeFilter === "trash") {
+      bulkButton(captureUiText("restore") + " selected", "restore-trash");
+      bulkButton(captureUiText("deletePermanent"), "delete", true);
+    } else {
+      bulkButton((activeFilter === "archive" ? captureUiText("unarchive") : captureUiText("archive")) + " selected", "archive");
+      bulkButton(captureUiText("trash"), "delete", true);
+    }
   }
   list.replaceChildren();
   if (!shown.length) {
@@ -886,22 +892,45 @@ bulkToolbar.addEventListener("click", async event => {
     setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
     say("Exported " + selected.length + " selected item(s)"); return;
   }
+  if (action === "archive") {
+    const archive = activeFilter !== "archive";
+    const now = Date.now();
+    captures = captures.map(item => selectedIds.has(item.id) ? { ...item, archivedAt: archive ? now : 0, trashedAt: 0, updatedAt: now } : item);
+    if (!persist()) { render(); return; }
+    selectedIds.clear(); selectionMode = false;
+    render(); say(archive ? captureUiText("archived") : captureUiText("unarchived")); return;
+  }
+  if (action === "restore-trash") {
+    const now = Date.now();
+    captures = captures.map(item => selectedIds.has(item.id) ? { ...item, archivedAt: 0, trashedAt: 0, updatedAt: now } : item);
+    if (!persist()) { render(); return; }
+    selectedIds.clear(); selectionMode = false;
+    render(); say(captureUiText("restored")); return;
+  }
   if (action === "delete") {
-    if (!window.confirm("Delete " + selected.length + " selected item(s)? This cannot be undone from this dialog.")) return;
+    if (activeFilter !== "trash") {
+      if (!window.confirm("Move " + selected.length + " selected item(s) to Trash? You can restore them later.")) return;
+      const now = Date.now();
+      captures = captures.map(item => selectedIds.has(item.id) ? { ...item, archivedAt: 0, trashedAt: now, updatedAt: now } : item);
+      if (!persist()) { render(); return; }
+      selectedIds.clear(); selectionMode = false;
+      render(); say(captureUiText("movedTrash")); return;
+    }
+    if (!window.confirm(captureUiText("confirmPermanent"))) return;
     const removed = selected;
     captures = captures.filter(item => !selectedIds.has(item.id));
     if (!persist()) { render(); return; }
     if (!addDeletedIds(removed.map(item => item.id))) {
       captures = [...captures, ...removed].sort((a, b) => Number(b.pinned) - Number(a.pinned) || Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0));
       if (!persist()) say("Could not safely record cloud deletion markers. Export a backup and pause cloud sync before continuing.");
-      else say("Deletion cancelled because the cloud deletion markers could not be saved.");
+      else say("Permanent deletion cancelled because the cloud deletion markers could not be saved.");
       render();
       return;
     }
     scheduleCloudSync();
     selectedIds.clear(); selectionMode = false;
     if (editingId && !captures.some(item => item.id === editingId)) resetEditor();
-    render(); say("Selected items deleted");
+    render(); say(captureUiText("deletedPermanent"));
   }
 });
 list.addEventListener("click",async event=>{
@@ -916,35 +945,45 @@ list.addEventListener("click",async event=>{
   if(action==="expand"){if(expandedCards.has(id))expandedCards.delete(id);else expandedCards.add(id);render();}
   else if(action==="pin"){captures=captures.map(entry=>entry.id===id?{...entry,pinned:!entry.pinned,updatedAt:Date.now()}:entry);if(!persist()){render();return;}render();say(item.pinned?"Откреплено":"Закреплено");}
   else if(action==="later"){captures=captures.map(entry=>entry.id===id?{...entry,readLater:!entry.readLater,updatedAt:Date.now()}:entry);if(!persist()){render();return;}render();say(item.readLater?captureUiText("removedLater"):captureUiText("savedLater"));}
-  else if(action==="delete"){
-    captures=captures.filter(entry=>entry.id!==id);
+  else if(action==="archive"){
+    const archive = !item.archivedAt;
+    captures = captures.map(entry => entry.id === id ? { ...entry, archivedAt: archive ? Date.now() : 0, trashedAt: 0, updatedAt: Date.now() } : entry);
+    if (!persist()) { render(); return; }
+    render(); say(archive ? captureUiText("archived") : captureUiText("unarchived"));
+  }
+  else if(action==="restore-trash"){
+    captures = captures.map(entry => entry.id === id ? { ...entry, archivedAt: 0, trashedAt: 0, updatedAt: Date.now() } : entry);
+    if (!persist()) { render(); return; }
+    render(); say(captureUiText("restored"));
+  }
+  else if(action==="delete-permanent"){
+    if (!window.confirm(captureUiText("confirmPermanent"))) return;
+    const removed = item;
+    captures = captures.filter(entry => entry.id !== id);
     if (!persist()) { render(); return; }
     if (!addDeletedId(id)) {
-      captures = [...captures.filter(entry => entry.id !== id), item].sort((a,b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt);
+      captures = [...captures, removed].sort((a,b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt);
       if (!persist()) say("Could not safely record the cloud deletion marker. Export a backup and pause cloud sync before continuing.");
-      else say("Deletion cancelled because the cloud deletion marker could not be saved.");
-      render();
-      return;
+      else say("Permanent deletion cancelled because the cloud deletion marker could not be saved.");
+      render(); return;
     }
     scheduleCloudSync();
+    if (editingId === id) resetEditor();
+    render(); say(captureUiText("deletedPermanent"));
+  }
+  else if(action==="delete"){
+    const now = Date.now();
+    captures = captures.map(entry => entry.id === id ? { ...entry, archivedAt: 0, trashedAt: now, updatedAt: now } : entry);
+    if (!persist()) { render(); return; }
     if(editingId===id)resetEditor();
-    render();say("Запись удалена");
+    render();say(captureUiText("movedTrash"));
     window.dispatchEvent(new CustomEvent("linka:toast", { detail: {
-      message: "Запись удалена",
-      actionLabel: "Отменить",
+      message: captureUiText("movedTrash"),
+      actionLabel: "Undo",
       onAction: () => {
-        const beforeUndo = captures.map(entry => ({ ...entry }));
-        captures = [...captures.filter(entry => entry.id !== id), item].sort((a,b) => b.updatedAt - a.updatedAt);
+        captures = captures.map(entry => entry.id === id ? { ...entry, trashedAt: 0, archivedAt: 0, updatedAt: Date.now() } : entry);
         if (!persist()) { render(); return; }
-        if (!removeDeletedIds([id])) {
-          captures = beforeUndo;
-          if (!persist()) say("Could not safely roll back the undo. Export a backup and pause cloud sync before continuing.");
-          else say("Undo cancelled because the cloud deletion marker could not be removed.");
-          render();
-          return;
-        }
-        scheduleCloudSync();
-        render(); say("Удаление отменено");
+        render(); say(captureUiText("restored"));
       }
     }}));
   }
