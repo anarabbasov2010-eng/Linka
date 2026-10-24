@@ -24,6 +24,12 @@ test("cloud merge respects deletion tombstones so removed data cannot reappear",
   assert.deepEqual(merged.map(item => item.id), ["kept"]);
 });
 
+test("cloud merge prefers the local copy when update timestamps are equal", () => {
+  const local = [{ id: "same", text: "latest local edit", createdAt: 1, updatedAt: 100 }];
+  const remote = [{ id: "same", text: "older remote edit", createdAt: 1, updatedAt: 100 }];
+  assert.equal(mergeCloudCaptures(local, remote, new Set())[0].text, "latest local edit");
+});
+
 test("cloud merge ignores malformed records and never silently truncates the library", () => {
   for (const count of [500, 1000, 5000, 10000]) {
     const items = Array.from({ length: count }, (_, index) => ({
