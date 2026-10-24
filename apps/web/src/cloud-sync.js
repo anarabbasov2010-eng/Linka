@@ -113,10 +113,33 @@ export function readDeletedIds(storage = globalThis.localStorage) {
     return new Set(Array.isArray(parsed) ? parsed.filter(x => typeof x === "string" && x) : []);
   } catch { return new Set(); }
 }
-export function addDeletedId(id, storage = globalThis.localStorage) {
+export function addDeletedIds(ids, storage = globalThis.localStorage) {
   const deleted = readDeletedIds(storage);
-  deleted.add(String(id));
-  try { storage?.setItem(DELETED_IDS_KEY, JSON.stringify(Array.from(deleted))); } catch {}
+  for (const id of ids || []) {
+    if (id == null || !String(id)) continue;
+    deleted.add(String(id));
+  }
+  try {
+    if (!storage || typeof storage.setItem !== "function") return false;
+    storage.setItem(DELETED_IDS_KEY, JSON.stringify(Array.from(deleted)));
+    return true;
+  } catch {
+    return false;
+  }
+}
+export function addDeletedId(id, storage = globalThis.localStorage) {
+  return addDeletedIds([id], storage);
+}
+export function removeDeletedIds(ids, storage = globalThis.localStorage) {
+  const deleted = readDeletedIds(storage);
+  for (const id of ids || []) deleted.delete(String(id));
+  try {
+    if (!storage || typeof storage.setItem !== "function") return false;
+    storage.setItem(DELETED_IDS_KEY, JSON.stringify(Array.from(deleted)));
+    return true;
+  } catch {
+    return false;
+  }
 }
 export function mergeCloudCaptures(localCaptures, remoteCaptures, deletedIds, maxItems = Number.POSITIVE_INFINITY) {
   const tombstones = deletedIds instanceof Set ? deletedIds : new Set(deletedIds || []);
