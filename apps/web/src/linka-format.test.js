@@ -22,6 +22,10 @@ test("rejects an inbox backup as a standalone document", () => {
   assert.throws(() => parseLinkaDocument(JSON.stringify({ captures: [] })), /не является текстовым/);
 });
 
+test("rejects an inbox backup exported as a JSON array", () => {
+  assert.throws(() => parseLinkaDocument(JSON.stringify([{ id: "x", text: "capture" }])), /не является текстовым/);
+});
+
 test("normalizes unsafe or empty titles and filenames", () => {
   const document = normalizeLinkaDocument({ title: "   ", text: "ok" });
   assert.equal(document.title, "Новый документ");
