@@ -151,6 +151,57 @@ async function storeDocument(document) {
     throw new Error("storage-unavailable");
   }
 }
+export async function exportLinkaDocuments() {
+  const documents = await listDocuments();
+  return documents
+    .filter(item => item && typeof item.id === "string" && typeof item.text === "string")
+    .map(item => normalizeLinkaDocument(item))
+    .sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
+}
+
+/**
+ * Merge portable documents by ID. IndexedDB writes happen in one transaction,
+ * so a quota/storage failure aborts the entire document import batch.
+ */
+export async function importLinkaDocuments(values = []) {
+  if (!Array.isArray(values)) throw new TypeError("Documents must be an array.");
+  const normalized = values
+    .filter(item => item && typeof item === "object" && typeof item.text === "string")
+    .map(item => normalizeLinkaDocument(item))
+    .filter(item => item.id && item.text.length <= 5_000_000);
+  if (!normalized.length) return { imported: 0, skipped: values.length };
+
+  const db = await database();
+  if (db) {
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      for (const item of normalized) store.put(item);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error || new Error("Could not import local documents."));
+      tx.onabort = () => reject(tx.error || new Error("Document import was rolled back."));
+    });
+    return { imported: normalized.length, skipped: values.length - normalized.length };
+  }
+
+  // The legacy localStorage fallback is intentionally bounded. Do not claim
+  // full import success if it cannot retain the entire set of documents.
+  const key = "linka.documents.fallback.v1";
+  let existing = [];
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || "[]");
+    if (Array.isArray(value)) existing = value;
+  } catch {}
+  const map = new Map(existing.filter(item => item && typeof item.id === "string").map(item => [item.id, item]));
+  normalized.forEach(item => map.set(item.id, item));
+  const all = [...map.values()].sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
+  const retained = all.slice(0, 12);
+  localStorage.setItem(key, JSON.stringify(retained));
+  const retainedIds = new Set(retained.map(item => item.id));
+  const imported = normalized.filter(item => retainedIds.has(item.id)).length;
+  return { imported, skipped: values.length - imported };
+}
+
 export async function searchLinkaDocuments(query = "", limit = 20) {
   const needle = String(query || "").trim().replace(/^"|"$/g, "").toLocaleLowerCase();
   if (needle.length < 2 || needle.includes(":")) return [];
