@@ -371,7 +371,7 @@ function addRevealAnimations() {
   const list = document.querySelector("#capture-list");
   if (list && "MutationObserver" in window) new MutationObserver(apply).observe(list, { childList: true });
 }
-function setLanguage(value) {
+export function setLanguage(value) {
   if (!COPY[value]) return;
   localStorage.setItem(LANG_KEY, value);
   translateInterface();
