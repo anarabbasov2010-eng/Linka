@@ -267,37 +267,7 @@ export function initVisualSystem() {
     }
   }, true);
 
-  const pointer = (() => { try { return window.matchMedia("(pointer: fine)"); } catch { return null; } })();
-  let activeCard = null;
-  if (pointer?.matches) {
-    document.addEventListener("pointermove", event => {
-      if (event.pointerType === "touch" || root.classList.contains("reduced-motion") || root.dataset.effects !== "atmosphere") return;
-      root.style.setProperty("--pointer-x", event.clientX + "px");
-      root.style.setProperty("--pointer-y", event.clientY + "px");
-      const card = event.target instanceof Element ? event.target.closest(".item, .capture") : null;
-      if (card !== activeCard) {
-        if (activeCard) {
-          activeCard.style.setProperty("--tilt-x", "0deg");
-          activeCard.style.setProperty("--tilt-y", "0deg");
-        }
-        activeCard = card;
-      }
-      if (card) {
-        const rect = card.getBoundingClientRect();
-        const x = ((event.clientX - rect.left) / Math.max(rect.width, 1) - .5) * 1.6;
-        const y = ((event.clientY - rect.top) / Math.max(rect.height, 1) - .5) * -1.4;
-        card.style.setProperty("--tilt-x", x.toFixed(2) + "deg");
-        card.style.setProperty("--tilt-y", y.toFixed(2) + "deg");
-      }
-    }, { passive: true });
-    document.addEventListener("pointerleave", () => {
-      if (activeCard) {
-        activeCard.style.setProperty("--tilt-x", "0deg");
-        activeCard.style.setProperty("--tilt-y", "0deg");
-        activeCard = null;
-      }
-    });
-  }
+  // Keep desktop surfaces responsive without per-pointer layout reads or card tilt work.
 
   const status = document.querySelector("#status");
   if (status) {
