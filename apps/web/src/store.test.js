@@ -43,6 +43,18 @@ test("filters links, notes, pinned items and search query", () => {
   assert.equal(visibleCaptures(items, "pinned").length, 1);
 });
 
+test("sorting supports oldest, title, domain, and longest-text views", () => {
+  const items = [
+    { id: "z", text: "A much longer note than the others", createdAt: 30, updatedAt: 30, previewTitle: "Zebra" },
+    { id: "b", text: "https://z-example.com/page", createdAt: 10, updatedAt: 10, previewTitle: "Beta" },
+    { id: "a", text: "https://a-example.com/page", createdAt: 20, updatedAt: 20, previewTitle: "Apple" }
+  ];
+  assert.deepEqual(visibleCaptures(items, "all", "", "oldest").map(item => item.id), ["b", "a", "z"]);
+  assert.deepEqual(visibleCaptures(items, "all", "", "title").map(item => item.id), ["a", "b", "z"]);
+  assert.deepEqual(visibleCaptures(items, "all", "", "domain").map(item => item.id), ["z", "a", "b"]);
+  assert.equal(visibleCaptures(items, "all", "", "longest")[0].id, "z");
+});
+
 test("search finds cached page titles, descriptions and host names", () => {
   const items = [
     { id: "site", text: "https://example.com/articles", createdAt: 1, updatedAt: 1, previewTitle: "City cycling guide", previewDescription: "Safe routes around town" },

@@ -116,7 +116,7 @@ export function parseSearchQuery(query = "") {
   return { ...parsed, text: parsed.text.join(" ").trim().toLocaleLowerCase() };
 }
 
-export function visibleCaptures(items, filter = "all", query = "") {
+export function visibleCaptures(items, filter = "all", query = "", sortMode = "recent") {
   const parsed = parseSearchQuery(query);
   return items.filter(item => {
     const isLink = /^https?:\/\//i.test(item.text);
@@ -148,7 +148,22 @@ export function visibleCaptures(items, filter = "all", query = "") {
     if (parsed.after !== null && !(savedAt >= parsed.after)) return false;
     const searchable = [item.text, item.previewTitle, item.previewDescription, host, ...(item.tags || [])].join(" ").toLocaleLowerCase();
     return !parsed.text || searchable.includes(parsed.text);
-  }).sort((a,b) => Number(b.pinned)-Number(a.pinned) || b.updatedAt-a.updatedAt);
+  }).sort((a, b) => {
+    const pinOrder = Number(b.pinned) - Number(a.pinned);
+    if (pinOrder) return pinOrder;
+    const activityOrder = Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0);
+    if (sortMode === "oldest") return Number(a.createdAt || 0) - Number(b.createdAt || 0) || activityOrder;
+    if (sortMode === "longest") return String(b.text || "").length - String(a.text || "").length || activityOrder;
+    if (sortMode === "title") return String(a.previewTitle || a.text || "").localeCompare(String(b.previewTitle || b.text || ""), undefined, { sensitivity: "base" }) || activityOrder;
+    if (sortMode === "domain") {
+      const domain = item => {
+        if (!/^https?:\/\//i.test(String(item.text || ""))) return "";
+        try { return new URL(item.text).hostname.replace(/^www\./i, "").toLocaleLowerCase(); } catch { return ""; }
+      };
+      return domain(a).localeCompare(domain(b)) || activityOrder;
+    }
+    return activityOrder;
+  });
 }
 export function makeCapture(text, existing = {}) {
   const now = Date.now();
