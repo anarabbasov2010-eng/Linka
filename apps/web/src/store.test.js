@@ -92,3 +92,33 @@ test("local storage does not silently truncate libraries above the former 1000-i
   assert.equal(saveCaptures(items, storage), true);
   assert.equal(loadCaptures(storage).length, 5000);
 });
+
+test("capture tags, collections and read-later status persist across storage", () => {
+  const storage = memoryStorage();
+  const item = makeCapture("Notes about responsive CSS", {
+    id: "tagged-note",
+    tags: ["#Design", "css", "design", "  frontend  "],
+    collection: "Work / UI",
+    readLater: true
+  });
+  assert.deepEqual(item.tags, ["Design", "css", "frontend"]);
+  assert.equal(item.collection, "Work / UI");
+  assert.equal(item.readLater, true);
+  assert.equal(saveCaptures([item], storage), true);
+  const loaded = loadCaptures(storage)[0];
+  assert.deepEqual(loaded.tags, ["Design", "css", "frontend"]);
+  assert.equal(loaded.collection, "Work / UI");
+  assert.equal(loaded.readLater, true);
+});
+
+test("search supports tags, collections and read-later operators", () => {
+  const items = [
+    makeCapture("CSS notes", { id: "design", tags: ["Design", "Frontend"], collection: "Research", readLater: true }),
+    makeCapture("Plan a hike", { id: "travel", tags: ["Travel"], collection: "Personal", readLater: false })
+  ];
+  assert.deepEqual(visibleCaptures(items, "all", "tag:design").map(item => item.id), ["design"]);
+  assert.deepEqual(visibleCaptures(items, "all", "in:research").map(item => item.id), ["design"]);
+  assert.deepEqual(visibleCaptures(items, "all", "is:later").map(item => item.id), ["design"]);
+  assert.deepEqual(visibleCaptures(items, "read-later").map(item => item.id), ["design"]);
+  assert.deepEqual(visibleCaptures(items, "all", "tag:travel in:personal").map(item => item.id), ["travel"]);
+});
