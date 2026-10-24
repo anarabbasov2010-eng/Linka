@@ -1365,11 +1365,12 @@ private fun LinkaApp(
     var profileDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    val atmospherePrefsMigrated = prefs.getBoolean("atmosphere_theme_v2_migrated", false)
     var atmosphereBackgroundUri by remember { mutableStateOf(prefs.getString(ATMOSPHERE_BACKGROUND_URI_KEY, "") ?: "") }
     var atmosphereBackgroundType by remember { mutableStateOf(prefs.getString(ATMOSPHERE_BACKGROUND_TYPE_KEY, "") ?: "") }
-    var atmosphereBackgroundEnabled by remember { mutableStateOf(prefs.getBoolean(ATMOSPHERE_BACKGROUND_ENABLED_KEY, true)) }
+    var atmosphereBackgroundEnabled by remember { mutableStateOf(if (atmospherePrefsMigrated) prefs.getBoolean(ATMOSPHERE_BACKGROUND_ENABLED_KEY, true) else true) }
     var atmosphereGrainEnabled by remember { mutableStateOf(prefs.getBoolean(ATMOSPHERE_GRAIN_ENABLED_KEY, true)) }
-    var musicEnabled by remember { mutableStateOf(prefs.getBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true)) }
+    var musicEnabled by remember { mutableStateOf(if (atmospherePrefsMigrated) prefs.getBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true) else true) }
     var playerExpanded by remember { mutableStateOf(false) }
     var musicVolume by remember { mutableFloatStateOf(prefs.getFloat(ATMOSPHERE_MUSIC_VOLUME_KEY, .14f).coerceIn(0f, 1f)) }
     val defaultAtmosphereTrack = remember { AtmosphereTrack("linka-default", "как всё заебало..", DEFAULT_MUSIC_URL, true) }
@@ -1389,9 +1390,21 @@ private fun LinkaApp(
     var musicTracks by remember {
         mutableStateOf(listOf(defaultAtmosphereTrack) + restoredMusicTracks.filterNot { it.id == defaultAtmosphereTrack.id || it.builtin })
     }
-    var musicIndex by remember { mutableIntStateOf(prefs.getInt(ATMOSPHERE_MUSIC_INDEX_KEY, 0).coerceAtLeast(0)) }
+    var musicIndex by remember { mutableIntStateOf(if (atmospherePrefsMigrated) prefs.getInt(ATMOSPHERE_MUSIC_INDEX_KEY, 0).coerceAtLeast(0) else 0) }
     var musicPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
     var musicPlaying by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (!atmospherePrefsMigrated) {
+            prefs.edit().putBoolean("atmosphere_theme_v2_migrated", true)
+                .putBoolean(ATMOSPHERE_BACKGROUND_ENABLED_KEY, true)
+                .putBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true)
+                .putBoolean(ATMOSPHERE_GRAIN_ENABLED_KEY, true)
+                .putInt(ATMOSPHERE_MUSIC_INDEX_KEY, 0)
+                .putBoolean(AMBIENT_AUDIO_KEY, false)
+                .apply()
+            AmbientAudioEngine.stop()
+        }
+    }
     val activeMusicTrack = musicTracks.getOrElse(musicIndex.coerceIn(0, musicTracks.lastIndex)) { musicTracks.first() }
     val backgroundSource = atmosphereBackgroundUri.ifBlank { DEFAULT_FOREST_VIDEO }
     fun persistMusicTracks(tracks: List<AtmosphereTrack>) {
@@ -1756,6 +1769,10 @@ private fun LinkaApp(
                 AsyncImage(model = Uri.parse(atmosphereBackgroundUri), contentDescription = null, contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize().graphicsLayer { alpha = .72f })
             } else {
+                if (atmosphereBackgroundUri.isBlank()) {
+                    AsyncImage(model = Uri.parse(DEFAULT_FOREST_POSTER), contentDescription = null, contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().graphicsLayer { alpha = .78f })
+                }
                 AndroidView(
                     modifier = Modifier.fillMaxSize().graphicsLayer { alpha = .68f },
                     factory = { viewContext -> LinkaAmbientVideoView(viewContext).apply { tag = backgroundSource; configure(backgroundSource, appInForeground) } },
@@ -1836,7 +1853,7 @@ private fun LinkaApp(
                             }
                         },
                         label = { Text(label, fontSize = 10.sp * fontScale, maxLines = 1) }, alwaysShowLabel = true,
-                        colors = androidx.compose.material3.NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent, selectedIconColor = sphereAccent, unselectedIconColor = muted, selectedTextColor = main, unselectedTextColor = muted))
+                        colors = androidx.compose.material3.NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent, selectedIconColor = linkaAccent, unselectedIconColor = muted, selectedTextColor = main, unselectedTextColor = muted))
                 }
             }
             }
