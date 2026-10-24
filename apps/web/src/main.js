@@ -2,7 +2,7 @@ import { loadCaptures, saveCaptures, makeCapture, visibleCaptures, getCaptureRec
 import { initLinkaExperience } from "./experience.js";
 import { initVisualSystem } from "./visual-system.js";
 import { initLinkaAtmosphere, openAtmosphereSettings } from "./atmosphere.js";
-import { initLinkaDocuments } from "./documents.js";
+import { initLinkaDocuments, searchLinkaDocuments, openLinkaDocumentById } from "./documents.js";
 import { initLinkaSignature } from "./signature-theme.js";
 import {
   addDeletedId, addDeletedIds, removeDeletedIds, disconnectCloud, getCloudConfig, getCloudSession,
@@ -444,17 +444,27 @@ function showSearchSpace(initial = "") {
   const hint = document.createElement("span"); hint.className = "search-hint"; hint.textContent = "Esc to close";
   searchWrap.append(input, hint);
   const info = document.createElement("div"); info.className = "search-space-meta";
-  const count = document.createElement("span"); const scope = document.createElement("span"); scope.textContent = "Across links and notes";
+  const count = document.createElement("span"); const scope = document.createElement("span"); scope.textContent = "Across links, notes and documents";
   info.append(count, scope);
   const results = document.createElement("div"); results.className = "search-space-results"; results.setAttribute("role", "listbox"); results.setAttribute("aria-label", "Search results");
   content.append(head, searchWrap, info, results);
   const layer = modalShell(content, { dismissable: true }); layer.classList.add("search-space-layer");
-  function refresh() {
+  let searchSequence = 0;
+  let searchTimer = null;
+  async function refresh() {
+    const sequence = ++searchSequence;
     const q = input.value.trim().toLocaleLowerCase();
     const found = visibleCaptures(captures, "all", input.value).slice(0, 80);
-    count.textContent = q ? (found.length + " matching " + (found.length === 1 ? "item" : "items")) : ("Recently saved · " + found.length);
+    const freeTextQuery = q.includes(":") ? "" : input.value.trim().replace(/^"|"$/g, "");
+    let documentFound = [];
+    if (freeTextQuery.length >= 2) {
+      documentFound = await searchLinkaDocuments(freeTextQuery, 20).catch(() => []);
+    }
+    if (sequence !== searchSequence) return;
+    const totalFound = found.length + documentFound.length;
+    count.textContent = q ? (totalFound + " matching " + (totalFound === 1 ? "item" : "items")) : ("Recently saved · " + totalFound);
     results.replaceChildren();
-    if (!found.length) {
+    if (!found.length && !documentFound.length) {
       const empty = document.createElement("div"); empty.className = "search-empty";
       empty.innerHTML = '<div style="font-size:22px;margin-bottom:9px">⌕</div><strong>No matches yet</strong><br>Try a different word, domain, or page title.';
       results.append(empty); return;
@@ -487,9 +497,34 @@ function showSearchSpace(initial = "") {
       });
       results.append(row);
     });
+    if (documentFound.length) {
+      const heading = document.createElement("div");
+      heading.className = "search-section-heading";
+      heading.textContent = "Text documents";
+      results.append(heading);
+      documentFound.forEach(item => {
+        const row = document.createElement("button");
+        row.type = "button"; row.className = "search-result"; row.setAttribute("role", "option");
+        const thumb = document.createElement("span"); thumb.className = "search-thumb"; thumb.textContent = "Aa";
+        const copy = document.createElement("span"); copy.className = "search-result-copy";
+        const rowTitle = document.createElement("span"); rowTitle.className = "search-result-title"; rowTitle.textContent = item.title || "Untitled document";
+        const detail = document.createElement("span"); detail.className = "search-result-detail"; detail.textContent = item.excerpt || "Open local document";
+        const type = document.createElement("span"); type.className = "search-result-type"; type.textContent = "Document";
+        copy.append(rowTitle, detail); row.append(thumb, copy, type);
+        row.addEventListener("click", async () => {
+          modalRoot.replaceChildren();
+          const opened = await openLinkaDocumentById(item.id).catch(() => false);
+          if (!opened) say("Could not open this document. It may have been deleted.");
+        });
+        results.append(row);
+      });
+    }
   }
-  input.addEventListener("input", refresh);
-  refresh(); input.focus(); input.select();
+  input.addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { void refresh(); }, 160);
+  });
+  void refresh(); input.focus(); input.select();
 }
 function makeAction(label, action, id) {
   const button = document.createElement("button");
