@@ -71,6 +71,9 @@ function ensureStyles() {
     .linka-type-erasing { display:inline; animation:linka-ink-out .19s ease both; }
     @keyframes linka-ink-out { from {opacity:.9;filter:blur(0)} to {opacity:0;filter:blur(2px)} }
     .linka-player-panel, .linka-doc-overlay { transition-duration:.58s !important; }
+    .linka-toast { animation:linka-forest-toast-in .56s cubic-bezier(.18,.78,.25,1) both !important; border-color:rgba(181,154,105,.30) !important; background:rgba(18,28,20,.97) !important; box-shadow:0 18px 58px rgba(0,0,0,.38),inset 0 1px rgba(232,223,200,.045) !important; }
+    .linka-toast-action, .linka-toast-close { color:var(--accent) !important; }
+    @keyframes linka-forest-toast-in { from {opacity:0;transform:translateY(9px) scale(.985);filter:blur(3px)} to {opacity:1;transform:translateY(0) scale(1);filter:blur(0)} }
     @media (prefers-reduced-motion: reduce) {
       *,*::before,*::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; scroll-behavior:auto !important; transition-duration:.01ms !important; }
     }
