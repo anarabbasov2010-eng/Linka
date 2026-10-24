@@ -105,7 +105,7 @@ function typingAnimation(){const ta=$("#capture-text");if(!ta||ta.dataset.linkaT
 async function initAudio(){
   state.audio=document.createElement("audio");
   state.audio.preload="metadata";
-  state.audio.crossOrigin="anonymous";
+  
   state.audio.addEventListener("play",()=>playing(true));
   state.audio.addEventListener("pause",()=>playing(false));
   state.audio.addEventListener("ended",()=>void loadTrack(state.index+1,true));
