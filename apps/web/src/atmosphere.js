@@ -2,6 +2,8 @@ const DEFAULT_TRACK={id:"linka-provided-track",name:"как всё заебал�
 const DEFAULT_VIDEO="https://videos.pexels.com/video-files/36928855/36928855-hd_1920_1080_30fps.mp4";
 const FOREST_VIDEO_CANDIDATES=[
   DEFAULT_VIDEO,
+  "https://videos.pexels.com/video-files/30312149/30312149-hd_1920_1080_30fps.mp4",
+  "https://videos.pexels.com/video-files/34381048/34381048-hd_1920_1080_30fps.mp4",
   "https://videos.pexels.com/video-files/30312148/30312148-hd_1920_1080_30fps.mp4",
   "https://videos.pexels.com/video-files/34222220/34222220-hd_1920_1080_30fps.mp4",
   "https://videos.pexels.com/video-files/13838155/13838155-hd_1920_1080_30fps.mp4"
