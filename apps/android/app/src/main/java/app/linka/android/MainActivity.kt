@@ -221,7 +221,7 @@ private val FOREST_VIDEO_CANDIDATES = listOf(
 )
 private const val DEFAULT_MUSIC_URL = ""
 private const val LINKA_DOCUMENT_FORMAT = "linka-document"
-private const val LINKA_DOCUMENT_MAX_CHARS = 1_000_000
+private const val LINKA_DOCUMENT_MAX_CHARS = 5_000_000
 private fun linkaDocumentFilename(value: String): String {
     val safe = value.trim().replace(Regex("""[\\/:*?"<>|]"""), "-")
         .trimEnd('.', ' ').take(100).ifBlank { "Linka document" }
@@ -912,7 +912,7 @@ class MainActivity : ComponentActivity() {
                 while (true) {
                     val count = it.read(buffer)
                     if (count < 0) break
-                    if (builder.length + count > 5_000_000) throw IllegalArgumentException("Документ превышает лимит 5 МБ текста.")
+                    if (builder.length + count > LINKA_DOCUMENT_MAX_CHARS) throw IllegalArgumentException("Документ превышает лимит 5 МБ текста.")
                     builder.append(buffer, 0, count)
                 }
                 builder.toString()
@@ -1575,7 +1575,7 @@ private fun LinkaApp(
             runCatching {
                 val raw = context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
                     ?: error("Не удалось прочитать файл")
-                require(raw.length <= 5_000_000) { "Файл больше 5 МБ текста и не может быть открыт в редакторе." }
+                require(raw.length <= LINKA_DOCUMENT_MAX_CHARS) { "Файл больше 5 МБ текста и не может быть открыт в редакторе." }
                 val displayName = runCatching {
                     context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
                         if (cursor.moveToFirst()) cursor.getString(0) else null
@@ -1595,7 +1595,7 @@ private fun LinkaApp(
                     require(parsed.optInt("version", 1) == 1) { "Эта версия документа не поддерживается." }
                     linkaDocumentId = parsed.optString("id").ifBlank { UUID.randomUUID().toString() }
                     linkaDocumentTitle = parsed.optString("title").ifBlank { fallbackTitle }.take(180)
-                    linkaDocumentText = parsed.optString("text", "").take(5_000_000)
+                    linkaDocumentText = parsed.optString("text", "").take(LINKA_DOCUMENT_MAX_CHARS)
                     linkaDocumentCreatedAt = parsed.optLong("createdAt", System.currentTimeMillis())
                 } else {
                     linkaDocumentId = UUID.randomUUID().toString()
@@ -1636,7 +1636,7 @@ private fun LinkaApp(
                 if (draftJson.optString("format") == LINKA_DOCUMENT_FORMAT && draftJson.optInt("version", 1) == 1) {
                     linkaDocumentId = draftJson.optString("id").ifBlank { UUID.randomUUID().toString() }
                     linkaDocumentTitle = draftJson.optString("title").ifBlank { if (lang == "ru") "Новый документ" else "New document" }.take(180)
-                    linkaDocumentText = draftJson.optString("text", "").take(5_000_000)
+                    linkaDocumentText = draftJson.optString("text", "").take(LINKA_DOCUMENT_MAX_CHARS)
                     linkaDocumentCreatedAt = draftJson.optLong("createdAt", System.currentTimeMillis())
                 }
             }
@@ -1649,7 +1649,7 @@ private fun LinkaApp(
         val snapshot = runCatching {
             JSONObject().put("format", LINKA_DOCUMENT_FORMAT).put("version", 1)
                 .put("id", linkaDocumentId).put("title", linkaDocumentTitle.ifBlank { "Linka document" }.take(180))
-                .put("text", linkaDocumentText.take(5_000_000))
+                .put("text", linkaDocumentText.take(LINKA_DOCUMENT_MAX_CHARS))
                 .put("createdAt", linkaDocumentCreatedAt).put("updatedAt", System.currentTimeMillis()).toString(2)
         }.getOrDefault("")
         if (snapshot.isNotBlank()) withContext(Dispatchers.IO) {
@@ -1778,16 +1778,16 @@ private fun LinkaApp(
         }
     }
     LaunchedEffect(externalDocumentTrigger) {
-        if (externalDocumentTrigger <= 0 || externalDocumentText.isBlank()) return@LaunchedEffect
+        if (externalDocumentTrigger <= 0) return@LaunchedEffect
         while (!linkaDraftRestored) delay(20L)
         runCatching {
-            require(externalDocumentText.length <= 5_000_000) { "Документ превышает лимит 5 МБ текста." }
+            require(externalDocumentText.length <= LINKA_DOCUMENT_MAX_CHARS) { "Документ превышает лимит 5 МБ текста." }
             val parsed = runCatching { JSONObject(externalDocumentText) }.getOrNull()
             if (parsed?.optString("format") == LINKA_DOCUMENT_FORMAT) {
                 require(parsed.optInt("version", 1) == 1) { "Эта версия документа .linka не поддерживается." }
                 linkaDocumentId = parsed.optString("id").ifBlank { UUID.randomUUID().toString() }
                 linkaDocumentTitle = parsed.optString("title").ifBlank { externalDocumentTitle.ifBlank { "Документ Linka" } }.take(180)
-                linkaDocumentText = parsed.optString("text", "").take(5_000_000)
+                linkaDocumentText = parsed.optString("text", "").take(LINKA_DOCUMENT_MAX_CHARS)
                 linkaDocumentCreatedAt = parsed.optLong("createdAt", System.currentTimeMillis())
             } else {
                 require(!externalDocumentText.trimStart().startsWith("[") && parsed?.has("captures") != true) { "Это резервная копия Linka, а не текстовый документ .linka." }
@@ -2349,7 +2349,7 @@ private fun LinkaApp(
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(activeMusicTrack.name, color = main, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
-                    Text(if (musicPlaying) "Linka · играет" else if (musicEnabled) "Тихий плейлист" else "Музыка выключена",
+                    Text(if (musicPlaying) "Linka · играет" else if (activeMusicTrack.uri.isBlank()) "Добавь свою музыку" else if (musicEnabled) "Тихий плейлист" else "Музыка выключена",
                         color = muted, fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 IconButton(onClick = { changeMusicTrack(-1) }, modifier = Modifier.size(25.dp)) {
@@ -2448,7 +2448,7 @@ private fun LinkaApp(
                 )
                 OutlinedTextField(
                     value = linkaDocumentText,
-                    onValueChange = { linkaDocumentText = it.take(5_000_000) },
+                    onValueChange = { linkaDocumentText = it.take(LINKA_DOCUMENT_MAX_CHARS) },
                     label = { Text(if (lang == "ru") "Текст" else "Text") },
                     placeholder = { Text(if (lang == "ru") "Начни писать…" else "Start writing…") },
                     modifier = Modifier.fillMaxWidth().heightIn(min = 200.dp),
@@ -2472,7 +2472,7 @@ private fun LinkaApp(
                         .put("version", 1)
                         .put("id", linkaDocumentId)
                         .put("title", title)
-                        .put("text", linkaDocumentText.take(5_000_000))
+                        .put("text", linkaDocumentText.take(LINKA_DOCUMENT_MAX_CHARS))
                         .put("createdAt", linkaDocumentCreatedAt)
                         .put("updatedAt", now).toString(2) + "\n"
                     linkaDocumentSaveLauncher.launch(linkaDocumentFilename(title))
