@@ -1,6 +1,13 @@
 import "./visual-system.css";
 
-const ACCENTS = { forest: { dark: "#B59A69", light: "#B59A69", glowDark: "rgba(181,154,105,.11)", glowLight: "rgba(181,154,105,.11)" } };
+const ACCENTS = {
+  forest: { dark: "#B59A69", light: "#8C6B3E", glowDark: "rgba(181,154,105,.11)", glowLight: "rgba(140,107,62,.10)" },
+  silver: { dark: "#B8C5D6", light: "#65768B", glowDark: "rgba(184,197,214,.11)", glowLight: "rgba(101,118,139,.10)" },
+  ocean: { dark: "#65C6BD", light: "#267D75", glowDark: "rgba(101,198,189,.12)", glowLight: "rgba(38,125,117,.10)" },
+  violet: { dark: "#B4A2F3", light: "#6851AD", glowDark: "rgba(180,162,243,.12)", glowLight: "rgba(104,81,173,.10)" },
+  rose: { dark: "#E4A4BC", light: "#A74468", glowDark: "rgba(228,164,188,.12)", glowLight: "rgba(167,68,104,.10)" },
+  emerald: { dark: "#9DD19C", light: "#407A45", glowDark: "rgba(157,209,156,.12)", glowLight: "rgba(64,122,69,.10)" }
+};
 const DENSITIES = ["compact", "standard", "spacious"];
 const EFFECTS = ["quiet", "balanced", "atmosphere"];
 
@@ -10,22 +17,24 @@ function storageGet(key, fallback = "") {
 function storageSet(key, value) {
   try { localStorage.setItem(key, value); } catch {}
 }
-function lightTheme() { return false; }
+function lightTheme(root = document.documentElement) {
+  return (root.dataset.theme || storageGet("linka.theme", "forest")) === "paper";
+}
 
 export function setLinkaAccent(value = "forest") {
-  const key = "forest";
+  const key = Object.prototype.hasOwnProperty.call(ACCENTS, value) ? value : "forest";
   const root = document.documentElement;
   root.dataset.accent = key;
   storageSet("linka.accent", key);
+  storageSet("linka.accent.user", key);
   const palette = ACCENTS[key];
   const light = lightTheme(root);
   root.style.setProperty("--accent", light ? palette.light : palette.dark);
-  root.style.setProperty("--accent-text", light ? "#FFFFFF" : "#171323");
+  root.style.setProperty("--accent-text", light ? "#FFFFFF" : "#17170F");
   root.style.setProperty("--glow", light ? palette.glowLight : palette.glowDark);
   window.dispatchEvent(new CustomEvent("linka:accent-changed", { detail: { accent: key } }));
   return key;
 }
-
 export function setLinkaDensity(value = "standard") {
   const key = DENSITIES.includes(value) ? value : "standard";
   document.documentElement.dataset.density = key;
@@ -35,7 +44,7 @@ export function setLinkaDensity(value = "standard") {
 }
 
 export function setLinkaEffects(value = "balanced") {
-  const key = "atmosphere";
+  const key = EFFECTS.includes(value) ? value : "balanced";
   document.documentElement.dataset.effects = key;
   storageSet("linka.effects", key);
   window.dispatchEvent(new CustomEvent("linka:effects-changed", { detail: { effects: key } }));
@@ -55,11 +64,9 @@ export function initVisualSystem() {
   if (root.dataset.visualSystemReady === "true") return;
   root.dataset.visualSystemReady = "true";
 
-  setLinkaAccent("forest");
+  setLinkaAccent(storageGet("linka.accent.user", "forest"));
   setLinkaDensity(storageGet("linka.density", "standard"));
-  setLinkaEffects("atmosphere");
-  storageSet("linka.accent", "forest");
-  storageSet("linka.effects", "atmosphere");
+  setLinkaEffects(storageGet("linka.effects", "atmosphere"));
 
   const savedMotion = storageGet("linka.reduceMotion", "");
   let reducedMotion = savedMotion === "true";
@@ -81,16 +88,10 @@ export function initVisualSystem() {
     });
   }
 
-  const appearanceChanged = () => setLinkaAccent("forest");
-  new MutationObserver(records => {
-    if (records.some(record => record.attributeName === "data-theme")) { root.dataset.theme = "forest"; appearanceChanged(); }
-  }).observe(root, { attributes: true, attributeFilter: ["data-theme"] });
-
-  const colorScheme = (() => {
-    try { return window.matchMedia("(prefers-color-scheme: light)"); } catch { return null; }
-  })();
-  root.dataset.theme = "forest";
-  root.style.colorScheme = "dark";
+  // Theme selection is owned by signature-theme.js and must not be reset here.
+  window.addEventListener("linka:theme-changed", () => {
+    setLinkaAccent(storageGet("linka.accent.user", "forest"));
+  });
 
   const toastStack = document.createElement("div");
   toastStack.className = "linka-toast-stack";
@@ -143,7 +144,7 @@ export function initVisualSystem() {
       '<label class="linka-command-search"><span aria-hidden="true">⌕</span><input type="search" autocomplete="off" spellcheck="false" placeholder="Type a command…" aria-label="Search commands"></label>' +
       '<div class="linka-command-meta"><span>COMMANDS</span><span>↑ ↓ select · ↵ run</span></div>' +
       '<div class="linka-command-results" role="listbox" aria-label="Commands"></div>' +
-      '<div class="linka-command-footer"><span><kbd>Ctrl K</kbd> to open</span><span>Linka · Obsidian</span></div>' +
+      '<div class="linka-command-footer"><span><kbd>Ctrl K</kbd> to open</span><span>Linka · Workspace</span></div>' +
     '</section>';
   document.body.append(palette);
   const commandInput = palette.querySelector("input");
