@@ -1221,10 +1221,36 @@ $("#import-file").addEventListener("change",async event=>{
 });
 $("#search-space-button").addEventListener("click",()=>showSearchSpace(search.value));
 document.addEventListener("keydown",event=>{
-  if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="k"){
-    event.preventDefault();showSearchSpace(search.value);
+  const command = event.ctrlKey || event.metaKey;
+  const key = event.key.toLowerCase();
+  const typingTarget = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement || event.target?.isContentEditable;
+  if(command && key === "k"){
+    event.preventDefault();showSearchSpace(search.value);return;
   }
-  if(event.key==="/"&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&!(event.target instanceof HTMLInputElement)&&!(event.target instanceof HTMLTextAreaElement)){
+  if(command && event.shiftKey && key === "e"){
+    event.preventDefault();
+    const selected = selectionMode && selectedIds.size
+      ? captures.filter(item => selectedIds.has(item.id))
+      : visibleCaptures(captures, activeFilter, search.value);
+    exportCaptureItems(selected, selectionMode && selectedIds.size ? "linka-selection" : "linka-inbox");
+    return;
+  }
+  if(command && event.shiftKey && key === "l" && selectionMode && selectedIds.size){
+    event.preventDefault();
+    const selected = captures.filter(item => selectedIds.has(item.id));
+    const readLater = !selected.every(item => item.readLater);
+    const now = Date.now();
+    captures = captures.map(item => selectedIds.has(item.id) ? { ...item, readLater, updatedAt: now } : item);
+    if (persist()) { render(); say(readLater ? captureUiText("savedLater") : captureUiText("removedLater")); }
+    else render();
+    return;
+  }
+  if(event.key === "Delete" && selectionMode && selectedIds.size && activeFilter !== "trash" && !typingTarget){
+    event.preventDefault();
+    bulkToolbar.querySelector('button[data-bulk-action="delete"]')?.click();
+    return;
+  }
+  if(event.key==="/"&&!command&&!event.altKey&&!typingTarget){
     event.preventDefault();showSearchSpace("");
   }
 });
