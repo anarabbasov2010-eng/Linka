@@ -37,8 +37,8 @@ jobs:
       - name: Inject public cloud endpoint when configured
         shell: pwsh
         env:
-          LINKA_SUPABASE_URL: \${{ vars.LINKA_SUPABASE_URL }}
-          LINKA_SUPABASE_PUBLISHABLE_KEY: \${{ vars.LINKA_SUPABASE_PUBLISHABLE_KEY }}
+          LINKA_SUPABASE_URL: ${{ vars.LINKA_SUPABASE_URL }}
+          LINKA_SUPABASE_PUBLISHABLE_KEY: ${{ vars.LINKA_SUPABASE_PUBLISHABLE_KEY }}
         run: |
           "LINKA_SUPABASE_URL=$($env:LINKA_SUPABASE_URL)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "LINKA_SUPABASE_PUBLISHABLE_KEY=$($env:LINKA_SUPABASE_PUBLISHABLE_KEY)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
@@ -51,8 +51,8 @@ jobs:
       - name: Configure signed Windows updates when signing keys exist
         shell: pwsh
         env:
-          LINKA_UPDATER_PUBLIC_KEY: \${{ vars.LINKA_UPDATER_PUBLIC_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY: \${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          LINKA_UPDATER_PUBLIC_KEY: ${{ vars.LINKA_UPDATER_PUBLIC_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: |
           $updaterEnabled = $false
           "LINKA_UPDATER_ENABLED=false" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
@@ -98,8 +98,8 @@ jobs:
       - name: Build Windows installer
         working-directory: apps/desktop
         env:
-          TAURI_SIGNING_PRIVATE_KEY: \${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: \${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run build
 
       - name: Smoke-test Windows startup
@@ -126,16 +126,16 @@ jobs:
       - name: Publish Windows-only release
         shell: bash
         env:
-          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           files=(apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe)
-          if [[ ! -f "\${files[0]:-}" ]]; then
+          if [[ ! -f "${files[0]:-}" ]]; then
             echo "::error::No Windows NSIS installer was produced."
             exit 1
           fi
-          cp "\${files[0]}" Linka-Windows-x64-setup.exe
-          version="\${LINKA_RELEASE_TAG#v}"
+          cp "${files[0]}" Linka-Windows-x64-setup.exe
+          version="${LINKA_RELEASE_TAG#v}"
           if gh release view "$LINKA_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$LINKA_RELEASE_TAG" Linka-Windows-x64-setup.exe --clobber --repo "$GITHUB_REPOSITORY"
           else
@@ -143,14 +143,14 @@ jobs:
               --title "Linka for Windows $version" \
               --notes "Linka desktop release $version. Windows and Web only; standalone Windows installer includes the WebView2 bootstrapper."
           fi
-          if [[ "\${LINKA_UPDATER_ENABLED:-false}" == "true" ]]; then
+          if [[ "${LINKA_UPDATER_ENABLED:-false}" == "true" ]]; then
             bundles=(apps/desktop/src-tauri/target/release/bundle/nsis/*.nsis.zip)
-            if [[ ! -f "\${bundles[0]:-}" || ! -f "\${bundles[0]}.sig" ]]; then
+            if [[ ! -f "${bundles[0]:-}" || ! -f "${bundles[0]}.sig" ]]; then
               echo "::error::Signed updater archive or signature is missing."
               exit 1
             fi
-            updater_zip="\${bundles[0]}"
-            signature_file="\${updater_zip}.sig"
+            updater_zip="${bundles[0]}"
+            signature_file="${updater_zip}.sig"
             signature="$(cat "$signature_file")"
             url="https://github.com/$GITHUB_REPOSITORY/releases/download/$LINKA_RELEASE_TAG/$(basename "$updater_zip")"
             jq -n --arg version "$version" --arg notes "Linka $version" --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg url "$url" --arg signature "$signature" '{
