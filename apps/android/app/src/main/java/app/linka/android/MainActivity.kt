@@ -35,9 +35,12 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.clickable
@@ -1209,6 +1212,7 @@ private fun LinkaApp(
     DisposableEffect(Unit) { onDispose { AmbientAudioEngine.stop() } }
     val ambientTransition = rememberInfiniteTransition(label = "linka-sphere")
     val ambientPulse by ambientTransition.animateFloat(initialValue = 0f, targetValue = 1f, animationSpec = infiniteRepeatable(animation = tween(durationMillis = 15_000, easing = LinearEasing), repeatMode = RepeatMode.Reverse), label = "sphere-pulse")
+    val ambientOrbit by ambientTransition.animateFloat(initialValue = 0f, targetValue = 1f, animationSpec = infiniteRepeatable(animation = tween(durationMillis = 32_000, easing = LinearEasing), repeatMode = RepeatMode.Restart), label = "sphere-orbit")
     var captures by remember { mutableStateOf(load()) }
     var draft by remember { mutableStateOf(sharedText) }
     var editingId by remember { mutableStateOf<String?>(null) }
@@ -1505,9 +1509,19 @@ private fun LinkaApp(
         AnimatedContent(
             targetState = tab, modifier = Modifier.fillMaxSize().padding(padding),
             transitionSpec = {
-                if (animations) (fadeIn(tween(durationMillis = 170)) + slideInVertically(tween(durationMillis = 190)) { it / 70 }) togetherWith
-                    (fadeOut(tween(durationMillis = 120)) + slideOutVertically(tween(durationMillis = 130)) { -it / 90 })
-                else fadeIn(tween(durationMillis = 90)) togetherWith fadeOut(tween(durationMillis = 90))
+                if (animations) {
+                    val forward = targetState > initialState
+                    (fadeIn(tween(durationMillis = 190)) +
+                        slideInHorizontally(animationSpec = spring(dampingRatio = .92f, stiffness = 420f)) { width ->
+                            if (forward) width / 22 else -width / 22
+                        } +
+                        slideInVertically(tween(durationMillis = 210)) { height -> height / 90 }) togetherWith
+                        (fadeOut(tween(durationMillis = 135)) +
+                            slideOutHorizontally(tween(durationMillis = 160)) { width ->
+                                if (forward) -width / 34 else width / 34
+                            } +
+                            slideOutVertically(tween(durationMillis = 145)) { height -> -height / 120 })
+                } else fadeIn(tween(durationMillis = 90)) togetherWith fadeOut(tween(durationMillis = 90))
             }, label = "linka-page"
         ) { page ->
             Column(Modifier.fillMaxSize().background(
@@ -1526,8 +1540,12 @@ private fun LinkaApp(
                 )
             ).drawBehind {
                 if (theme != "oled" && effects != "quiet" && animations) {
-                    val center = Offset(size.width * .52f, size.height * .13f)
-                    val radius = size.width * (.27f + .012f * ambientPulse)
+                    val orbitAngle = ambientOrbit * (2.0 * Math.PI)
+                    val center = Offset(
+                        size.width * (.52f + .018f * kotlin.math.sin(orbitAngle).toFloat()),
+                        size.height * (.13f + .009f * kotlin.math.cos(orbitAngle).toFloat())
+                    )
+                    val radius = size.width * (.265f + .014f * ambientPulse)
                     val strength = if (effects == "atmosphere") .19f else .10f
                     val glowRadius = radius * 1.85f
                     drawCircle(
@@ -1549,6 +1567,20 @@ private fun LinkaApp(
                             center = highlight, radius = radius * .62f
                         ), radius = radius * .62f, center = highlight
                     )
+                    if (effects == "atmosphere") {
+                        drawCircle(
+                            color = sphereAccent.copy(alpha = .055f + .012f * ambientPulse),
+                            radius = radius * 1.15f,
+                            center = center,
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.1.dp.toPx())
+                        )
+                        drawCircle(
+                            color = Color.White.copy(alpha = .018f),
+                            radius = radius * .91f,
+                            center = center,
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = .7.dp.toPx())
+                        )
+                    }
                 }
             }.verticalScroll(rememberScrollState()).imePadding()
                 .padding(horizontal = 18.dp).padding(top = 14.dp, bottom = 28.dp),
@@ -1656,13 +1688,13 @@ private fun LinkaApp(
                         Text(tr(lang, "manage"), color = muted, fontSize = 12.sp * fontScale)
                         SettingsGroup(tr(lang, "appearance"), panel, border, main) {
                             Text(tr(lang, "appearance"), color = main, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                            Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                                 listOf("dark" to tr(lang, "themeDark"), "oled" to "OLED Black", "light" to tr(lang, "themeLight"), "system" to tr(lang, "themeSystem")).forEach { (v, label) ->
                                     FilterChip(selected = theme == v, onClick = { setTheme(v) }, label = { Text(label, fontSize = 11.sp) })
                                 }
                             }
                             Text(if (lang == "ru") "Акцентный цвет" else if (lang == "az") "Vurğu rəngi" else if (lang == "tr") "Vurgu rengi" else "Accent color", color = muted, fontSize = 11.sp)
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 listOf("violet" to "Violet", "blue" to "Blue", "mint" to "Mint", "rose" to "Rose").forEach { (v, label) ->
                                     FilterChip(selected = accent == v, onClick = { setAccent(v) }, label = { Text(label, fontSize = 10.sp) })
                                 }
@@ -1671,13 +1703,13 @@ private fun LinkaApp(
                             SettingSwitch(tr(lang, "animations"), animations, setAnimations, main, muted)
                             SettingSwitch(tr(lang, "ambientAudio"), ambientAudio, setAmbientAudio, main, muted)
                             Text(if (lang == "ru") "Интенсивность эффектов" else if (lang == "az") "Effektlərin intensivliyi" else if (lang == "tr") "Efekt yoğunluğu" else "Visual effects", color = muted, fontSize = 11.sp)
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 listOf("quiet" to (if (lang == "ru") "Тихо" else if (lang == "az") "Sakit" else if (lang == "tr") "Sakin" else "Quiet"), "balanced" to (if (lang == "ru") "Баланс" else if (lang == "az") "Balans" else if (lang == "tr") "Dengeli" else "Balanced"), "atmosphere" to (if (lang == "ru") "Атмосфера" else if (lang == "az") "Atmosfer" else if (lang == "tr") "Atmosfer" else "Atmosphere")).forEach { (v, label) ->
                                     FilterChip(selected = effects == v, onClick = { setEffects(v) }, label = { Text(label, fontSize = 10.sp) })
                                 }
                             }
                             Text(if (lang == "ru") "Плотность интерфейса" else if (lang == "az") "İnterfeys sıxlığı" else if (lang == "tr") "Arayüz yoğunluğu" else "Interface density", color = muted, fontSize = 11.sp)
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 listOf("compact" to (if (lang == "ru") "Компактно" else if (lang == "az") "Yığcam" else if (lang == "tr") "Kompakt" else "Compact"), "standard" to (if (lang == "ru") "Стандарт" else if (lang == "az") "Standart" else if (lang == "tr") "Standart" else "Standard"), "spacious" to (if (lang == "ru") "Свободно" else if (lang == "az") "Geniş" else if (lang == "tr") "Geniş" else "Spacious")).forEach { (v, label) ->
                                     FilterChip(selected = density == v, onClick = { setDensity(v) }, label = { Text(label, fontSize = 10.sp) })
                                 }
@@ -2073,7 +2105,7 @@ private fun LanguageWelcome(dark: Boolean, animations: Boolean, onContinue: (Str
 @Composable
 private fun Header(lang: String, main: Color, muted: Color, panel: Color, border: Color, onSettings: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Surface(shape = RoundedCornerShape(16.dp), color = panel.copy(alpha = .96f), border = BorderStroke(1.dp, border)) {
+        Surface(shape = RoundedCornerShape(16.dp), color = panel.copy(alpha = .88f), border = BorderStroke(1.dp, border.copy(alpha = .85f)), shadowElevation = 5.dp) {
             androidx.compose.foundation.Image(painterResource(R.drawable.linka_mark), "Linka logo", Modifier.size(47.dp).padding(4.dp))
         }
         Column {
@@ -2142,13 +2174,29 @@ private fun CaptureCard(
             fetchLinkPreview(capture.text)?.let { onPreviewLoaded(capture, it) }
         }
     }
-    Card(colors = CardDefaults.cardColors(containerColor = if (capture.pinned) raised else panel), border = BorderStroke(1.dp, border),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (capture.pinned) 2.dp else 1.dp),
-        shape = RoundedCornerShape(23.dp), modifier = Modifier.fillMaxWidth().then(if (animations) Modifier.animateContentSize(spring(dampingRatio = .82f, stiffness = 320f)) else Modifier)) {
+    val accentColor = MaterialTheme.colorScheme.primary
+    Card(
+        colors = CardDefaults.cardColors(containerColor = if (capture.pinned) raised.copy(alpha = .98f) else panel.copy(alpha = .93f)),
+        border = BorderStroke(1.dp, if (capture.pinned) accentColor.copy(alpha = .38f) else border.copy(alpha = .76f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (capture.pinned) 2.dp else 0.dp),
+        shape = RoundedCornerShape(23.dp),
+        modifier = Modifier.fillMaxWidth().then(if (animations) Modifier.animateContentSize(spring(dampingRatio = .86f, stiffness = 340f)) else Modifier)
+    ) {
         Column(Modifier.padding(when (density) { "compact" -> 12.dp; "spacious" -> 21.dp; else -> 15.dp }), verticalArrangement = Arrangement.spacedBy(when (density) { "compact" -> 6.dp; "spacious" -> 13.dp; else -> 9.dp })) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                Icon(if (link) Icons.Outlined.Link else Icons.Outlined.NoteAlt, null, tint = muted, modifier = Modifier.size(16.dp))
-                Text(if (capture.pinned) tr(lang, "pinned").uppercase() else tr(lang, captureTypeKey(capture)).uppercase(), color = muted, fontSize = 9.sp, letterSpacing = 1.sp)
+                Surface(
+                    color = accentColor.copy(alpha = if (capture.pinned) .15f else .075f),
+                    shape = RoundedCornerShape(9.dp)
+                ) {
+                    Icon(if (link) Icons.Outlined.Link else Icons.Outlined.NoteAlt, null,
+                        tint = if (capture.pinned) accentColor else muted,
+                        modifier = Modifier.padding(7.dp).size(15.dp))
+                }
+                Text(
+                    if (capture.pinned) tr(lang, "pinned").uppercase() else tr(lang, captureTypeKey(capture)).uppercase(),
+                    color = if (capture.pinned) accentColor else muted,
+                    fontSize = 9.sp, letterSpacing = 1.sp, fontWeight = FontWeight.SemiBold
+                )
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = { onPin(capture) }, modifier = Modifier.size(30.dp)) {
                     Icon(Icons.Outlined.PushPin, tr(lang, if (capture.pinned) "unpin" else "pin"), tint = if (capture.pinned) main else muted, modifier = Modifier.size(17.dp))
@@ -2218,7 +2266,12 @@ private fun PrivacyCard(lang: String, panel: Color, border: Color, main: Color, 
 private fun SettingsGroup(title: String, panel: Color, border: Color, main: Color, content: @Composable () -> Unit) {
     Card(colors = CardDefaults.cardColors(containerColor = panel.copy(alpha = .96f)), border = BorderStroke(1.dp, border.copy(alpha = .82f)), shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
-            Text(title, color = main, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                Surface(color = MaterialTheme.colorScheme.primary.copy(alpha = .14f), shape = RoundedCornerShape(6.dp)) {
+                    Box(Modifier.size(width = 4.dp, height = 18.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(6.dp)))
+                }
+                Text(title, color = main, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-.2).sp)
+            }
             content()
         }
     }
