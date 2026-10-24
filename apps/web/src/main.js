@@ -11,12 +11,10 @@ import {
   startGoogleOAuth, completeGoogleOAuthCallback
 } from "./cloud-sync.js";
 import QRCode from "qrcode";
+import { inspectTrashStorage, saveTrash, TRASH_KEY, TRASH_RECOVERY_KEY, MAX_TRASH_ITEMS } from "./trash-store.js";
 
 const $ = selector => document.querySelector(selector);
 const QUICK_DRAFT_KEY = "linka.quickDraft.v1";
-const TRASH_KEY = "linka.trash.v1";
-const TRASH_RECOVERY_KEY = "linka.trash.recovery.v1";
-const MAX_TRASH_ITEMS = 1000;
 const form = $("#capture-form");
 const draft = $("#capture-text");
 const saveButton = $("#save-button");
@@ -365,65 +363,10 @@ function modalShell(content, { dismissable = false } = {}) {
   return layer;
 }
 function inspectTrash() {
-  let raw;
-  try { raw = localStorage.getItem(TRASH_KEY); }
-  catch { return { status: "unavailable", items: [], error: "Local storage is unavailable." }; }
-  if (raw == null) return { status: "empty", items: [], raw: null };
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.some(item => !item || typeof item.id !== "string" || typeof item.text !== "string")) {
-      throw new TypeError("Trash data is not a valid item array.");
-    }
-    return { status: parsed.length ? "ok" : "empty", items: parsed, raw };
-  } catch (error) {
-    try {
-      if (!localStorage.getItem(TRASH_RECOVERY_KEY)) {
-        localStorage.setItem(TRASH_RECOVERY_KEY, JSON.stringify({
-          capturedAt: Date.now(), raw, reason: String(error?.message || error)
-        }));
-      }
-    } catch {}
-    return { status: "corrupt", items: [], raw, error: String(error?.message || error) };
-  }
+  return inspectTrashStorage();
 }
 function writeTrash(items) {
-  const current = inspectTrash();
-  if (current.status === "corrupt" || current.status === "unavailable") return false;
-  try { localStorage.setItem(TRASH_KEY, JSON.stringify(items)); return true; }
-  catch { return false; }
-}
-function moveCapturesToTrash(items) {
-  const previousTrash = inspectTrash();
-  if (previousTrash.status === "corrupt" || previousTrash.status === "unavailable") return false;
-  const nextTrash = new Map(previousTrash.items.map(item => [item.id, item]));
-  const deletedAt = Date.now();
-  for (const item of items) nextTrash.set(item.id, { ...item, deletedAt });
-  if (nextTrash.size > MAX_TRASH_ITEMS) return false;
-  if (!writeTrash([...nextTrash.values()].sort((a, b) => Number(b.deletedAt || 0) - Number(a.deletedAt || 0)))) return false;
-
-  const oldTombstones = readDeletedIds();
-  const nextTombstones = new Set(oldTombstones);
-  for (const item of items) nextTombstones.add(item.id);
-  try {
-    localStorage.setItem(DELETED_IDS_KEY, JSON.stringify([...nextTombstones]));
-    const check = readDeletedIds();
-    if (items.some(item => !check.has(item.id))) throw new Error("Tombstone write was not retained.");
-  } catch {
-    writeTrash(previousTrash.items);
-    return false;
-  }
-
-  const previousCaptures = captures;
-  const nextCaptures = captures.filter(item => !items.some(deleted => deleted.id === item.id));
-  if (!saveCaptures(nextCaptures)) {
-    try { localStorage.setItem(DELETED_IDS_KEY, JSON.stringify([...oldTombstones])); } catch {}
-    writeTrash(previousTrash.items);
-    return false;
-  }
-  captures = nextCaptures;
-  scheduleCloudSync();
-  render();
-  return true;
+  return saveTrash(items);
 }
 function clearDeletedId(id) {
   const deleted = readDeletedIds();
