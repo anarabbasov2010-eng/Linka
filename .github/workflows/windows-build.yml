@@ -28,11 +28,18 @@ jobs:
           $tag = "v$version"
           "LINKA_RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "VITE_LINKA_DESKTOP_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          $configPath = Join-Path $env:GITHUB_WORKSPACE "apps/desktop/src-tauri/tauri.conf.json"
-          $config = Get-Content -Raw $configPath | ConvertFrom-Json
-          $config.version = $version
-          $config | ConvertTo-Json -Depth 100 | Set-Content -Encoding utf8 $configPath
-          Write-Host "Building Linka Windows $version without a mobile release dependency."
+          $versionFiles = @("apps/web/package.json", "apps/desktop/package.json", "apps/desktop/src-tauri/tauri.conf.json")
+          foreach ($relativePath in $versionFiles) {
+            $path = Join-Path $env:GITHUB_WORKSPACE $relativePath
+            $manifest = Get-Content -Raw $path | ConvertFrom-Json
+            $manifest.version = $version
+            $manifest | ConvertTo-Json -Depth 100 | Set-Content -Encoding utf8 $path
+          }
+          $cargoPath = Join-Path $env:GITHUB_WORKSPACE "apps/desktop/src-tauri/Cargo.toml"
+          $cargo = Get-Content -Raw $cargoPath
+          $cargo = [regex]::Replace($cargo, '(?m)^version = "[^"]+"$', "version = `"$version`"", 1)
+          Set-Content -Path $cargoPath -Value $cargo -Encoding utf8
+          Write-Host "Building Linka Windows $version with synchronized manifests and no mobile-release dependency."
 
       - name: Inject public cloud endpoint when configured
         shell: pwsh
@@ -111,6 +118,16 @@ jobs:
           Start-Sleep -Seconds 8
           $process.Refresh()
           if ($process.HasExited) {
+            $diagnosticPaths = @(
+              (Join-Path $env:LOCALAPPDATA "Linka\logs\startup.log"),
+              (Join-Path $env:TEMP "Linka\startup.log")
+            )
+            foreach ($logPath in $diagnosticPaths) {
+              if (Test-Path $logPath) {
+                Write-Host "---- Linka startup diagnostics: $logPath ----"
+                Get-Content -Raw $logPath
+              }
+            }
             throw "Linka exited during the startup smoke test (exit code $($process.ExitCode))."
           }
           Stop-Process -Id $process.Id -Force

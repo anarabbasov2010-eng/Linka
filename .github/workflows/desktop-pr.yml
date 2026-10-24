@@ -48,6 +48,16 @@ jobs:
           Start-Sleep -Seconds 8
           $process.Refresh()
           if ($process.HasExited) {
+            $diagnosticPaths = @(
+              (Join-Path $env:LOCALAPPDATA "Linka\logs\startup.log"),
+              (Join-Path $env:TEMP "Linka\startup.log")
+            )
+            foreach ($logPath in $diagnosticPaths) {
+              if (Test-Path $logPath) {
+                Write-Host "---- Linka startup diagnostics: $logPath ----"
+                Get-Content -Raw $logPath
+              }
+            }
             throw "Linka exited during the startup smoke test (exit code $($process.ExitCode))."
           }
           Stop-Process -Id $process.Id -Force
