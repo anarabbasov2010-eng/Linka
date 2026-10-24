@@ -110,9 +110,9 @@ test("duplicate URL comparison ignores tracking parameters without rewriting sto
 });
 
 test("multi-link paste is split only when every non-empty line is an HTTP URL", () => {
-  assert.deepEqual(splitCaptureBatch("https://example.com/a\\n\\nhttps://example.com/b"), [
+  assert.deepEqual(splitCaptureBatch("https://example.com/a\n\nhttps://example.com/b"), [
     "https://example.com/a", "https://example.com/b"
   ]);
-  assert.equal(splitCaptureBatch("A thought\\nhttps://example.com"), null);
+  assert.equal(splitCaptureBatch("A thought\nhttps://example.com"), null);
   assert.equal(splitCaptureBatch("https://example.com"), null);
 });

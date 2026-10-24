@@ -242,7 +242,7 @@ function render() {
       try {
         const url = new URL(item.text.trim());
         const domainTitle = document.createElement("p"); domainTitle.className = "item-title";
-        domainTitle.textContent = url.hostname.replace(/^www\\./i, "");
+        domainTitle.textContent = url.hostname.replace(/^www\./i, "");
         previewBits.push(domainTitle);
       } catch {}
     }
