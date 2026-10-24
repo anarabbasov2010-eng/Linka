@@ -169,6 +169,8 @@ export function parseSearchQuery(query = "") {
 
 export function visibleCaptures(items, filter = "all", query = "") {
   const parsed = parseSearchQuery(query);
+  const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+  const startOfTomorrow = new Date(startOfToday); startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
   return items.filter(item => {
     const isLink = /^https?:\/\//i.test(item.text);
     const showTrash = filter === "trash" || parsed.trashed;
@@ -189,11 +191,7 @@ export function visibleCaptures(items, filter = "all", query = "") {
     if (isLink) { try { host = new URL(item.text).hostname.replace(/^www\./i, "").toLocaleLowerCase(); } catch {} }
     if (parsed.site && !(host === parsed.site || host.endsWith("." + parsed.site))) return false;
     const savedAt = Number(item.createdAt || item.updatedAt || 0);
-    if (filter === "today") {
-      const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
-      const startOfTomorrow = new Date(startOfToday); startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
-      if (!(savedAt >= startOfToday.getTime() && savedAt < startOfTomorrow.getTime())) return false;
-    }
+    if (filter === "today" && !(savedAt >= startOfToday.getTime() && savedAt < startOfTomorrow.getTime())) return false;
     if (parsed.before !== null && !(savedAt < parsed.before)) return false;
     if (parsed.after !== null && !(savedAt >= parsed.after)) return false;
     const searchable = [item.text, item.previewTitle, item.previewDescription, host, ...(item.tags || []), item.collection || ""].join(" ").toLocaleLowerCase();
