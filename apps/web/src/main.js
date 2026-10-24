@@ -1,6 +1,6 @@
 import { loadCaptures, saveCaptures, makeCapture, visibleCaptures, getCaptureStorageStatus, getCaptureRecoveryData } from "./store.js";
 import { initLinkaExperience } from "./experience.js";
-import { initVisualSystem, setLinkaAccent, setLinkaDensity, setLinkaEffects } from "./visual-system.js";
+import { initVisualSystem } from "./visual-system.js";
 import { initLinkaAtmosphere, openAtmosphereSettings } from "./atmosphere.js";
 import { initLinkaDocuments } from "./documents.js";
 import { initLinkaSignature } from "./signature-theme.js";
@@ -601,117 +601,6 @@ function showCloudSyncНастройки() {
     finally { setBusy(false); }
   }
 }
-async function checkWindowsInstaller(statusLine, downloadLink) {
-  statusLine.textContent = "Проверитьing the latest Linka release…";
-  downloadLink.hidden = true;
-  try {
-    const response = await fetch("https://api.github.com/repos/anarabbasov2010-eng/Linka/releases/latest", {
-      headers: { Accept: "application/vnd.github+json", "User-Agent": "Linka-Web" }
-    });
-    if (!response.ok) throw new Error(`GitHub returned ${response.status}. Try again later.`);
-    const release = await response.json();
-    const tag = String(release.tag_name || "").replace(/^v/, "");
-    const asset = (release.assets || []).find(item => item.name === "Linka-Windows-x64-setup.exe");
-    if (!asset) {
-      statusLine.textContent = "The Windows installer for this release is still being built. Проверить again shortly.";
-      return;
-    }
-    downloadLink.href = asset.browser_download_url;
-    downloadLink.hidden = false;
-    downloadLink.textContent = desktopBuildVersion && compareVersions(tag, desktopBuildVersion) > 0
-      ? `Скачать update ${tag}`
-      : "Скачать Windows installer";
-    if (desktopBuildVersion && compareVersions(tag, desktopBuildVersion) <= 0) {
-      statusLine.textContent = `Приложение для Windows version ${desktopBuildVersion} is current. You can reinstall the latest installer over the existing copy.`;
-    } else {
-      statusLine.textContent = `Linka Windows ${tag} is available. Run the installer over your existing copy to update it.`;
-    }
-  } catch (error) {
-    statusLine.textContent = error?.message || "Не удалось проверить обновления Windows.";
-  }
-}
-
-function showНастройки() {
-  const content=document.createElement("div");
-  const head=document.createElement("div"); head.className="modal-head";
-  const logo=document.createElement("img"); logo.className="modal-logo"; logo.src="/linka-mark.svg"; logo.alt="";
-  const meta=document.createElement("div"); const title=document.createElement("h2"); title.textContent="Настройки";
-  const sub=document.createElement("p"); sub.textContent="Настрой Linka под себя"; meta.append(title,sub); head.append(logo,meta); content.append(head);
-  function addChoiceSetting(titleText, descriptionText, options, selectedValue, onSelect, ariaLabel) {
-    const row = document.createElement("div"); row.className = "setting-row visual-setting-row";
-    const meta = document.createElement("div");
-    const title = document.createElement("strong"); title.textContent = titleText;
-    const description = document.createElement("p"); description.textContent = descriptionText;
-    meta.append(title, description);
-    const group = document.createElement("div"); group.className = "theme-options"; group.setAttribute("aria-label", ariaLabel || titleText);
-    options.forEach(option => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "theme-option" + (selectedValue === option.value ? " active" : "");
-      button.textContent = option.label;
-      if (option.color) button.style.setProperty("--option-color", option.color);
-      button.addEventListener("click", () => {
-        onSelect(option.value);
-        group.querySelectorAll("button").forEach(node => node.classList.toggle("active", node === button));
-      });
-      group.append(button);
-    });
-    row.append(meta, group); content.append(row);
-  }
-  addChoiceSetting("Плотность интерфейса", "Больше пространства или больше содержимого", [
-    {value:"compact",label:"Компактно"},
-    {value:"standard",label:"Стандарт"},
-    {value:"spacious",label:"Свободно"}
-  ], localStorage.getItem("linka.density") || "standard", setLinkaDensity, "Interface density");
-  const motionRow=document.createElement("div"); motionRow.className="setting-row";
-  const motionMeta=document.createElement("div"); const mt=document.createElement("strong"); mt.textContent="Меньше анимации";
-  const md=document.createElement("p"); md.textContent="Уменьшает движение и переходы интерфейса"; motionMeta.append(mt,md);
-  const toggle=document.createElement("button"); toggle.type="button"; toggle.className="toggle"; toggle.setAttribute("aria-pressed",String(reduceMotion)); toggle.setAttribute("aria-label","Toggle reduced motion");
-  const knob=document.createElement("span"); toggle.append(knob);
-  toggle.addEventListener("click",()=>{reduceMotion=!reduceMotion;localStorage.setItem("linka.reduceMotion",String(reduceMotion));toggle.setAttribute("aria-pressed",String(reduceMotion));document.documentElement.classList.toggle("reduced-motion",reduceMotion);});
-  motionRow.append(motionMeta,toggle);content.append(motionRow);
-  if(reduceMotion)document.documentElement.classList.add("reduced-motion");
-  const cloudRow=document.createElement("div"); cloudRow.className="setting-row";
-  const cloudMeta=document.createElement("div");
-  const cloudTitle=document.createElement("strong"); cloudTitle.textContent="Облачная синхронизация";
-  const cloudDesc=document.createElement("p"); const cloudSession=getCloudSession();
-  cloudDesc.textContent=cloudSession ? `Connected as ${cloudSession.email || "your account"} · ${cloudSyncStatus || "sync across your devices"}` : "Синхронизируй ссылки и заметки между Android, Windows и сайтом";
-  cloudMeta.append(cloudTitle,cloudDesc);
-  const cloudButton=document.createElement("button"); cloudButton.type="button"; cloudButton.className="ghost"; cloudButton.textContent=cloudSession?"Manage":"Set up";
-  cloudButton.addEventListener("click",()=>{modalRoot.replaceChildren();showCloudSyncНастройки();});
-  cloudRow.append(cloudMeta,cloudButton);content.append(cloudRow);
-
-  const windowsRow=document.createElement("div"); windowsRow.className="setting-row";
-  const windowsMeta=document.createElement("div");
-  const windowsTitle=document.createElement("strong"); windowsTitle.textContent="Приложение для Windows";
-  const windowsDesc=document.createElement("p"); windowsDesc.textContent=desktopBuildVersion ? `Installed version ${desktopBuildVersion}. Updates install over the existing app.` : "Проверить the latest Windows installer or update your existing desktop app.";
-  windowsMeta.append(windowsTitle,windowsDesc);
-  const windowsControls=document.createElement("div"); windowsControls.className="windows-update-controls";
-  const windowsПроверить=document.createElement("button"); windowsПроверить.type="button"; windowsПроверить.className="ghost"; windowsПроверить.textContent="Проверить";
-  const windowsСкачать=document.createElement("a"); windowsСкачать.className="primary"; windowsСкачать.textContent="Скачать"; windowsСкачать.target="_blank"; windowsСкачать.rel="noopener noreferrer"; windowsСкачать.hidden=true;
-  windowsControls.append(windowsПроверить,windowsСкачать);
-  windowsRow.append(windowsMeta,windowsControls);content.append(windowsRow);
-  const windowsStatus=document.createElement("p"); windowsStatus.className="cloud-status"; windowsStatus.textContent="Проверить release status before downloading an installer.";
-  content.append(windowsStatus);
-  windowsПроверить.addEventListener("click",()=>{void checkWindowsInstaller(windowsStatus,windowsСкачать);});
-
-  const atmosphereRow=document.createElement("div"); atmosphereRow.className="setting-row";
-  const atmosphereMeta=document.createElement("div"); const atmosphereTitle=document.createElement("strong"); atmosphereTitle.textContent="Атмосфера и музыка";
-  const atmosphereDesc=document.createElement("p"); atmosphereDesc.textContent="Лесной фон, плёночное зерно, свой трек и плейлист";
-  atmosphereMeta.append(atmosphereTitle,atmosphereDesc);
-  const atmosphereOpen=document.createElement("button"); atmosphereOpen.type="button"; atmosphereOpen.className="ghost"; atmosphereOpen.textContent="Настроить";
-  atmosphereOpen.addEventListener("click",()=>{modalRoot.replaceChildren();openAtmosphereSettings();});
-  atmosphereRow.append(atmosphereMeta,atmosphereOpen); content.append(atmosphereRow);
-  const agreementRow=document.createElement("div"); agreementRow.className="setting-row";
-  const am=document.createElement("div"); const at=document.createElement("strong");at.textContent="Пользовательское соглашение";const ap=document.createElement("p");ap.textContent="Review the local-storage and privacy terms";am.append(at,ap);
-  const view=document.createElement("button");view.type="button";view.className="ghost";view.textContent="Читать условия";
-  view.addEventListener("click",()=>{modalRoot.replaceChildren();showAgreement({mustAccept:false});});
-  agreementRow.append(am,view);content.append(agreementRow);
-  const actions=document.createElement("div");actions.className="modal-actions";const close=document.createElement("button");close.type="button";close.className="primary";close.textContent="Готово";close.addEventListener("click",()=>modalRoot.replaceChildren());actions.append(close);content.append(actions);
-  const layer=modalShell(content,{dismissable:true});
-  const priorFocus=document.activeElement;
-  layer.querySelector("button")?.focus();
-}
 showCaptureStorageRecoveryNotice();
 restoreQuickDraft();
 draft.addEventListener("input",()=>{saveButton.disabled=!draft.value.trim();saveQuickDraft();});
@@ -831,7 +720,7 @@ $("#import-file").addEventListener("change",async event=>{
   }catch{say("Этот файл не похож на экспорт Linka");}finally{event.target.value="";}
 });
 window.addEventListener("linka:open-cloud-settings",()=>{modalRoot.replaceChildren();showCloudSyncНастройки();});
-$("#settings-button").addEventListener("click",()=>window.dispatchEvent(new CustomEvent("linka:open-settings")));
+window.addEventListener("linka:open-atmosphere-settings", () => openAtmosphereSettings());
 $("#search-space-button").addEventListener("click",()=>showSearchSpace(search.value));
 document.addEventListener("keydown",event=>{
   if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="k"){
