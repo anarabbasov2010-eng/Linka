@@ -151,6 +151,43 @@ async function storeDocument(document) {
     throw new Error("storage-unavailable");
   }
 }
+export async function searchLinkaDocuments(query = "", limit = 20) {
+  const needle = String(query || "").trim().replace(/^"|"$/g, "").toLocaleLowerCase();
+  if (needle.length < 2 || needle.includes(":")) return [];
+  const documents = await listDocuments();
+  const matches = [];
+  for (let index = 0; index < documents.length; index++) {
+    const item = documents[index];
+    const title = String(item.title || "");
+    const text = String(item.text || "");
+    const titleMatch = title.toLocaleLowerCase().includes(needle);
+    const textPosition = titleMatch ? -1 : text.toLocaleLowerCase().indexOf(needle);
+    if (titleMatch || textPosition >= 0) {
+      const excerptStart = textPosition >= 0 ? Math.max(0, textPosition - 72) : 0;
+      const excerptEnd = textPosition >= 0 ? Math.min(text.length, textPosition + needle.length + 110) : Math.min(text.length, 160);
+      matches.push({
+        id: String(item.id),
+        title: title || t("untitled"),
+        updatedAt: Number(item.updatedAt || item.createdAt || 0),
+        excerpt: text.slice(excerptStart, excerptEnd).replace(/\s+/g, " ").trim(),
+        matchedTitle: titleMatch
+      });
+      if (matches.length >= Math.max(1, Math.min(50, Number(limit) || 20))) break;
+    }
+    // Searching large local documents remains cooperative and does not keep
+    // the main thread busy for a long uninterrupted scan.
+    if (index % 2 === 1) await new Promise(resolve => setTimeout(resolve, 0));
+  }
+  return matches;
+}
+
+export async function openLinkaDocumentById(id) {
+  const documentValue = (await listDocuments()).find(item => String(item.id) === String(id));
+  if (!documentValue) return false;
+  await openEditor(documentValue);
+  return true;
+}
+
 async function listDocuments() {
   const db = await database();
   if (db) {
