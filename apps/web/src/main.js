@@ -1,4 +1,4 @@
-import { loadCaptures, saveCaptures, makeCapture, visibleCaptures } from "./store.js";
+import { loadCaptures, saveCaptures, makeCapture, visibleCaptures, getCaptureStorageStatus, getCaptureRecoveryData } from "./store.js";
 import { initLinkaExperience } from "./experience.js";
 import { initVisualSystem, setLinkaAccent, setLinkaDensity, setLinkaEffects } from "./visual-system.js";
 import { initLinkaAtmosphere, openAtmosphereSettings } from "./atmosphere.js";
@@ -13,6 +13,7 @@ import {
 import QRCode from "qrcode";
 
 const $ = selector => document.querySelector(selector);
+const QUICK_DRAFT_KEY = "linka.quickDraft.v1";
 const form = $("#capture-form");
 const draft = $("#capture-text");
 const saveButton = $("#save-button");
@@ -77,9 +78,47 @@ function formatDate(value) {
   try { return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
   catch { return "Saved"; }
 }
-function persist() {
-  if (!saveCaptures(captures)) say("Storage unavailable or full. Export a backup before closing.");
+function persist(options = {}) {
+  if (!saveCaptures(captures, undefined, options)) {
+    const storage = getCaptureStorageStatus();
+    say(storage.status === "corrupt"
+      ? "Библиотека повреждена. Исходные данные сохранены для восстановления; обычная запись заблокирована."
+      : "Не удалось сохранить библиотеку: проверь свободное место и выгрузи резервную копию.");
+    return false;
+  }
   scheduleCloudSync();
+  return true;
+}
+function saveQuickDraft() {
+  try { if (draft?.value) localStorage.setItem(QUICK_DRAFT_KEY, JSON.stringify({ text: draft.value, updatedAt: Date.now() })); else localStorage.removeItem(QUICK_DRAFT_KEY); } catch {}
+}
+function clearQuickDraft() { try { localStorage.removeItem(QUICK_DRAFT_KEY); } catch {} }
+function restoreQuickDraft() {
+  try {
+    const record = JSON.parse(localStorage.getItem(QUICK_DRAFT_KEY) || "null");
+    if (record && typeof record.text === "string" && record.text && !draft.value) {
+      draft.value = record.text; saveButton.disabled = !draft.value.trim(); say("Восстановлен несохранённый черновик");
+    }
+  } catch {}
+}
+function showCaptureStorageRecoveryNotice() {
+  if (getCaptureStorageStatus().status !== "corrupt") return;
+  const banner = document.createElement("section");
+  banner.className = "linka-recovery-banner"; banner.setAttribute("role", "alert");
+  banner.style.cssText = "display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:12px 0;padding:14px 16px;border:1px solid rgba(230,171,120,.5);border-radius:15px;background:rgba(90,45,24,.3);color:var(--text,#eee);";
+  const copy = document.createElement("div"); copy.style.cssText = "flex:1;min-width:220px;line-height:1.5;font-size:13px;";
+  copy.textContent = "Не удалось прочитать библиотеку. Исходные данные сохранены для восстановления; Linka не будет перезаписывать повреждённое хранилище автоматически.";
+  const download = document.createElement("button"); download.type = "button"; download.className = "ghost"; download.textContent = "Скачать исходные данные";
+  download.addEventListener("click", () => {
+    const recovery = getCaptureRecoveryData();
+    if (!recovery) { say("Резервная копия исходных данных недоступна."); return; }
+    const url = URL.createObjectURL(new Blob([JSON.stringify(recovery, null, 2)], { type: "application/json" }));
+    const anchor = document.createElement("a"); anchor.href = url; anchor.download = "linka-damaged-library-recovery.json";
+    anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+  const importButton = document.createElement("button"); importButton.type = "button"; importButton.className = "primary"; importButton.textContent = "Импортировать резервную копию";
+  importButton.addEventListener("click", () => $("#import-button")?.click());
+  banner.append(copy, download, importButton); form?.parentElement?.insertBefore(banner, form);
 }
 function scheduleCloudSync() {
   if (!getCloudSession()) return;
@@ -91,8 +130,8 @@ async function syncNow({ silent = false } = {}) {
   cloudSyncBusy = true;
   try {
     const result = await syncCloudCaptures(captures, readDeletedIds());
+    if (!saveCaptures(result.captures)) throw new Error("Облачная копия обновлена, но локальное хранилище не изменено. Исходные локальные данные сохранены для восстановления.");
     captures = result.captures;
-    saveCaptures(captures);
     cloudSyncStatus = result.message;
     render();
     if (!silent) say(result.message);
@@ -280,7 +319,7 @@ function makeAction(label, action, id) {
   return button;
 }
 function resetEditor() {
-  editingId = null; draft.value = ""; composeLabel.textContent = "Quick capture";
+  editingId = null; draft.value = ""; clearQuickDraft(); composeLabel.textContent = "Quick capture";
   saveButton.innerHTML = 'Save to inbox <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg>';
   saveButton.disabled = true;
 }
@@ -673,14 +712,20 @@ function showНастройки() {
   const priorFocus=document.activeElement;
   layer.querySelector("button")?.focus();
 }
-draft.addEventListener("input",()=>{saveButton.disabled=!draft.value.trim();});
+showCaptureStorageRecoveryNotice();
+restoreQuickDraft();
+draft.addEventListener("input",()=>{saveButton.disabled=!draft.value.trim();saveQuickDraft();});
 draft.addEventListener("keydown",event=>{if((event.ctrlKey||event.metaKey)&&event.key==="Enter"&&draft.value.trim()){event.preventDefault();form.requestSubmit();}});
 form.addEventListener("submit",event=>{
   event.preventDefault();const text=draft.value.trim();if(!text)return;
+  const previousCaptures=captures.slice();
   const existing=editingId?captures.find(item=>item.id===editingId):null;
-  if(existing){captures=captures.map(item=>item.id===editingId?{...item,text:text.slice(0,100000),updatedAt:Date.now()}:item);say("Запись обновлена");}
-  else{captures.unshift(makeCapture(text));say("Сохранено на этом устройстве");window.dispatchEvent(new CustomEvent("linka:capture-saved",{detail:{title:"Saved to Linka",body:text.slice(0,140)}}));}
-  persist();resetEditor();render();
+  if(existing){captures=captures.map(item=>item.id===editingId?{...item,text,updatedAt:Date.now()}:item);}
+  else{captures.unshift(makeCapture(text));}
+  if(!persist()){captures=previousCaptures;render();return;}
+  if(existing) say("Запись обновлена");
+  else window.dispatchEvent(new CustomEvent("linka:capture-saved",{detail:{title:"Saved to Linka",body:text.slice(0,140)}}));
+  resetEditor();render();
 });
 search.addEventListener("input",render);
 filters.forEach(button=>button.addEventListener("click",()=>{
@@ -779,10 +824,14 @@ $("#import-file").addEventListener("change",async event=>{
   const file=event.target.files?.[0];if(!file)return;
   try{const parsed=JSON.parse(await file.text());const imported=Array.isArray(parsed)?parsed:parsed.captures;if(!Array.isArray(imported))throw new Error("Invalid file");
     const normalized=imported.map(item=>makeCapture(item.text,item)).filter(Boolean);const restoredIds=new Set(normalized.map(item=>item.id));const deleted=readDeletedIds();restoredIds.forEach(id=>deleted.delete(id));try{localStorage.setItem("linka.deletedIds.v1",JSON.stringify(Array.from(deleted)));}catch{}const map=new Map(captures.map(item=>[item.id,item]));normalized.forEach(item=>map.set(item.id,item));
-    captures=Array.from(map.values()).sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,1000);persist();render();say("Imported "+normalized.length+" capture(s)");
+    const previousCaptures=captures;
+    captures=Array.from(map.values()).sort((a,b)=>b.updatedAt-a.updatedAt);
+    if(!persist({allowReplaceCorrupt:true})){captures=previousCaptures;render();say("Не удалось импортировать резервную копию. Исходная библиотека сохранена.");return;}
+    render();say("Imported "+normalized.length+" capture(s)");
   }catch{say("Этот файл не похож на экспорт Linka");}finally{event.target.value="";}
 });
-$("#settings-button").addEventListener("click",showНастройки);
+window.addEventListener("linka:open-cloud-settings",()=>{modalRoot.replaceChildren();showCloudSyncНастройки();});
+$("#settings-button").addEventListener("click",()=>window.dispatchEvent(new CustomEvent("linka:open-settings")));
 $("#search-space-button").addEventListener("click",()=>showSearchSpace(search.value));
 document.addEventListener("keydown",event=>{
   if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="k"){

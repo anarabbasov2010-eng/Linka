@@ -24,12 +24,12 @@ test("cloud merge respects deletion tombstones so removed data cannot reappear",
   assert.deepEqual(merged.map(item => item.id), ["kept"]);
 });
 
-test("cloud merge ignores malformed records and enforces the shared item limit", () => {
+test("cloud merge ignores malformed records but never truncates the merged local library", () => {
   const items = Array.from({ length: 510 }, (_, index) => ({
     id: String(index), text: "note", createdAt: index + 1, updatedAt: index + 1
   }));
   const merged = mergeCloudCaptures(items.concat([null, { id: "bad", text: "" }]), [], new Set());
-  assert.equal(merged.length, 500);
+  assert.equal(merged.length, 510);
   assert.equal(merged[0].id, "509");
 });
 
@@ -77,4 +77,14 @@ test("Google OAuth callback ignores normal routes and reports provider errors", 
     completeGoogleOAuthCallback({ location: { hash: "#error=access_denied&error_description=Sign-in%20was%20cancelled" } }),
     /Sign-in was cancelled/i
   );
+});
+
+
+test("cloud merge preserves 500, 1000, and 5000 distinct local records", () => {
+  for (const count of [500, 1000, 5000]) {
+    const records = Array.from({ length: count }, (_, index) => ({ id: String(index), text: "note " + index, createdAt: index + 1, updatedAt: index + 1 }));
+    const merged = mergeCloudCaptures(records, [], new Set());
+    assert.equal(merged.length, count, `expected all ${count} records to survive`);
+    assert.equal(new Set(merged.map(item => item.id)).size, count);
+  }
 });

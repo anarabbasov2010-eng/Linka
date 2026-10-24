@@ -144,39 +144,41 @@ function createMirrorAnimation(textarea, mirror) {
   ["fontFamily","fontSize","fontWeight","fontStyle","lineHeight","letterSpacing","textAlign","textIndent","paddingTop","paddingRight","paddingBottom","paddingLeft","boxSizing","tabSize"].forEach(key => { mirror.style[key] = computed[key]; });
   let previous = textarea.value;
   let clearGhostTimer = 0;
+  const MAX_MIRRORED_CHARS = 1800;
+  const setPlainTextMode = enabled => {
+    mirror.style.display = enabled ? "none" : "";
+    textarea.style.color = enabled ? "var(--linka-paper)" : "transparent";
+    textarea.style.webkitTextFillColor = enabled ? "var(--linka-paper)" : "transparent";
+    textarea.classList.toggle("linka-doc-plain-text", enabled);
+  };
   const draw = (value, before = value, animate = false) => {
-    mirror.replaceChildren();
+    clearTimeout(clearGhostTimer);
+    if (value.length > MAX_MIRRORED_CHARS || before.length > MAX_MIRRORED_CHARS) {
+      setPlainTextMode(true); mirror.replaceChildren(); return;
+    }
+    setPlainTextMode(false); mirror.replaceChildren();
     if (!value && !before) return;
     const prefix = reducedMotion() ? value.length : (() => { let i = 0; while (i < value.length && i < before.length && value[i] === before[i]) i++; return i; })();
     let suffix = 0;
     while (suffix < value.length - prefix && suffix < before.length - prefix && value[value.length - 1 - suffix] === before[before.length - 1 - suffix]) suffix++;
     const removed = before.slice(prefix, before.length - suffix);
     const added = value.slice(prefix, value.length - suffix);
+    if (animate && (removed.length + added.length > 240 || value.length > MAX_MIRRORED_CHARS / 2)) { mirror.textContent = value; return; }
     const makeSpan = (character, className, index) => {
-      const span = document.createElement("span");
-      span.className = className || "";
-      span.textContent = character;
+      const span = document.createElement("span"); span.className = className || ""; span.textContent = character;
       if (className === "linka-doc-letter") span.style.animationDelay = Math.min(Math.max(index, 0) * 9, 90) + "ms";
       return span;
     };
     for (let i = 0; i < prefix; i++) mirror.append(makeSpan(value[i], "", i));
     if (animate && removed && !reducedMotion()) {
       [...removed].forEach((character, index) => mirror.append(makeSpan(character, "linka-doc-gone", index)));
-      clearTimeout(clearGhostTimer);
       clearGhostTimer = setTimeout(() => draw(textarea.value), 210);
     }
     [...added].forEach((character, index) => mirror.append(makeSpan(character, animate && !reducedMotion() ? "linka-doc-letter" : "", index)));
     for (let i = value.length - suffix; i < value.length; i++) if (i >= prefix) mirror.append(makeSpan(value[i], "", i));
   };
   draw(textarea.value);
-  textarea.addEventListener("input", () => {
-    const next = textarea.value;
-    draw(next, previous, true);
-    previous = next;
-  });
-  textarea.addEventListener("scroll", () => { mirror.scrollTop = textarea.scrollTop; mirror.scrollLeft = textarea.scrollLeft; });
-  textarea.addEventListener("focus", () => { mirror.scrollTop = textarea.scrollTop; });
-  return () => clearTimeout(clearGhostTimer);
+  textarea.addEventListener("input", () => { const next = textarea.value; draw(next, previous, true); previous = next; });
 }
 
 function downloadDocument(document) {
@@ -267,7 +269,7 @@ function attachImportedFilePicker() {
     const file = event.target.files?.[0];
     if (!file) return;
     try {
-      if (file.size > 20 * 1024 * 1024) throw new Error("too-large");
+      if (file.size > 24 * 1024 * 1024) throw new Error("too-large");
       const parsed = parseLinkaDocument(await file.text(), file.name.replace(/\.[^.]+$/, "") || t("untitled"));
       currentDocument = await storeDocument(parsed);
       titleField.value = currentDocument.title;
