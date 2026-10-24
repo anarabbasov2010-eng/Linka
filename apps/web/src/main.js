@@ -1228,14 +1228,24 @@ $("#import-file").addEventListener("change",async event=>{
   try {
     const raw = await file.text();
     let imported;
-    if (/\.json$/i.test(file.name) || /^\s*[\[{]/.test(raw)) {
+    if (/\.json$/i.test(file.name) || file.type === "application/json") {
       const parsed = JSON.parse(raw);
       imported = Array.isArray(parsed) ? parsed : parsed.captures;
       if (!Array.isArray(imported)) throw new Error("Invalid Linka JSON backup");
     } else {
       // Text and Markdown files are imported as a single note to avoid guessing
       // where a user's paragraphs, lists, or code samples should be split.
-      imported = [{ id: undefined, text: raw }];
+      // JSON without a .json extension is only treated as a backup when it
+      // actually parses to a captures array; otherwise it remains plain text.
+      try {
+        const parsed = JSON.parse(raw);
+        const candidate = Array.isArray(parsed) ? parsed : parsed?.captures;
+        imported = Array.isArray(candidate) && candidate.every(item => item && typeof item.text === "string")
+          ? candidate
+          : [{ text: raw }];
+      } catch {
+        imported = [{ text: raw }];
+      }
     }
     const normalized=imported.map(item=>makeCapture(item.text,item)).filter(Boolean);
     if (!normalized.length) throw new Error("No text captures found");
