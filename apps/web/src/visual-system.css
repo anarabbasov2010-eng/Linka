@@ -352,3 +352,231 @@ body { text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; 
   .bulk-toolbar .action { flex: 1 1 26%; min-height: 38px; }
   .selection-mode-button { min-height: 40px; }
 }
+
+
+/* Linka Desktop Studio: refined glass surfaces and low-cost motion. */
+:root {
+  --glass-border: rgba(220, 208, 171, .20);
+  --glass-soft: rgba(19, 32, 22, .58);
+  --glass-raised: rgba(31, 45, 33, .60);
+  --desktop-ease: cubic-bezier(.16, 1, .3, 1);
+}
+html[data-platform="desktop"] body,
+html[data-platform="web"] body {
+  background: transparent !important;
+}
+@media (min-width: 761px) and (hover: hover) and (pointer: fine) {
+  html[data-platform="desktop"] .shell,
+  html[data-platform="web"] .shell {
+    width: min(100%, 1440px);
+    max-width: 1440px;
+    margin-inline: auto;
+    padding: 34px clamp(30px, 3.5vw, 58px) 70px;
+  }
+  html[data-platform="desktop"] .topbar,
+  html[data-platform="web"] .topbar {
+    margin-bottom: clamp(42px, 5vh, 66px);
+  }
+  html[data-platform="desktop"] .hero,
+  html[data-platform="web"] .hero {
+    max-width: 900px;
+    margin-bottom: 42px;
+  }
+  html[data-platform="desktop"] .hero h1,
+  html[data-platform="web"] .hero h1 {
+    font-size: clamp(52px, 5.3vw, 78px);
+    letter-spacing: -.055em;
+    line-height: 1.03;
+  }
+  html[data-platform="desktop"] .capture,
+  html[data-platform="web"] .capture {
+    width: min(100%, 960px);
+    max-width: 960px;
+    padding: 20px;
+    border: 1px solid var(--glass-border) !important;
+    border-radius: 27px;
+    background:
+      linear-gradient(135deg, rgba(232,223,200,.095), rgba(24,39,27,.56) 36%, rgba(9,17,11,.54)) !important;
+    box-shadow: 0 26px 72px rgba(0,0,0,.20), inset 0 1px 0 rgba(255,255,255,.085);
+    backdrop-filter: blur(22px) saturate(130%);
+    -webkit-backdrop-filter: blur(22px) saturate(130%);
+    transition: border-color 240ms ease, box-shadow 260ms ease, background 260ms ease;
+  }
+  html[data-platform="desktop"] .capture:focus-within,
+  html[data-platform="web"] .capture:focus-within {
+    border-color: rgba(204, 183, 127, .42) !important;
+    box-shadow: 0 30px 84px rgba(0,0,0,.24), 0 0 0 4px rgba(181,154,105,.075), inset 0 1px 0 rgba(255,255,255,.10);
+  }
+  html[data-platform="desktop"] .compose,
+  html[data-platform="web"] .compose {
+    min-height: 112px;
+    border-color: rgba(232,223,200,.13);
+    border-radius: 17px;
+    background: rgba(5, 12, 7, .34);
+    color: var(--text);
+    caret-color: #d7c18e;
+    transition: border-color 220ms ease, box-shadow 220ms ease, background 220ms ease;
+  }
+  html[data-platform="desktop"] .compose:focus,
+  html[data-platform="web"] .compose:focus {
+    background: rgba(5,12,7,.44);
+    border-color: rgba(204,183,127,.34);
+    box-shadow: 0 0 0 3px rgba(181,154,105,.07);
+  }
+  html[data-platform="desktop"] .workspace,
+  html[data-platform="web"] .workspace {
+    width: 100%;
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+  html[data-platform="desktop"] .toolbar,
+  html[data-platform="web"] .toolbar {
+    margin-bottom: 18px;
+  }
+  html[data-platform="desktop"] .grid,
+  html[data-platform="web"] .grid {
+    gap: 14px;
+  }
+  html[data-platform="desktop"] .item,
+  html[data-platform="web"] .item {
+    min-width: 0;
+    min-height: 164px;
+    border: 1px solid rgba(232,223,200,.13) !important;
+    border-radius: 20px;
+    padding: 18px;
+    background:
+      linear-gradient(145deg, rgba(232,223,200,.075), rgba(19,32,22,.61) 52%, rgba(8,15,10,.52)) !important;
+    box-shadow: 0 13px 38px rgba(0,0,0,.13), inset 0 1px 0 rgba(255,255,255,.055);
+    backdrop-filter: blur(18px) saturate(125%);
+    -webkit-backdrop-filter: blur(18px) saturate(125%);
+    transform: none !important;
+    transition: transform 220ms var(--desktop-ease), border-color 220ms ease, background 220ms ease, box-shadow 220ms ease;
+  }
+  html[data-platform="desktop"] .item:hover,
+  html[data-platform="web"] .item:hover {
+    border-color: rgba(204,183,127,.32) !important;
+    background:
+      linear-gradient(145deg, rgba(232,223,200,.10), rgba(24,40,27,.66) 52%, rgba(8,15,10,.54)) !important;
+    box-shadow: 0 20px 48px rgba(0,0,0,.20), inset 0 1px 0 rgba(255,255,255,.085);
+    transform: translateY(-3px) !important;
+  }
+  html[data-platform="desktop"] .item.pinned,
+  html[data-platform="web"] .item.pinned {
+    border-color: rgba(181,154,105,.37) !important;
+    background:
+      linear-gradient(145deg, rgba(181,154,105,.13), rgba(19,32,22,.59) 58%, rgba(8,15,10,.50)) !important;
+  }
+  html[data-platform="desktop"] .item-text,
+  html[data-platform="web"] .item-text {
+    color: rgba(232,223,200,.91);
+    line-height: 1.78;
+    font-size: 12px;
+  }
+  html[data-platform="desktop"] .filter,
+  html[data-platform="web"] .filter,
+  html[data-platform="desktop"] .ghost,
+  html[data-platform="web"] .ghost,
+  html[data-platform="desktop"] .icon-btn,
+  html[data-platform="web"] .icon-btn {
+    border-color: rgba(232,223,200,.12);
+    background: rgba(17,29,20,.46);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: color 180ms ease, border-color 180ms ease, background 180ms ease, transform 180ms var(--desktop-ease);
+  }
+  html[data-platform="desktop"] .filter.active,
+  html[data-platform="web"] .filter.active {
+    color: #e8dfc8;
+    border-color: rgba(181,154,105,.28);
+    background: rgba(181,154,105,.12);
+  }
+  html[data-platform="desktop"] .bulk-toolbar,
+  html[data-platform="web"] .bulk-toolbar {
+    border-color: rgba(232,223,200,.16);
+    background: rgba(13,23,15,.64);
+    box-shadow: 0 14px 38px rgba(0,0,0,.12), inset 0 1px rgba(255,255,255,.06);
+    backdrop-filter: blur(18px) saturate(125%);
+    -webkit-backdrop-filter: blur(18px) saturate(125%);
+  }
+  html[data-platform="desktop"] .modal,
+  html[data-platform="web"] .modal {
+    border-color: rgba(204,183,127,.25);
+    background: linear-gradient(145deg, rgba(28,42,30,.91), rgba(8,15,10,.94));
+    box-shadow: 0 34px 100px rgba(0,0,0,.42), inset 0 1px rgba(255,255,255,.075);
+    backdrop-filter: blur(24px) saturate(135%);
+    -webkit-backdrop-filter: blur(24px) saturate(135%);
+  }
+  html[data-platform="desktop"] .web-side-nav,
+  html[data-platform="web"] .web-side-nav {
+    border-color: rgba(232,223,200,.12);
+    background: rgba(11,20,13,.50);
+    backdrop-filter: blur(18px) saturate(125%);
+    -webkit-backdrop-filter: blur(18px) saturate(125%);
+  }
+  html[data-platform="desktop"] .linka-player-dock,
+  html[data-platform="web"] .linka-player-dock {
+    border-color: rgba(204,183,127,.28) !important;
+    background: rgba(15,25,17,.76) !important;
+    box-shadow: 0 18px 50px rgba(0,0,0,.28), inset 0 1px rgba(255,255,255,.07) !important;
+    backdrop-filter: blur(24px) saturate(130%);
+    -webkit-backdrop-filter: blur(24px) saturate(130%);
+  }
+  html[data-platform="desktop"] .linka-player-window,
+  html[data-platform="web"] .linka-player-window,
+  html[data-platform="desktop"] .linka-atmosphere-settings,
+  html[data-platform="web"] .linka-atmosphere-settings {
+    border-color: rgba(204,183,127,.24);
+    background: linear-gradient(145deg, rgba(31,46,33,.91), rgba(8,15,10,.95));
+    backdrop-filter: blur(26px) saturate(135%);
+    -webkit-backdrop-filter: blur(26px) saturate(135%);
+  }
+  html[data-platform="desktop"] .linka-doc-window,
+  html[data-platform="web"] .linka-doc-window {
+    background: linear-gradient(145deg, rgba(31,45,34,.91), rgba(8,15,10,.94) 72%);
+    backdrop-filter: blur(25px) saturate(125%);
+    -webkit-backdrop-filter: blur(25px) saturate(125%);
+  }
+  html[data-platform="desktop"] .linka-type-letter,
+  html[data-platform="web"] .linka-type-letter,
+  html[data-platform="desktop"] .linka-doc-letter,
+  html[data-platform="web"] .linka-doc-letter {
+    animation: linka-desktop-ink 190ms var(--desktop-ease) both;
+  }
+  html[data-platform="desktop"] .linka-type-erasing,
+  html[data-platform="web"] .linka-type-erasing,
+  html[data-platform="desktop"] .linka-doc-gone,
+  html[data-platform="web"] .linka-doc-gone {
+    animation: linka-desktop-erase 150ms ease both;
+  }
+  @media (min-width: 1360px) {
+    html[data-platform="desktop"] .grid,
+    html[data-platform="web"] .grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+    html[data-platform="desktop"] .item,
+    html[data-platform="web"] .item {
+      min-height: 174px;
+    }
+  }
+}
+@keyframes linka-desktop-ink {
+  from { opacity: 0; transform: translateY(2px); text-shadow: 0 0 8px rgba(204,183,127,.18); }
+  to { opacity: 1; transform: translateY(0); text-shadow: 0 0 0 transparent; }
+}
+@keyframes linka-desktop-erase {
+  from { opacity: .92; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-1px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-platform="desktop"] .item,
+  html[data-platform="web"] .item,
+  html[data-platform="desktop"] .linka-type-letter,
+  html[data-platform="web"] .linka-type-letter,
+  html[data-platform="desktop"] .linka-doc-letter,
+  html[data-platform="web"] .linka-doc-letter {
+    animation: none !important;
+    transition-duration: .01ms !important;
+    transform: none !important;
+  }
+}
