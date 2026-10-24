@@ -23,6 +23,8 @@ export function normalizeCapture(item) {
     updatedAt: Number(item.updatedAt || createdAt || Date.now()),
     pinned: Boolean(item.pinned),
     readLater: Boolean(item.readLater),
+    archivedAt: Math.max(0, Number(item.archivedAt) || 0),
+    trashedAt: Math.max(0, Number(item.trashedAt) || 0),
     tags: normalizeTags(item.tags),
     collection: String(item.collection || "").trim().slice(0, 80),
     previewTitle: String(item.previewTitle || "").slice(0, 180),
@@ -137,12 +139,14 @@ export function saveCaptures(items, storage = globalThis.localStorage) {
 }
 export function parseSearchQuery(query = "") {
   const tokens = String(query).match(/"[^"]*"|\S+/g) || [];
-  const parsed = { text: [], type: "", pinned: false, readLater: false, tag: "", collection: "", site: "", before: null, after: null };
+  const parsed = { text: [], type: "", pinned: false, readLater: false, archived: false, trashed: false, tag: "", collection: "", site: "", before: null, after: null };
   for (const raw of tokens) {
     const token = raw.replace(/^"|"$/g, "");
     const lower = token.toLocaleLowerCase();
     if (lower === "is:pinned") { parsed.pinned = true; continue; }
     if (lower === "is:later" || lower === "is:readlater") { parsed.readLater = true; continue; }
+    if (lower === "is:archived") { parsed.archived = true; continue; }
+    if (lower === "is:trash" || lower === "is:trashed") { parsed.trashed = true; continue; }
     if (lower.startsWith("tag:") && lower.slice(4).trim()) { parsed.tag = lower.slice(4).trim().replace(/^#+/, ""); continue; }
     if (lower.startsWith("in:") && lower.slice(3).trim()) { parsed.collection = lower.slice(3).trim(); continue; }
     if (lower === "type:link" || lower === "type:note") { parsed.type = lower.slice(5); continue; }
@@ -167,6 +171,10 @@ export function visibleCaptures(items, filter = "all", query = "") {
   const parsed = parseSearchQuery(query);
   return items.filter(item => {
     const isLink = /^https?:\/\//i.test(item.text);
+    const showTrash = filter === "trash" || parsed.trashed;
+    const showArchive = filter === "archive" || parsed.archived;
+    if (showTrash ? !item.trashedAt : Boolean(item.trashedAt)) return false;
+    if (!showTrash && (showArchive ? !item.archivedAt : Boolean(item.archivedAt))) return false;
     if (filter === "pinned" && !item.pinned) return false;
     if (filter === "links" && !isLink) return false;
     if (filter === "notes" && isLink) return false;
@@ -192,7 +200,8 @@ export function makeCapture(text, existing = {}) {
   return normalizeCapture({
     id:existing.id || `capture-${now}-${Math.random().toString(36).slice(2,8)}`,
     text, createdAt:existing.createdAt || now, updatedAt:now, pinned:existing.pinned || false,
-    readLater: Boolean(existing.readLater), tags: existing.tags || [], collection: existing.collection || "",
+    readLater: Boolean(existing.readLater), archivedAt: Number(existing.archivedAt) || 0, trashedAt: Number(existing.trashedAt) || 0,
+    tags: existing.tags || [], collection: existing.collection || "",
     previewTitle: existing.previewTitle || "", previewDescription: existing.previewDescription || "", previewImageUrl: existing.previewImageUrl || ""
   });
 }
