@@ -20,7 +20,7 @@ fn read_linka_document(argument: &str) -> Option<String> {
 
     // Avoid reading arbitrary large files if a malformed path is passed to Linka.
     let metadata = fs::metadata(path).ok()?;
-    if !metadata.is_file() || metadata.len() > 20 * 1024 * 1024 {
+    if !metadata.is_file() || metadata.len() > 24 * 1024 * 1024 {
         return None;
     }
 

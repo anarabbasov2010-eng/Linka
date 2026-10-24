@@ -1,9 +1,9 @@
 const TOKENS = {
   bg: "#0B120D",
-  panel: "rgba(18,28,20,.88)",
-  panelSolid: "#121C14",
-  panelRaised: "#1B291D",
-  line: "rgba(232,223,200,.105)",
+  panel: "rgba(18,28,20,.62)",
+  panelSolid: "rgba(15,23,17,.84)",
+  panelRaised: "rgba(29,41,31,.64)",
+  line: "rgba(232,223,200,.14)",
   lineStrong: "rgba(181,154,105,.30)",
   text: "#E8DFC8",
   muted: "#B3BDA9",
@@ -54,11 +54,11 @@ function ensureStyles() {
       text-wrap:pretty;
     }
     .linka-doc-body, .linka-doc-type-mirror { font-size:15px !important; line-height:1.86 !important; letter-spacing:.008em !important; }
-    .linka-player-dock { border-color:rgba(181,154,105,.32) !important; background:rgba(16,24,18,.90) !important; color:var(--text) !important; box-shadow:0 18px 52px rgba(0,0,0,.42),inset 0 1px rgba(232,223,200,.045) !important; }
+    .linka-player-dock { border-color:rgba(181,154,105,.32) !important; background:rgba(16,24,18,.74) !important; color:var(--text) !important; box-shadow:0 18px 52px rgba(0,0,0,.42),inset 0 1px rgba(232,223,200,.045) !important; }
     .linka-player-art { color:var(--accent) !important; background:linear-gradient(145deg,rgba(181,154,105,.22),rgba(32,44,36,.78)) !important; }
     .linka-player-button:hover { background:rgba(181,154,105,.16) !important; border-color:rgba(181,154,105,.42) !important; }
     .linka-player-play { color:#12170f !important; background:var(--accent) !important; border-color:transparent !important; }
-    .linka-player-window { color:var(--text) !important; border-color:rgba(181,154,105,.28) !important; background:linear-gradient(150deg,rgba(32,44,36,.985),rgba(9,16,11,.985) 75%) !important; }
+    .linka-player-window { color:var(--text) !important; border-color:rgba(181,154,105,.28) !important; background:linear-gradient(150deg,rgba(32,44,36,.88),rgba(9,16,11,.91) 75%) !important; }
     .linka-player-window .linka-player-art { color:var(--accent) !important; }
     .linka-player-disc { border-color:rgba(181,154,105,.40) !important; background:radial-gradient(circle at 38% 32%,rgba(209,195,162,.34),rgba(125,138,114,.19) 47%,rgba(7,13,8,.92) 75%) !important; box-shadow:0 0 52px rgba(181,154,105,.13) !important; }
     .linka-player-panel, .linka-atmosphere-settings { color:var(--text) !important; }

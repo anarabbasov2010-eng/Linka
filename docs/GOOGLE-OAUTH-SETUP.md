@@ -1,6 +1,6 @@
 # Linka Google sign-in setup (free)
 
-Google OAuth is the primary account sign-in for Linka Web and Android. The Supabase project remains on the Free plan. Standard Google sign-in does not need SMS or a mail sender. Provider credentials must be entered in the Supabase dashboard and must never be committed to GitHub.
+Google OAuth is the primary account sign-in for Linka Web and the Windows desktop app. The Supabase project remains on the Free plan. Standard Google sign-in does not need SMS or a mail sender. Provider credentials must be entered in the Supabase dashboard and must never be committed to GitHub.
 
 ## 1. Create Google OAuth credentials
 
@@ -17,15 +17,15 @@ Google OAuth is the primary account sign-in for Linka Web and Android. The Supab
 2. Enable **Google** and paste the OAuth client ID and client secret from Google Cloud.
 3. Open [Authentication → URL Configuration](https://supabase.com/dashboard/project/imppocbirxwlvnfdfbll/auth/url-configuration) and add the exact redirect URLs:
    - Your deployed Linka website origin, such as `https://your-linka-site.example` (replace with the actual domain).
-   - `linka://auth/callback` for Android deep-link sign-in.
+   - `linka://auth/callback` for Windows desktop deep-link sign-in.
    - The exact Tauri origin used by the Windows build if it differs from the web origin.
 4. Save.
 
-The Google Cloud **authorized redirect URI** is the Supabase callback in step 1. The website and Android deep link are **Supabase allowed redirect URLs**; these are different settings.
+The Google Cloud **authorized redirect URI** is the Supabase callback in step 1. The website and Windows desktop deep link are **Supabase allowed redirect URLs**; these are different settings.
 
 ## 3. Test sign-in
 
-1. Open Linka Web or Android.
+1. Open Linka Web or the Windows desktop app.
 2. Select **Continue with Google**.
 3. Choose a Google account and approve the consent screen.
 4. On first sign-in, finish the Linka profile. Name is required; age is optional.
@@ -37,7 +37,7 @@ Supabase does not automatically merge an existing email-OTP account with a Googl
 
 ## Security
 
-- Never put the Google client secret or Supabase service-role key into client code, Android resources, GitHub, or chat.
+- Never put the Google client secret or Supabase service-role key into client code, Windows/Web client code, GitHub, or chat.
 - The Supabase publishable key is the only Supabase key that belongs in client apps.
 - Use exact redirect URLs; avoid wildcard redirects.
 - SMTP configuration is not required for Google OAuth. It is only needed if email OTP is retained as an alternative sign-in method.

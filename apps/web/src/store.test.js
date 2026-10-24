@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { loadCaptures, saveCaptures, makeCapture, visibleCaptures, STORAGE_KEY } from "./store.js";
+import { loadCaptures, saveCaptures, makeCapture, visibleCaptures, STORAGE_KEY, inspectCaptureStorage, getCaptureRecoveryData } from "./store.js";
 
 function memoryStorage() {
   const data = new Map();
@@ -18,10 +18,17 @@ test("saving and loading captures keeps normalized text", () => {
   assert.ok(storage.getItem(STORAGE_KEY));
 });
 
-test("invalid stored JSON safely returns an empty inbox", () => {
+test("invalid stored JSON is preserved for recovery and blocks accidental overwrites", () => {
   const storage = memoryStorage();
   storage.setItem(STORAGE_KEY, "{");
   assert.deepEqual(loadCaptures(storage), []);
+  assert.equal(inspectCaptureStorage(storage).status, "corrupt");
+  assert.equal(getCaptureRecoveryData(storage).raw, "{");
+  assert.equal(storage.getItem(STORAGE_KEY), "{");
+  assert.equal(saveCaptures([makeCapture("new")], storage), false);
+  assert.equal(storage.getItem(STORAGE_KEY), "{");
+  assert.equal(saveCaptures([makeCapture("restored")], storage, { allowReplaceCorrupt: true }), true);
+  assert.equal(loadCaptures(storage)[0].text, "restored");
 });
 
 test("filters links, notes, pinned items and search query", () => {
@@ -59,4 +66,28 @@ test("search supports type, pinned, site and date operators", () => {
   assert.deepEqual(visibleCaptures(items, "all", "before:2026-02-01").map(item => item.id), ["a"]);
   assert.deepEqual(visibleCaptures(items, "all", "after:2026-02-01").map(item => item.id), ["c", "b"]);
   assert.deepEqual(visibleCaptures(items, "all", 'type:link "Guide"').map(item => item.id), ["a"]);
+});
+
+
+test("local storage round-trips more than 1000 captures without truncation", () => {
+  const storage = memoryStorage();
+  const items = Array.from({ length: 1500 }, (_, index) => makeCapture("note " + index));
+  assert.equal(saveCaptures(items, storage), true);
+  assert.equal(loadCaptures(storage).length, 1500);
+});
+
+test("normalization does not silently truncate long capture text", () => {
+  const storage = memoryStorage();
+  const longText = "x".repeat(120_000);
+  assert.equal(saveCaptures([makeCapture(longText)], storage), true);
+  assert.equal(loadCaptures(storage)[0].text.length, 120_000);
+});
+
+test("search supports tags, status, and archive scope", () => {
+  const items = [
+    { id: "tagged", text: "Design notes", createdAt: 2, updatedAt: 2, tags: ["design-system"], status: "important" },
+    { id: "archived", text: "Old research", createdAt: 1, updatedAt: 1, archived: true, tags: ["research"] }
+  ];
+  assert.deepEqual(visibleCaptures(items, "all", "tag:design-system is:important").map(item => item.id), ["tagged"]);
+  assert.deepEqual(visibleCaptures(items, "all", "in:archive tag:research").map(item => item.id), ["archived"]);
 });

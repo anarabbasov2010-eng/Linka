@@ -1,13 +1,13 @@
 # Linka Cloud Sync
 
-Linka is local-first: links and notes are saved on the current device even while offline. Optional Cloud Sync can merge saved items across Linka for Android, Windows and the web when each client is connected to the **same Supabase project and the same Linka account**.
+Linka is local-first: links and notes are saved on the current device even while offline. Optional Cloud Sync can merge saved items across Linka for Windows and the web when each client is connected to the **same Supabase project and the same Linka account**.
 
 ## Free setup
 
 1. Create a Supabase project on a plan that suits your usage. Check current pricing and quotas in your Supabase dashboard before using it for a public service.
-2. Open the project's SQL Editor and run the schema shown by **Settings → Linka Cloud Sync → Copy database setup SQL** in the web app, or use the **Set up sync database** action in Android's Cloud Sync screen.
+2. Open the project's SQL Editor and run the schema shown by **Settings → Linka Cloud Sync → Copy database setup SQL** in the web app's Settings → Linka Cloud Sync.
 3. Copy the project URL and the **publishable key** (or legacy public anon key) from the Supabase dashboard. Do not use a `service_role` or secret key in Linka.
-4. In a build configured with the shared public project URL and publishable key, Linka can register or sign in with a six-digit email OTP. Use the same email account on Android, Windows and the website. The code is intended to expire after two minutes and the client waits two minutes before offering another; the Supabase Auth settings must enforce the same expiry and rate limit. Builds without the shared defaults can be configured manually in Settings.
+4. In a build configured with the shared public project URL and publishable key, Linka can register or sign in with a six-digit email OTP. Use the same email account in Windows and on the website. The code is intended to expire after two minutes and the client waits two minutes before offering another; the Supabase Auth settings must enforce the same expiry and rate limit. Builds without the shared defaults can be configured manually in Settings.
 5. Make a backup before the first sync. Linka merges captures by ID and most-recent update time; deleted capture IDs are stored as tombstones so old copies should not reappear during a successful sync.
 
 ## Database schema
@@ -35,7 +35,7 @@ If the Supabase Data API is configured to restrict exposed tables, confirm `publ
 
 - Local saving and manual JSON backup/import work without any cloud project.
 - The web client and Windows desktop client share the same web storage and Cloud Sync module.
-- Android Cloud Sync uses its own encrypted refresh-token store in Android Keystore; the web/Windows session is stored by the browser/WebView in local storage. They are separate sessions under the same account.
+- Web and Windows keep separate local sessions in their browser/WebView storage. Both clients can sync under the same account.
 - Items are merged by capture ID and the newest `updatedAt`; deletion tombstones prevent previously deleted copies from being merged back.
 - Keep regular JSON backups for important information. Cloud Sync is a convenience feature, not a guaranteed backup or a substitute for a separate export.
 - Free service limits and availability can change; check the provider dashboard for current quotas.

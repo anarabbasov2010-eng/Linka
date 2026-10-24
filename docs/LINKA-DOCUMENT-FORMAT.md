@@ -1,6 +1,6 @@
 # Linka text document format
 
-Linka uses the `.linka` extension for standalone text documents. The current format is UTF-8 JSON so a document keeps its title and timestamps when it moves between Windows and Android.
+Linka uses the `.linka` extension for standalone text documents. The current format is UTF-8 JSON so a document keeps its title and timestamps when it moves between Windows and Web.
 
 ## Version 1
 
@@ -23,10 +23,10 @@ Linka uses the `.linka` extension for standalone text documents. The current for
 - `text` contains the complete UTF-8 text, including line breaks.
 - `createdAt` and `updatedAt` are Unix timestamps in milliseconds.
 
-The web and Android editors accept up to 5,000,000 characters per document. Opening an inbox backup as a standalone document is rejected to avoid confusing a bulk data backup with a text file. Ordinary UTF-8 plain-text files can be opened and saved into the `.linka` format.
+The Web and Windows editors accept up to 5,000,000 characters per document. Opening an inbox backup as a standalone document is rejected to avoid confusing a bulk data backup with a text file. Ordinary UTF-8 plain-text files can be opened and saved into the `.linka` format.
 
 ## Storage and transfer
 
-The web editor stores working drafts in IndexedDB with a small localStorage fallback. Android stores an auto-restored draft in the app's private files area. These working drafts are local to each device and are not included in cloud sync or the link inbox. Use **Save .linka** to create a portable file; use **Open .linka** to import it elsewhere.
+The web editor stores working drafts in IndexedDB with a small localStorage fallback. The Windows app uses the same WebView-backed local draft storage as the Web client. These working drafts are local to each device and are not included in cloud sync or the link inbox. Use **Save .linka** to create a portable file; use **Open .linka** to import it elsewhere.
 
-Windows file association is registered by the Tauri installer. Android declares the Linka document MIME type for file-open intents, in addition to the in-app file picker. File association behavior still depends on the operating system's package/installer registration and the source file provider.
+Windows file association is registered by the Tauri installer. The Web client opens files through the browser file picker. File association behavior still depends on the operating system's package/installer registration and the source file provider.
