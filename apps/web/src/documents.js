@@ -1,0 +1,382 @@
+import { linkaFilename, normalizeLinkaDocument, parseLinkaDocument, serializeLinkaDocument } from "./linka-format.js";
+
+const DB_NAME = "linka-documents-v1";
+const STORE_NAME = "documents";
+const MAX_RECENT = 8;
+const labels = {
+  ru: { documents: "Текстовые документы", newDoc: "Новый документ", open: "Открыть .linka", save: "Сохранить .linka", saved: "Черновик сохранён на этом устройстве", saving: "Сохраняем…", failed: "Не удалось сохранить черновик", untitled: "Новый документ", placeholder: "Начни писать…", close: "Закрыть", recent: "Недавние документы", local: "Локально · не отправляется в облако", openFailed: "Не удалось открыть файл .linka", fileSaved: "Файл .linka подготовлен", content: "Текст документа", title: "Название документа", help: "Файл можно открыть в Linka на другом устройстве.", },
+  en: { documents: "Text documents", newDoc: "New document", open: "Open .linka", save: "Save .linka", saved: "Draft saved on this device", saving: "Saving…", failed: "Could not save draft", untitled: "New document", placeholder: "Start writing…", close: "Close", recent: "Recent documents", local: "Local only · not sent to cloud sync", openFailed: "Could not open this .linka file", fileSaved: ".linka file prepared", content: "Document text", title: "Document title", help: "Open this file in Linka on another device.", },
+  az: { documents: "Mətn sənədləri", newDoc: "Yeni sənəd", open: ".linka aç", save: ".linka saxla", saved: "Qaralama bu cihazda saxlanıldı", saving: "Saxlanılır…", failed: "Qaralamanı saxlamaq olmadı", untitled: "Yeni sənəd", placeholder: "Yazmağa başla…", close: "Bağla", recent: "Son sənədlər", local: "Yalnız cihazda · buludla paylaşılmır", openFailed: ".linka faylını açmaq olmadı", fileSaved: ".linka faylı hazırdır", content: "Sənədin mətni", title: "Sənədin adı", help: "Bu faylı başqa cihazda Linka ilə aça bilərsən.", },
+  tr: { documents: "Metin belgeleri", newDoc: "Yeni belge", open: ".linka aç", save: ".linka kaydet", saved: "Taslak bu cihazda kaydedildi", saving: "Kaydediliyor…", failed: "Taslak kaydedilemedi", untitled: "Yeni belge", placeholder: "Yazmaya başla…", close: "Kapat", recent: "Son belgeler", local: "Yalnızca cihazda · bulut eşitlemesine gönderilmez", openFailed: ".linka dosyası açılamadı", fileSaved: ".linka dosyası hazır", content: "Belge metni", title: "Belge başlığı", help: "Bu dosyayı başka bir cihazda Linka ile açabilirsin.", }
+};
+let initialized = false;
+let dbPromise = null;
+let overlay = null;
+let currentDocument = null;
+let titleField = null;
+let bodyField = null;
+let statusLine = null;
+let recentList = null;
+let saveTimer = 0;
+let animationTimer = 0;
+let previousFocus = null;
+let inputPicker = null;
+const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches || document.documentElement.classList.contains("reduced-motion");
+const uid = () => globalThis.crypto?.randomUUID?.() || ("doc-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 9));
+const lang = () => {
+  const v = (localStorage.getItem("linka.language.v1") || document.documentElement.lang || "ru").toLowerCase().slice(0, 2);
+  return labels[v] ? v : "ru";
+};
+const t = key => labels[lang()][key] || labels.ru[key] || key;
+
+function addStyles() {
+  if (document.getElementById("linka-documents-styles")) return;
+  const style = document.createElement("style");
+  style.id = "linka-documents-styles";
+  style.textContent = `
+    :root { --linka-forest:#101814; --linka-forest-raised:#1d2a20; --linka-paper:#e8dfc8; --linka-brass:#b59a69; --linka-sage:#7d8a72; }
+    .linka-doc-trigger { position:relative; display:inline-grid; place-items:center; }
+    .linka-doc-trigger svg { width:18px; height:18px; }
+    .linka-doc-overlay { position:fixed; inset:0; z-index:10050; display:grid; place-items:center; padding:clamp(10px,3vw,28px); background:rgba(4,9,6,.12); opacity:0; backdrop-filter:blur(0); transition:opacity .44s ease,background .44s ease,backdrop-filter .44s ease; }
+    .linka-doc-overlay.is-open { opacity:1; background:rgba(4,9,6,.76); backdrop-filter:blur(17px) saturate(.8); }
+    .linka-doc-window { width:min(920px,100%); max-height:min(92dvh,1000px); overflow:hidden; display:flex; flex-direction:column; border:1px solid rgba(181,154,105,.38); border-radius:25px; color:var(--linka-paper); background:linear-gradient(152deg,rgba(31,45,34,.985),rgba(10,16,12,.99) 72%); box-shadow:0 34px 115px rgba(0,0,0,.52),inset 0 1px rgba(255,255,255,.045); transform:translateY(16px) scale(.985); filter:blur(4px); transition:transform .55s cubic-bezier(.2,.8,.2,1),filter .55s,box-shadow .4s; }
+    .linka-doc-overlay.is-open .linka-doc-window { transform:translateY(0) scale(1); filter:blur(0); }
+    .linka-doc-header { display:flex; align-items:center; gap:14px; padding:18px 21px 15px; border-bottom:1px solid rgba(232,223,200,.11); }
+    .linka-doc-mark { flex:0 0 42px; width:42px; height:42px; display:grid; place-items:center; border:1px solid rgba(181,154,105,.38); border-radius:15px; color:var(--linka-brass); background:linear-gradient(145deg,rgba(181,154,105,.18),rgba(16,24,20,.5)); }
+    .linka-doc-mark svg { width:22px; height:22px; }
+    .linka-doc-headcopy { flex:1; min-width:0; }
+    .linka-doc-headcopy h2 { margin:0; color:var(--linka-paper); font-family:"Palatino Linotype","Book Antiqua",Georgia,serif; font-size:clamp(20px,3vw,27px); font-weight:500; letter-spacing:-.035em; }
+    .linka-doc-headcopy p { margin:5px 0 0; color:#aeb7a7; font-size:11px; line-height:1.55; }
+    .linka-doc-actions { display:flex; flex-wrap:wrap; gap:8px; padding:12px 21px; border-bottom:1px solid rgba(232,223,200,.08); }
+    .linka-doc-btn { min-height:38px; padding:9px 13px; border:1px solid rgba(181,154,105,.25); border-radius:12px; color:var(--linka-paper); background:rgba(232,223,200,.045); font:500 12px/1.2 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; cursor:pointer; transition:background .23s,border-color .23s,transform .23s; }
+    .linka-doc-btn:hover { background:rgba(181,154,105,.15); border-color:rgba(181,154,105,.55); }
+    .linka-doc-btn:active { transform:scale(.985); }
+    .linka-doc-btn.primary { color:#13180f; background:var(--linka-brass); border-color:transparent; }
+    .linka-doc-btn.primary:hover { background:#c8b184; }
+    .linka-doc-btn:focus-visible,.linka-doc-title:focus-visible,.linka-doc-body:focus-visible { outline:2px solid #d7c39a; outline-offset:3px; }
+    .linka-doc-fields { display:flex; flex-direction:column; gap:12px; min-height:0; padding:16px 21px 10px; }
+    .linka-doc-label { display:block; color:#c1c8ba; font-size:10px; font-weight:650; letter-spacing:.09em; text-transform:uppercase; }
+    .linka-doc-title { width:100%; margin-top:7px; padding:12px 14px; border:1px solid rgba(232,223,200,.15); border-radius:12px; outline:none; color:#f0e8d7; background:rgba(4,10,6,.28); font:500 18px/1.35 "Palatino Linotype","Book Antiqua",Georgia,serif; }
+    .linka-doc-body-wrap { position:relative; flex:1; min-height:220px; max-height:45vh; overflow:hidden; border:1px solid rgba(232,223,200,.14); border-radius:15px; background:rgba(4,10,6,.28); }
+    .linka-doc-type-mirror,.linka-doc-body { box-sizing:border-box; width:100%; min-height:220px; max-height:45vh; margin:0; padding:17px 17px 20px; border:0; border-radius:15px; font:400 15px/1.86 "Palatino Linotype","Book Antiqua",Georgia,serif; letter-spacing:.008em; white-space:pre-wrap; overflow-wrap:anywhere; tab-size:4; }
+    .linka-doc-type-mirror { position:absolute; inset:0; overflow:auto; pointer-events:none; color:#e8dfc8; z-index:0; }
+    .linka-doc-body { position:relative; z-index:1; display:block; resize:vertical; outline:none; color:transparent; -webkit-text-fill-color:transparent; caret-color:#d3bd8c; background:transparent; }
+    .linka-doc-body::selection { background:rgba(181,154,105,.32); color:transparent; }
+    .linka-doc-letter { display:inline; animation:linka-doc-letter-in .2s cubic-bezier(.2,.8,.2,1) both; }
+    .linka-doc-gone { display:inline; animation:linka-doc-letter-out .19s ease both; }
+    @keyframes linka-doc-letter-in { from {opacity:0;filter:blur(2px);transform:translateY(2px)} to {opacity:1;filter:blur(0);transform:translateY(0)} }
+    @keyframes linka-doc-letter-out { from {opacity:.88;filter:blur(0)} to {opacity:0;filter:blur(2px)} }
+    .linka-doc-footer { display:flex; align-items:center; flex-wrap:wrap; gap:8px 14px; padding:10px 21px 16px; color:#aeb7a7; font-size:10px; line-height:1.6; }
+    .linka-doc-footer-status { flex:1 1 170px; color:#c6b78e; }
+    .linka-doc-recent { padding:0 21px 15px; }
+    .linka-doc-recent h3 { margin:0 0 8px; color:#b7c0ad; font-size:10px; font-weight:650; letter-spacing:.11em; text-transform:uppercase; }
+    .linka-doc-recent-list { display:flex; gap:7px; flex-wrap:wrap; max-height:74px; overflow:auto; }
+    .linka-doc-recent-item { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:7px 10px; border:1px solid rgba(232,223,200,.1); border-radius:9px; color:#c6ccb9; background:rgba(232,223,200,.04); font-size:10px; cursor:pointer; }
+    .linka-doc-recent-item:hover { border-color:rgba(181,154,105,.5); background:rgba(181,154,105,.11); }
+    .linka-doc-error { color:#f2b8a8; }
+    @media(max-width:600px) { .linka-doc-window { max-height:94dvh; border-radius:19px; } .linka-doc-header { padding:14px 14px 12px; } .linka-doc-actions,.linka-doc-fields { padding-left:14px; padding-right:14px; } .linka-doc-actions { gap:6px; } .linka-doc-btn { flex:1 1 auto; padding:9px 10px; } .linka-doc-recent,.linka-doc-footer { padding-left:14px; padding-right:14px; } .linka-doc-body-wrap,.linka-doc-type-mirror,.linka-doc-body { min-height:190px; max-height:38vh; } }
+    @media(prefers-reduced-motion:reduce) { .linka-doc-overlay,.linka-doc-window,.linka-doc-btn { transition:none!important; } .linka-doc-letter,.linka-doc-gone { animation:none!important; } }
+    html.reduced-motion .linka-doc-overlay,html.reduced-motion .linka-doc-window,html.reduced-motion .linka-doc-btn { transition:none!important; }
+    html.reduced-motion .linka-doc-letter,html.reduced-motion .linka-doc-gone { animation:none!important; }
+    .top-actions #linka-document-button { border-color:rgba(181,154,105,.28); }
+  `;
+  document.head.append(style);
+}
+
+function openDatabase() {
+  if (!("indexedDB" in window)) return Promise.resolve(null);
+  return new Promise(resolve => {
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains(STORE_NAME)) request.result.createObjectStore(STORE_NAME, { keyPath: "id" });
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => resolve(null);
+    request.onblocked = () => resolve(null);
+  });
+}
+function database() {
+  if (!dbPromise) dbPromise = openDatabase();
+  return dbPromise;
+}
+async function storeDocument(document) {
+  const normalized = normalizeLinkaDocument(document);
+  const db = await database();
+  if (db) {
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const request = tx.objectStore(STORE_NAME).put(normalized);
+      request.onsuccess = resolve;
+      request.onerror = () => reject(request.error || new Error("storage-error"));
+      tx.onabort = () => reject(tx.error || new Error("storage-error"));
+    });
+    return normalized;
+  }
+  const key = "linka.documents.fallback.v1";
+  try {
+    const list = JSON.parse(localStorage.getItem(key) || "[]").filter(item => item && typeof item.id === "string" && item.id !== normalized.id);
+    list.unshift(normalized);
+    localStorage.setItem(key, JSON.stringify(list.slice(0, 12)));
+    return normalized;
+  } catch {
+    throw new Error("storage-unavailable");
+  }
+}
+async function listDocuments() {
+  const db = await database();
+  if (db) {
+    const records = await new Promise((resolve, reject) => {
+      const request = db.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME).getAll();
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+    return records.sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
+  }
+  try { return JSON.parse(localStorage.getItem("linka.documents.fallback.v1") || "[]"); } catch { return []; }
+}
+function setStatus(message, isError = false) {
+  if (!statusLine) return;
+  statusLine.textContent = message;
+  statusLine.classList.toggle("linka-doc-error", isError);
+}
+function createMirrorAnimation(textarea, mirror) {
+  const computed = getComputedStyle(textarea);
+  ["fontFamily","fontSize","fontWeight","fontStyle","lineHeight","letterSpacing","textAlign","textIndent","paddingTop","paddingRight","paddingBottom","paddingLeft","boxSizing","tabSize"].forEach(key => { mirror.style[key] = computed[key]; });
+  let previous = textarea.value;
+  let clearGhostTimer = 0;
+  const draw = (value, before = value, animate = false) => {
+    mirror.replaceChildren();
+    if (!value && !before) return;
+    const prefix = reducedMotion() ? value.length : (() => { let i = 0; while (i < value.length && i < before.length && value[i] === before[i]) i++; return i; })();
+    let suffix = 0;
+    while (suffix < value.length - prefix && suffix < before.length - prefix && value[value.length - 1 - suffix] === before[before.length - 1 - suffix]) suffix++;
+    const removed = before.slice(prefix, before.length - suffix);
+    const added = value.slice(prefix, value.length - suffix);
+    const makeSpan = (character, className, index) => {
+      const span = document.createElement("span");
+      span.className = className || "";
+      span.textContent = character;
+      if (className === "linka-doc-letter") span.style.animationDelay = Math.min(Math.max(index, 0) * 9, 90) + "ms";
+      return span;
+    };
+    for (let i = 0; i < prefix; i++) mirror.append(makeSpan(value[i], "", i));
+    if (animate && removed && !reducedMotion()) {
+      [...removed].forEach((character, index) => mirror.append(makeSpan(character, "linka-doc-gone", index)));
+      clearTimeout(clearGhostTimer);
+      clearGhostTimer = setTimeout(() => draw(textarea.value), 210);
+    }
+    [...added].forEach((character, index) => mirror.append(makeSpan(character, animate && !reducedMotion() ? "linka-doc-letter" : "", index)));
+    for (let i = value.length - suffix; i < value.length; i++) if (i >= prefix) mirror.append(makeSpan(value[i], "", i));
+  };
+  draw(textarea.value);
+  textarea.addEventListener("input", () => {
+    const next = textarea.value;
+    draw(next, previous, true);
+    previous = next;
+  });
+  textarea.addEventListener("scroll", () => { mirror.scrollTop = textarea.scrollTop; mirror.scrollLeft = textarea.scrollLeft; });
+  textarea.addEventListener("focus", () => { mirror.scrollTop = textarea.scrollTop; });
+  return () => clearTimeout(clearGhostTimer);
+}
+
+function downloadDocument(document) {
+  const blob = new Blob([serializeLinkaDocument(document)], { type: "application/vnd.linka.document+json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = window.document.createElement("a");
+  anchor.href = url;
+  anchor.download = linkaFilename(document.title);
+  anchor.rel = "noopener";
+  anchor.style.display = "none";
+  window.document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  setStatus(t("fileSaved"));
+}
+function closeEditor() {
+  clearTimeout(saveTimer);
+  if (bodyField && currentDocument) {
+    currentDocument = normalizeLinkaDocument({ ...currentDocument, title: titleField?.value || currentDocument.title, text: bodyField.value, updatedAt: Date.now() });
+    void storeDocument(currentDocument).catch(() => {});
+  }
+  overlay?.classList.remove("is-open");
+  const old = overlay;
+  overlay = null;
+  currentDocument = null;
+  titleField = null; bodyField = null; statusLine = null; recentList = null; inputPicker = null;
+  setTimeout(() => old?.remove(), reducedMotion() ? 0 : 460);
+  document.removeEventListener("keydown", handleKeyDown);
+  previousFocus?.focus?.();
+}
+function handleKeyDown(event) {
+  if (event.key === "Escape" && overlay) { event.preventDefault(); closeEditor(); }
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s" && overlay) { event.preventDefault(); persistCurrent(true); }
+}
+async function persistCurrent(showSaved = false) {
+  if (!currentDocument || !bodyField) return;
+  clearTimeout(saveTimer);
+  const snapshot = normalizeLinkaDocument({
+    ...currentDocument,
+    title: titleField?.value || t("untitled"),
+    text: bodyField.value,
+    updatedAt: Date.now()
+  });
+  currentDocument = snapshot;
+  if (statusLine) setStatus(t("saving"));
+  try {
+    await storeDocument(snapshot);
+    if (showSaved && statusLine) setStatus(t("saved"));
+    await refreshRecentList();
+  } catch {
+    setStatus(t("failed"), true);
+  }
+}
+function scheduleSave() {
+  if (!currentDocument || !bodyField) return;
+  setStatus(t("saving"));
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => void persistCurrent(true), 460);
+}
+async function refreshRecentList() {
+  if (!recentList || !currentDocument) return;
+  recentList.replaceChildren();
+  const recent = (await listDocuments()).filter(item => item.id !== currentDocument.id).slice(0, MAX_RECENT);
+  for (const item of recent) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "linka-doc-recent-item";
+    button.textContent = item.title || t("untitled");
+    button.title = item.title || t("untitled");
+    button.addEventListener("click", () => void openEditor(item));
+    recentList.append(button);
+  }
+  if (recent.length === 0) {
+    const empty = document.createElement("span");
+    empty.className = "linka-doc-recent-item";
+    empty.textContent = t("local");
+    empty.disabled = true;
+    recentList.append(empty);
+  }
+}
+function attachImportedFilePicker() {
+  inputPicker = document.createElement("input");
+  inputPicker.type = "file";
+  inputPicker.accept = ".linka,.txt,application/vnd.linka.document+json,application/json,text/plain";
+  inputPicker.hidden = true;
+  inputPicker.addEventListener("change", async event => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      if (file.size > 20 * 1024 * 1024) throw new Error("too-large");
+      const parsed = parseLinkaDocument(await file.text(), file.name.replace(/\.[^.]+$/, "") || t("untitled"));
+      currentDocument = await storeDocument(parsed);
+      titleField.value = currentDocument.title;
+      bodyField.value = currentDocument.text;
+      bodyField.dispatchEvent(new Event("input", { bubbles: true }));
+      setStatus(t("saved"));
+      await refreshRecentList();
+    } catch (error) {
+      setStatus(error?.message || t("openFailed"), true);
+    } finally {
+      event.target.value = "";
+    }
+  });
+  overlay.append(inputPicker);
+}
+function buildEditorUI() {
+  overlay = document.createElement("div");
+  overlay.className = "linka-doc-overlay";
+  overlay.setAttribute("role", "presentation");
+  overlay.innerHTML = '<section class="linka-doc-window" role="dialog" aria-modal="true" aria-labelledby="linka-doc-heading"><header class="linka-doc-header"><div class="linka-doc-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3.8h7l4 4V20H7z"/><path d="M14 3.8V8h4M10 12h5M10 15.5h5M10 18.5h3"/></svg></div><div class="linka-doc-headcopy"><h2 id="linka-doc-heading"></h2><p></p></div><button class="linka-doc-btn" type="button" data-close></button></header><div class="linka-doc-actions"><button class="linka-doc-btn primary" type="button" data-new></button><button class="linka-doc-btn" type="button" data-open></button><button class="linka-doc-btn" type="button" data-save></button></div><div class="linka-doc-fields"><label class="linka-doc-label"><span data-title-label></span><input class="linka-doc-title" type="text" maxlength="180" autocomplete="off"></label><label class="linka-doc-label"><span data-body-label></span><div class="linka-doc-body-wrap"><div class="linka-doc-type-mirror" aria-hidden="true"></div><textarea class="linka-doc-body" spellcheck="true" maxlength="5000000"></textarea></div></label></div><div class="linka-doc-footer"><span class="linka-doc-footer-status" role="status" aria-live="polite"></span><span data-help></span></div><div class="linka-doc-recent"><h3></h3><div class="linka-doc-recent-list"></div></div></section>';
+  const panel = overlay.querySelector(".linka-doc-window");
+  const q = selector => panel.querySelector(selector);
+  q("#linka-doc-heading").textContent = "Linka · " + t("documents");
+  q(".linka-doc-headcopy p").textContent = t("local");
+  q("[data-close]").textContent = t("close");
+  q("[data-new]").textContent = t("newDoc");
+  q("[data-open]").textContent = t("open");
+  q("[data-save]").textContent = t("save");
+  q("[data-title-label]").textContent = t("title");
+  q("[data-body-label]").textContent = t("content");
+  q(".linka-doc-title").placeholder = t("untitled");
+  q(".linka-doc-body").placeholder = t("placeholder");
+  q("[data-help]").textContent = t("help");
+  q(".linka-doc-recent h3").textContent = t("recent");
+  titleField = q(".linka-doc-title");
+  bodyField = q(".linka-doc-body");
+  statusLine = q(".linka-doc-footer-status");
+  recentList = q(".linka-doc-recent-list");
+  q("[data-close]").addEventListener("click", closeEditor);
+  q("[data-new]").addEventListener("click", () => {
+    void persistCurrent(false);
+    currentDocument = normalizeLinkaDocument({ id: uid(), title: t("untitled"), text: "" });
+    titleField.value = currentDocument.title;
+    bodyField.value = "";
+    bodyField.dispatchEvent(new Event("input", { bubbles: true }));
+    setStatus(t("saved"));
+    void storeDocument(currentDocument).then(refreshRecentList).catch(() => setStatus(t("failed"), true));
+  });
+  q("[data-open]").addEventListener("click", () => inputPicker?.click());
+  q("[data-save]").addEventListener("click", () => {
+    void persistCurrent(false).then(() => downloadDocument(normalizeLinkaDocument({ ...currentDocument, title: titleField.value || t("untitled"), text: bodyField.value, updatedAt: Date.now() })));
+  });
+  titleField.addEventListener("input", scheduleSave);
+  bodyField.addEventListener("input", scheduleSave);
+  createMirrorAnimation(bodyField, q(".linka-doc-type-mirror"));
+  overlay.addEventListener("click", event => { if (event.target === overlay) closeEditor(); });
+  document.body.append(overlay);
+  document.addEventListener("keydown", handleKeyDown);
+  requestAnimationFrame(() => { overlay?.classList.add("is-open"); titleField?.focus(); titleField?.select(); });
+  attachImportedFilePicker();
+}
+async function openEditor(documentValue = null) {
+  previousFocus = document.activeElement;
+  clearTimeout(saveTimer);
+  currentDocument = normalizeLinkaDocument(documentValue || { id: uid(), title: t("untitled"), text: "" });
+  buildEditorUI();
+  titleField.value = currentDocument.title;
+  bodyField.value = currentDocument.text;
+  bodyField.dispatchEvent(new Event("input", { bubbles: true }));
+  setStatus(t("saved"));
+  await storeDocument(currentDocument).catch(() => setStatus(t("failed"), true));
+  await refreshRecentList();
+}
+async function openRawDocument(raw, fallbackTitle = t("untitled")) {
+  const parsed = parseLinkaDocument(raw, fallbackTitle);
+  if (overlay) closeEditor();
+  await openEditor(parsed);
+}
+export async function initLinkaDocuments() {
+  if (initialized) return;
+  initialized = true;
+  addStyles();
+  const settings = document.querySelector("#settings-button");
+  const top = document.querySelector(".top-actions");
+  if (top && !document.querySelector("#linka-document-button")) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.id = "linka-document-button";
+    button.className = "icon-btn linka-doc-trigger";
+    button.setAttribute("aria-label", t("documents"));
+    button.title = t("documents");
+    button.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3.5h7l4 4V20H7z"/><path d="M14 3.5v4h4M10 12h5M10 15.5h5M10 18.5h3"/></svg>';
+    button.addEventListener("click", () => void openEditor());
+    top.insertBefore(button, settings || null);
+  }
+  document.addEventListener("linka:open-documents", () => void openEditor());
+  if (window.__TAURI_INTERNALS__) {
+    try {
+      const events = await import("@tauri-apps/api/event");
+      const core = await import("@tauri-apps/api/core");
+      await events.listen("linka-open-document", event => {
+        void openRawDocument(String(event.payload || "")).catch(error => setStatus(error?.message || t("openFailed"), true));
+      });
+      const startupDocument = await core.invoke("take_startup_document");
+      if (typeof startupDocument === "string" && startupDocument) {
+        void openRawDocument(startupDocument).catch(error => console.warn("Unable to open the Linka document", error));
+      }
+    } catch (error) {
+      console.warn("Linka file-open integration could not start", error);
+    }
+  }
+}
