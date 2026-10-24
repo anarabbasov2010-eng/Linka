@@ -11,12 +11,14 @@ const ONBOARDED_KEY = "linka.experience.onboarded.v1";
 const NOTIFY_KEY = "linka.desktop-notifications.v1";
 const RELEASES_URL = "https://api.github.com/repos/anarabbasov2010-eng/Linka/releases/latest";
 const BUILD_VERSION = String(import.meta.env.VITE_LINKA_DESKTOP_VERSION || "").trim();
+const UPDATER_ENABLED = String(import.meta.env.VITE_LINKA_UPDATER_ENABLED || "false") === "true";
 const LANGUAGES = [
   { value: "en", label: "EN" }, { value: "ru", label: "RU" },
   { value: "az", label: "AZ" }, { value: "tr", label: "TR" }
 ];
 const COPY = {
   en: {
+    ambientSound: "Ambient sound", ambientSoundBody: "A quiet, slowly breathing synth pad. Off by default.", audioUnavailable: "Ambient audio is not available in this environment.", checkUpdates: "Check for updates", updateChanges: "What changed",
     privacy: "Private by default · local-first", eyebrow: "Your personal library",
     hero: ["Keep", "what", "matters."], heroBody: "Links, notes, and useful ideas. Saved once. Easy to find again.",
     quick: "Quick capture", subtitle: "Keep the useful stuff.", placeholder: "Drop a link. Save a thought. Keep it for later…",
@@ -36,7 +38,7 @@ const COPY = {
     waiting: "Waiting for approval…", pairingReady: "QR code ready", qrUnavailable: "QR pairing service isn't configured yet.",
     notification: "Desktop notifications", enableNotifications: "Enable notifications", notificationsOn: "Notifications enabled",
     updateTitle: "Linka update", updateReady: "A newer release is available.", updateButton: "Install update", updateDownloading: "Downloading update", updateInstalling: "Installing update", updateRestarting: "Restarting Linka…", updateInstalled: "Update installed. Restart Linka to finish.",
-    latest: "You're using the latest desktop build.", close: "Close", cancel: "Cancel",
+    latest: "You're using the latest desktop build.", updaterNotConfigured: "Signed in-app updates are not configured yet. Use the installer from GitHub Releases for manual updates.", close: "Close", cancel: "Cancel",
     codeSent: "Code sent. Check your inbox and spam folder.", codeWait: "You can request another code in",
     profileSaved: "Profile saved.", connected: "Account connected.", offlineSaved: "Setup saved. Linka will work locally.",
     errors: "Something went wrong. Check your connection and try again.", expired: "This code expired. Request a new one.",
@@ -44,6 +46,7 @@ const COPY = {
     signOutInfo: "You have signed out. Your local library has not been deleted."
   },
   ru: {
+    ambientSound: "Атмосферный звук", ambientSoundBody: "Тихий синтезаторный фон с медленным дыханием. По умолчанию выключен.", audioUnavailable: "Атмосферный звук недоступен в этой среде.", checkUpdates: "Проверить обновления", updateChanges: "Что изменилось",
     privacy: "Приватность по умолчанию · сначала локально", eyebrow: "Твоя личная библиотека",
     hero: ["Сохраняй", "то,", "что важно."], heroBody: "Ссылки, заметки и идеи. Сохраняй один раз — находи снова.",
     quick: "Быстрое сохранение", subtitle: "Только то, что нужно.", placeholder: "Вставь ссылку или сохрани мысль…",
@@ -63,7 +66,7 @@ const COPY = {
     waiting: "Ожидаем подтверждения…", pairingReady: "QR-код готов", qrUnavailable: "Сервис входа по QR ещё не настроен.",
     notification: "Уведомления на компьютере", enableNotifications: "Включить уведомления", notificationsOn: "Уведомления включены",
     updateTitle: "Обновление Linka", updateReady: "Доступна новая версия.", updateButton: "Установить обновление", updateDownloading: "Загрузка обновления", updateInstalling: "Установка обновления", updateRestarting: "Перезапуск Linka…", updateInstalled: "Обновление установлено. Перезапусти Linka.",
-    latest: "Установлена последняя версия для компьютера.", close: "Закрыть", cancel: "Отмена",
+    latest: "Установлена последняя версия для компьютера.", updaterNotConfigured: "Автообновление внутри приложения ещё не настроено. Для ручного обновления используй установщик из GitHub Releases.", close: "Закрыть", cancel: "Отмена",
     codeSent: "Код отправлен. Проверь почту и папку «Спам».", codeWait: "Повторный код можно запросить через",
     profileSaved: "Профиль сохранён.", connected: "Аккаунт подключён.", offlineSaved: "Настройки сохранены. Linka продолжит работать локально.",
     errors: "Не удалось выполнить действие. Проверь соединение и повтори попытку.", expired: "Срок действия кода истёк. Запроси новый.",
@@ -71,6 +74,7 @@ const COPY = {
     signOutInfo: "Вы вышли из аккаунта. Локальная библиотека не удалена."
   },
   az: {
+    ambientSound: "Atmosfer səsi", ambientSoundBody: "Yavaş nəfəs alan sakit sintezator fonu. Standart olaraq sönülüdür.", audioUnavailable: "Atmosfer səsi bu mühitdə mövcud deyil.", checkUpdates: "Yeniləmələri yoxla", updateChanges: "Nə dəyişdi",
     privacy: "Məxfilik standartdır · əvvəlcə cihazda", eyebrow: "Şəxsi kitabxanan",
     hero: ["Vacib", "olanı", "saxla."], heroBody: "Linklər, qeydlər və ideyalar. Bir dəfə saxla, sonra asan tap.",
     quick: "Tez yadda saxla", subtitle: "Yalnız lazım olanlar.", placeholder: "Link əlavə et və ya fikrini yaz…",
@@ -90,7 +94,7 @@ const COPY = {
     waiting: "Təsdiq gözlənilir…", pairingReady: "QR kod hazırdır", qrUnavailable: "QR giriş xidməti hələ qurulmayıb.",
     notification: "Kompüter bildirişləri", enableNotifications: "Bildirişləri aktiv et", notificationsOn: "Bildirişlər aktivdir",
     updateTitle: "Linka yeniləməsi", updateReady: "Yeni versiya mövcuddur.", updateButton: "Yeniləməni quraşdır", updateDownloading: "Yeniləmə endirilir", updateInstalling: "Yeniləmə quraşdırılır", updateRestarting: "Linka yenidən başladılır…", updateInstalled: "Yeniləmə quraşdırıldı. Linka-nı yenidən aç.",
-    latest: "Ən son masaüstü versiyası quraşdırılıb.", close: "Bağla", cancel: "Ləğv et",
+    latest: "Ən son masaüstü versiyası quraşdırılıb.", updaterNotConfigured: "Tətbiqdaxili avtomatik yeniləmə hələ qurulmayıb. Əl ilə yeniləmək üçün GitHub Releases quraşdırıcısından istifadə et.", close: "Bağla", cancel: "Ləğv et",
     codeSent: "Kod göndərildi. E-poçtu və spam qovluğunu yoxla.", codeWait: "Yeni kodu bu müddətdən sonra istəyə bilərsən:",
     profileSaved: "Profil yadda saxlanıldı.", connected: "Hesab qoşuldu.", offlineSaved: "Parametrlər saxlanıldı. Linka lokal işləyəcək.",
     errors: "Əməliyyat alınmadı. Bağlantını yoxla və yenidən cəhd et.", expired: "Kodun vaxtı bitib. Yeni kod istə.",
@@ -98,6 +102,7 @@ const COPY = {
     signOutInfo: "Hesabdan çıxdın. Lokal kitabxanan silinməyib."
   },
   tr: {
+    ambientSound: "Ortam sesi", ambientSoundBody: "Yavaşça nefes alan sakin bir synth tonu. Varsayılan olarak kapalı.", audioUnavailable: "Ortam sesi bu ortamda kullanılamıyor.", checkUpdates: "Güncellemeleri denetle", updateChanges: "Neler değişti",
     privacy: "Varsayılan gizlilik · önce cihazda", eyebrow: "Kişisel kitaplığın",
     hero: ["Önemli", "olanı", "sakla."], heroBody: "Bağlantılar, notlar ve fikirler. Bir kez kaydet, sonra kolayca bul.",
     quick: "Hızlı kayıt", subtitle: "Yalnızca gerekenler.", placeholder: "Bağlantı ekle veya bir düşünce yaz…",
@@ -117,7 +122,7 @@ const COPY = {
     waiting: "Onay bekleniyor…", pairingReady: "QR kod hazır", qrUnavailable: "QR giriş hizmeti henüz yapılandırılmadı.",
     notification: "Masaüstü bildirimleri", enableNotifications: "Bildirimleri etkinleştir", notificationsOn: "Bildirimler etkin",
     updateTitle: "Linka güncellemesi", updateReady: "Yeni sürüm kullanıma hazır.", updateButton: "Güncellemeyi yükle", updateDownloading: "Güncelleme indiriliyor", updateInstalling: "Güncelleme yükleniyor", updateRestarting: "Linka yeniden başlatılıyor…", updateInstalled: "Güncelleme yüklendi. Uygulamayı yeniden aç.",
-    latest: "En güncel masaüstü sürümünü kullanıyorsun.", close: "Kapat", cancel: "Vazgeç",
+    latest: "En güncel masaüstü sürümünü kullanıyorsun.", updaterNotConfigured: "Uygulama içi otomatik güncelleme henüz yapılandırılmadı. Elle güncellemek için GitHub Releases yükleyicisini kullan.", close: "Kapat", cancel: "Vazgeç",
     codeSent: "Kod gönderildi. Gelen kutunu ve spam klasörünü kontrol et.", codeWait: "Yeni kodu şu süre sonra isteyebilirsin:",
     profileSaved: "Profil kaydedildi.", connected: "Hesap bağlandı.", offlineSaved: "Ayarlar kaydedildi. Linka yerel çalışmaya devam edecek.",
     errors: "İşlem başarısız. Bağlantını kontrol edip tekrar dene.", expired: "Kodun süresi doldu. Yeni bir kod iste.",
@@ -129,12 +134,90 @@ let updateRecord = null;
 let pendingNativeUpdate = null;
 let lastUpdateNotice = "";
 let updateTimer = null;
+let ambientAudioContext = null;
+let ambientAudioNodes = [];
+let ambientAudioEnabled = false;
 
+function stopAmbientSound() {
+  ambientAudioNodes.forEach(node => { try { node.stop?.(); } catch {} try { node.disconnect?.(); } catch {} });
+  ambientAudioNodes = [];
+  if (ambientAudioContext) { const ctx = ambientAudioContext; ambientAudioContext = null; try { ctx.close(); } catch {} }
+  ambientAudioEnabled = false;
+}
+async function startAmbientSound() {
+  stopAmbientSound();
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) throw new Error("audio-unavailable");
+  const ctx = new AudioContextClass(); ambientAudioContext = ctx;
+  const master = ctx.createGain(); master.gain.value = 0.055; master.connect(ctx.destination);
+  [110, 164.81, 220, 329.63].forEach((frequency, index) => {
+    const oscillator = ctx.createOscillator(), voice = ctx.createGain();
+    oscillator.type = "sine"; oscillator.frequency.value = frequency; voice.gain.value = [0.22, 0.15, 0.10, 0.045][index];
+    oscillator.connect(voice); voice.connect(master); oscillator.start(); ambientAudioNodes.push(oscillator, voice);
+  });
+  const lfo = ctx.createOscillator(), depth = ctx.createGain(); lfo.frequency.value = 0.075; depth.gain.value = 0.012;
+  lfo.connect(depth); depth.connect(master.gain); lfo.start(); ambientAudioNodes.push(lfo, depth);
+  await ctx.resume(); ambientAudioEnabled = true;
+}
 function langCode() {
   const saved = localStorage.getItem(LANG_KEY);
   if (COPY[saved]) return saved;
   const browser = String(navigator.language || "en").slice(0, 2).toLowerCase();
   return COPY[browser] ? browser : "en";
+}
+function localizeReleaseNotes(body) {
+  const language = langCode();
+  const rows = String(body || "").split(/\r?\n/).map(line => line.trim().replace(/^[-*•]\s*/, "")).filter(Boolean);
+  const dict = {
+    en: [
+      ["ambient sphere", "Added a slow, softly pulsing signature sphere behind the workspace."],
+      ["transparent navigation", "Made navigation translucent with a smoother spring-like active state."],
+      ["ambient sound", "Added optional low-volume ambient synth sound; off by default."],
+      ["notification", "Improved update notifications and in-app status feedback."],
+      ["release notes", "Release notes now follow the selected application language."],
+      ["preserved local", "Preserved local-first storage and existing saved items."]
+    ],
+    ru: [
+      ["ambient sphere", "Добавлена медленно пульсирующая фирменная сфера на фоне."],
+      ["transparent navigation", "Навигация стала прозрачнее, активный раздел переключается плавно и с упругим откликом."],
+      ["ambient sound", "Добавлен тихий атмосферный синтезаторный фон; по умолчанию он выключен."],
+      ["notification", "Улучшены уведомления об обновлениях и статусы внутри приложения."],
+      ["release notes", "Список изменений отображается на выбранном языке приложения."],
+      ["preserved local", "Сохранено локальное хранение и существующие записи."]
+    ],
+    az: [
+      ["ambient sphere", "Arxa fona yavaş nəbz vuran firmanın kürəsi əlavə edildi."],
+      ["transparent navigation", "Naviqasiya şəffaflaşdırıldı, aktiv bölmə yumşaq animasiya ilə dəyişir."],
+      ["ambient sound", "Sakit atmosfer sintezator səsi əlavə edildi; standart olaraq sönülüdür."],
+      ["notification", "Yeniləmə bildirişləri və tətbiqdaxili statuslar yaxşılaşdırıldı."],
+      ["release notes", "Dəyişiklik qeydləri seçilmiş tətbiq dilində göstərilir."],
+      ["preserved local", "Yerli yaddaş və mövcud qeydlər qorunub saxlanıldı."]
+    ],
+    tr: [
+      ["ambient sphere", "Arka plana yavaşça nabız atan imza küresi eklendi."],
+      ["transparent navigation", "Gezinme şeffaflaştırıldı; etkin bölüm yumuşak ve yaylı bir geçişle değişiyor."],
+      ["ambient sound", "Düşük sesli ortam synth sesi eklendi; varsayılan olarak kapalı."],
+      ["notification", "Güncelleme bildirimleri ve uygulama içi durum geri bildirimi iyileştirildi."],
+      ["release notes", "Sürüm notları seçilen uygulama dilinde gösteriliyor."],
+      ["preserved local", "Yerel depolama ve mevcut kayıtlar korundu."]
+    ]
+  };
+  const translations = dict[language] || dict.en;
+  const output = [];
+  for (const row of rows) {
+    const lower = row.toLowerCase();
+    if (lower.startsWith("important") || lower.startsWith("migration from linka 0.4.72")) {
+      output.push(language === "ru" ? "Важно: эта версия устанавливается рядом со старой Linka. Экспортируйте резервную копию из старого приложения и импортируйте её здесь перед удалением старой версии."
+        : language === "az" ? "Vacib: bu versiya köhnə Linka ilə yanaşı quraşdırılır. Köhnə tətbiqdən ehtiyat nüsxəni ixrac edin və köhnə versiyanı silməzdən əvvəl burada idxal edin."
+        : language === "tr" ? "Önemli: bu sürüm eski Linka'nın yanına kurulur. Eski uygulamadan yedek dışa aktarın ve eski sürümü kaldırmadan önce burada içe aktarın."
+        : "Important: this version installs alongside old Linka. Export a backup from the old app and import it here before removing the old version.");
+      continue;
+    }
+    const match = translations.find(([needle]) => lower.includes(needle));
+    if (match && !output.includes(match[1])) output.push(match[1]);
+    else if (!match && !/^(what's new|install the apk|automated android build)/i.test(row)) output.push(row);
+  }
+  return output.slice(0, 8);
 }
 function tr(key) { return (COPY[langCode()] || COPY.en)[key] ?? COPY.en[key] ?? key; }
 function make(tag, className = "", text = "") {
@@ -418,8 +501,10 @@ async function checkForRelease({ notify = false } = {}) {
 function showUpdateSettings(panel) {
   const section = make("section", "linka-settings-block");
   section.append(make("h3", "", tr("updateTitle")));
-  const detail = make("p", "linka-muted", tr("latest"));
-  const check = button("Check now", "linka-button linka-button-secondary");
+  const detail = make("p", "linka-muted", isDesktopShell() && !UPDATER_ENABLED ? tr("updaterNotConfigured") : tr("latest"));
+  const notes = make("div", "linka-release-notes");
+  notes.hidden = true;
+  const check = button(tr("checkUpdates"), "linka-button linka-button-secondary");
   check.addEventListener("click", async () => {
     check.disabled = true;
     detail.textContent = "Checking…";
@@ -428,11 +513,17 @@ function showUpdateSettings(panel) {
     detail.textContent = pendingNativeUpdate
       ? tr("updateReady") + " " + (pendingNativeUpdate.version || latest || "")
       : latest && BUILD_VERSION && compareVersions(BUILD_VERSION, latest) < 0
-        ? tr("updateReady") + " " + latest : tr("latest");
-    if (updateRecord) releaseButton(section, tr("updateButton"), updateRecord.html_url || RELEASES_URL, detail);
+        ? tr("updateReady") + " " + latest : isDesktopShell() && !UPDATER_ENABLED ? tr("updaterNotConfigured") : tr("latest");
+    if (updateRecord) {
+      releaseButton(section, tr("updateButton"), updateRecord.html_url || RELEASES_URL, detail);
+      notes.replaceChildren(make("strong", "", tr("updateChanges")));
+      const list = make("ul", "");
+      localizeReleaseNotes(updateRecord.body || "").forEach(line => list.append(make("li", "", line)));
+      if (list.children.length) { notes.append(list); notes.hidden = false; }
+    }
     check.disabled = false;
   });
-  section.append(detail, check);
+  section.append(detail, notes, check);
   panel.append(section);
 }
 function showNotificationSettings(panel) {
@@ -724,6 +815,19 @@ function showSettings() {
   themeLabel.append(themeSelect);
   dialog.panel.append(themeLabel);
 
+  const soundSection = make("div", "linka-settings-block");
+  soundSection.append(make("h3", "", tr("ambientSound")), make("p", "linka-muted", tr("ambientSoundBody")));
+  const soundToggle = button("", "linka-button linka-button-secondary");
+  const refreshSoundLabel = () => { soundToggle.textContent = (ambientAudioEnabled ? "✓ " : "") + tr("ambientSound"); soundToggle.setAttribute("aria-pressed", String(ambientAudioEnabled)); };
+  refreshSoundLabel();
+  soundToggle.addEventListener("click", async () => {
+    soundToggle.disabled = true;
+    try { if (ambientAudioEnabled) stopAmbientSound(); else await startAmbientSound(); refreshSoundLabel(); }
+    catch { stopAmbientSound(); soundSection.append(make("p", "linka-muted", tr("audioUnavailable"))); }
+    finally { soundToggle.disabled = false; }
+  });
+  soundSection.append(soundToggle); dialog.panel.append(soundSection);
+
   const motionSection = make("div", "linka-settings-block");
   motionSection.append(make("h3", "", tr("reducedMotion")), make("p", "linka-muted", tr("reducedMotionBody")));
   const motionToggle = button("", "linka-button linka-button-secondary");
@@ -767,7 +871,7 @@ function addAccountButton() {
 
 function mountWebNavigation() {
   const shell = document.querySelector("#app");
-  if (!shell || window.__TAURI_INTERNALS__ || shell.querySelector(".web-sidebar")) return;
+  if (!shell || shell.querySelector(".web-sidebar")) return;
   const sidebar = make("aside", "web-sidebar");
   sidebar.setAttribute("aria-label", "Linka navigation");
   const brand = make("a", "web-side-brand");
@@ -777,18 +881,23 @@ function mountWebNavigation() {
   const nav = make("nav", "web-side-nav");
   nav.setAttribute("aria-label", "Library sections");
   const entries = [
-    ["all", "▦", "Inbox"], ["pinned", "⌖", "Pinned"],
-    ["links", "↗", "Links"], ["notes", "Aa", "Notes"],
-    ["search", "⌕", "Search"], ["capture", "+", "New capture"],
-    ["account", "○", "Account"], ["settings", "⚙", "Settings"]
+    ["all", "▦", tr("inbox")], ["pinned", "⌖", tr("pinned")],
+    ["links", "↗", tr("links")], ["notes", "Aa", tr("notes")],
+    ["search", "⌕", tr("search")], ["capture", "+", tr("quick")],
+    ["account", "○", tr("account")], ["settings", "⚙", tr("settings")]
   ];
   const itemButtons = new Map();
+  const activePill = make("span", "web-nav-active-pill");
+  activePill.setAttribute("aria-hidden", "true");
+  nav.append(activePill);
   const activate = key => {
     for (const [value, node] of itemButtons) {
       const active = value === key;
       node.classList.toggle("active", active);
       node.setAttribute("aria-current", active ? "page" : "false");
     }
+    const target = itemButtons.get(key);
+    if (target) { activePill.style.height = target.offsetHeight + "px"; activePill.style.transform = "translate3d(0," + target.offsetTop + "px,0)"; activePill.style.opacity = "1"; }
   };
   for (const [key, glyph, label] of entries) {
     const node = make("button", "web-nav-item");

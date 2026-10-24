@@ -261,6 +261,86 @@ body{background:var(--bg);background-image:radial-gradient(ellipse at 8% 0%,rgba
     @media(max-width:700px){.shell{padding:17px 14px 100px}.topbar{margin-bottom:35px}.privacy{display:none}.hero h1{font-size:clamp(42px,12vw,62px)}.capture{padding:12px;border-radius:21px}.capture-foot{align-items:flex-end}.capture-foot .hint{max-width:55%}.primary{padding:12px 14px}.toolbar{align-items:flex-start;flex-direction:column}.tools{width:100%;flex-wrap:wrap}.search{width:100%;max-width:none;flex:1;min-width:130px}.search:focus{width:100%;max-width:none}.grid{grid-template-columns:minmax(0,1fr);gap:10px}.item{padding:15px}.footer{margin-top:30px;flex-direction:column;gap:5px}.modal{padding:19px;border-radius:21px}}
     @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 
+
+    /* Linka Atmosphere — one slow, quiet focal sphere; no high-frequency motion. */
+    .ambient::before {
+      content:""; position:absolute; width:min(68vw,760px); aspect-ratio:1; left:50%; top:-24%;
+      transform:translate3d(-50%,0,0); border-radius:50%; pointer-events:none;
+      background:radial-gradient(circle at 42% 38%,rgba(169,154,255,.22) 0%,rgba(115,94,184,.13) 28%,rgba(72,62,114,.06) 49%,transparent 72%);
+      filter:blur(18px); opacity:.82; animation:linkaSphereBreathe 24s ease-in-out infinite alternate;
+      will-change:transform,opacity;
+    }
+    @keyframes linkaSphereBreathe {
+      0% {transform:translate3d(-50%,0,0) scale(.94);opacity:.58}
+      50% {transform:translate3d(-49%,2.5%,0) scale(1.025);opacity:.9}
+      100% {transform:translate3d(-51%,-1.5%,0) scale(.98);opacity:.68}
+    }
+    .topbar {background:color-mix(in srgb,var(--bg) 74%,transparent);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-radius:18px;padding:8px 10px;transition:background .28s ease,border-color .28s ease}
+    .filter,.web-nav-item,.icon-btn,.primary,.ghost {transition:transform .22s cubic-bezier(.2,.8,.2,1),background-color .24s ease,border-color .24s ease,color .24s ease,box-shadow .24s ease}
+    .filter:active,.web-nav-item:active,.icon-btn:active,.primary:active,.ghost:active {transform:scale(.965)}
+    .web-side-nav {position:relative}
+    .web-nav-active-pill {position:absolute;z-index:0;left:0;right:0;top:0;display:block;height:43px;border:1px solid var(--line-strong);border-radius:13px;
+      background:linear-gradient(115deg,color-mix(in srgb,var(--panel-raised) 88%,rgba(169,154,255,.13)),color-mix(in srgb,var(--panel) 94%,transparent));
+      box-shadow:inset 0 1px rgba(255,255,255,.035),0 4px 18px rgba(0,0,0,.06);
+      opacity:0;pointer-events:none;transition:transform .32s cubic-bezier(.2,.85,.22,1),height .22s ease,opacity .16s ease;will-change:transform}
+    .web-nav-item {position:relative;z-index:1;background:transparent!important;border-color:transparent!important;box-shadow:none!important;transform:none}
+    .web-nav-item:hover {transform:translateX(2px)}
+    .web-nav-item.active {color:var(--text)}
+    .web-nav-item[data-nav="capture"] {background:var(--text)!important;color:var(--bg)!important;border-color:var(--text)!important;box-shadow:0 8px 26px rgba(0,0,0,.13)!important}
+    .web-nav-item[data-nav="capture"] .web-nav-glyph {color:var(--bg)}
+    /* The installed Windows shell gets the same navigation system, with desktop spacing. */
+    html[data-platform="desktop"] .shell {
+      width:min(1680px,100%);max-width:1680px;margin:0 auto;padding:20px 22px 38px 0;
+      grid-template-columns:220px minmax(0,1fr);
+      grid-template-areas:"web-sidebar topbar" "web-sidebar hero" "web-sidebar capture" "web-sidebar workspace" "web-sidebar footer";
+      column-gap:clamp(18px,2.5vw,34px);row-gap:14px;align-items:start;
+    }
+    html[data-platform="desktop"] .web-sidebar {
+      grid-area:web-sidebar;grid-row:1 / 6;align-self:stretch;position:sticky;top:0;height:calc(100vh - 16px);min-height:520px;
+      display:flex;flex-direction:column;gap:22px;padding:22px 13px 16px;border-right:1px solid var(--line);border-radius:0;
+      background:color-mix(in srgb,var(--bg) 72%,transparent);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);z-index:15;
+    }
+    html[data-platform="desktop"] .web-side-brand {display:flex;align-items:center;gap:10px;color:var(--text);text-decoration:none;padding:4px 9px 12px;font-size:24px;font-weight:720;letter-spacing:-.08em}
+    html[data-platform="desktop"] .web-side-brand img {width:34px;height:34px;border-radius:12px}
+    html[data-platform="desktop"] .web-side-caption {padding:0 11px;color:var(--muted);font-size:9px;letter-spacing:.16em;font-weight:750}
+    html[data-platform="desktop"] .web-side-nav {display:flex;flex-direction:column;gap:5px}
+    html[data-platform="desktop"] .web-nav-item {width:100%;display:flex;align-items:center;gap:11px;text-align:left;min-height:42px;padding:10px 11px;border-radius:13px;color:var(--muted);font-size:12px;font-weight:550;cursor:pointer}
+    html[data-platform="desktop"] .web-nav-glyph {display:grid;place-items:center;width:23px;min-width:23px;height:23px;border-radius:8px;color:var(--soft);font-size:16px;line-height:1}
+    html[data-platform="desktop"] .web-nav-item[data-nav="capture"] {margin-top:10px}
+    html[data-platform="desktop"] .web-nav-item[data-nav="account"] {margin-top:auto}
+    html[data-platform="desktop"] .web-side-foot {display:flex;align-items:flex-start;gap:10px;margin-top:auto;padding:13px 9px;border-top:1px solid var(--line);color:var(--soft);font-size:10px;line-height:1.5}
+    html[data-platform="desktop"] .web-side-foot strong,html[data-platform="desktop"] .web-side-foot small {display:block}
+    html[data-platform="desktop"] .web-side-foot strong {font-size:11px;font-weight:650}
+    html[data-platform="desktop"] .web-side-foot small {margin-top:3px;color:var(--muted);font-size:9px}
+    html[data-platform="desktop"] .web-side-status-dot {width:7px;height:7px;min-width:7px;margin-top:4px;border-radius:50%;background:#8aa899;box-shadow:0 0 0 4px color-mix(in srgb,#8aa899 12%,transparent)}
+    html[data-platform="desktop"] .topbar {grid-area:topbar;margin:0 0 8px;justify-content:flex-end;padding:8px 10px;border:1px solid var(--line);background:color-mix(in srgb,var(--panel) 72%,transparent);backdrop-filter:blur(18px)}
+    html[data-platform="desktop"] .topbar > .brand {display:none}
+    html[data-platform="desktop"] .hero {grid-area:hero;max-width:none;text-align:left;margin:0;padding:8px 0 0}
+    html[data-platform="desktop"] .hero h1 {font-size:clamp(40px,4.3vw,58px);line-height:1;letter-spacing:-.085em;margin:12px 0}
+    html[data-platform="desktop"] .hero > p {margin-left:0;margin-right:0;text-align:left;max-width:620px;font-size:13px}
+    html[data-platform="desktop"] .hero-sub {justify-content:flex-start}
+    html[data-platform="desktop"] .capture {grid-area:capture;max-width:none;width:100%;margin:0;padding:16px 18px;border-radius:23px}
+    html[data-platform="desktop"] .workspace {grid-area:workspace;max-width:none;width:100%;margin:8px 0 0;padding-top:0}
+    html[data-platform="desktop"] .grid {grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    html[data-platform="desktop"] .footer {grid-area:footer;max-width:none;width:100%;margin:18px 0 0}
+    html[data-platform="desktop"] #modal-root {position:relative;z-index:20}
+    html[data-platform="desktop"] .modal-layer {z-index:30}
+    @media(min-width:1280px){html[data-platform="desktop"] .grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+    @media(max-width:980px){html[data-platform="desktop"] .shell{grid-template-columns:72px minmax(0,1fr);column-gap:15px;padding-right:14px}
+      html[data-platform="desktop"] .web-sidebar{align-items:center;padding:18px 7px 12px}
+      html[data-platform="desktop"] .web-side-brand{padding:0;justify-content:center}
+      html[data-platform="desktop"] .web-side-brand span,html[data-platform="desktop"] .web-side-caption,html[data-platform="desktop"] .web-nav-label,html[data-platform="desktop"] .web-side-foot span:last-child{display:none}
+      html[data-platform="desktop"] .web-side-nav{width:100%;align-items:center}
+      html[data-platform="desktop"] .web-nav-item{width:46px;min-height:44px;height:44px;justify-content:center;padding:7px}
+      html[data-platform="desktop"] .web-side-foot{padding:12px 0;justify-content:center}
+      html[data-platform="desktop"] .web-side-status-dot{margin:0}
+    }
+    @media(prefers-reduced-motion:reduce){.ambient::before{animation:none;transform:translate3d(-50%,0,0)}.web-nav-active-pill{transition:none}}
+
+    .linka-release-notes {margin:12px 0 0;padding:13px 15px;border:1px solid var(--line);border-radius:15px;background:color-mix(in srgb,var(--panel) 78%,transparent);font-size:12px;line-height:1.55;color:var(--muted)}
+    .linka-release-notes strong {display:block;color:var(--text);font-size:12px;margin-bottom:6px;font-weight:650}
+    .linka-release-notes ul {margin:0;padding-left:18px;display:grid;gap:5px}
+    .linka-release-notes li::marker {color:var(--accent)}
   </style>
 </head>
 <body>

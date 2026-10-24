@@ -10,6 +10,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioTrack
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -23,6 +26,10 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -32,6 +39,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
@@ -97,18 +105,22 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -167,6 +179,7 @@ private const val LANGUAGE_KEY = "language"
 private const val TERMS_KEY = "agreement_accepted"
 private const val TERMS_VERSION = "2026-10-23-v2"
 private const val ANIMATIONS_KEY = "animations"
+const val AMBIENT_AUDIO_KEY = "ambient_audio"
 private const val DENSITY_KEY = "interface_density"
 private const val EFFECTS_KEY = "visual_effects"
 private const val FONT_SCALE_KEY = "font_scale"
@@ -290,7 +303,7 @@ private val words = mapOf(
         "all" to "All", "pinned" to "Pinned", "links" to "Links", "notes" to "Notes", "items" to "items",
         "empty" to "Nothing here yet", "emptyBody" to "Save something above, or share text from another app to Linka. Migrating from 0.4.72? Export a backup in old Linka, then import it here from Settings → Your data.",
         "private" to "Private by default", "privacyBody" to "Stored on this device. Export a backup whenever you need it.",
-        "appearance" to "Appearance", "language" to "App language", "animations" to "Smooth animations",
+        "appearance" to "Appearance", "language" to "App language", "animations" to "Smooth animations", "ambientAudio" to "Ambient sound",
         "fontSize" to "Text size", "updateAlerts" to "Update notifications", "updateAlertsBody" to "Notify me when a newer Android version is released.", "notificationsEnabled" to "Notifications are allowed on this device.", "notificationsBlocked" to "Android is blocking Linka notifications. Enable them in system settings.", "notificationSettings" to "Open notification settings", "testNotification" to "Send test notification",
         "updates" to "App updates", "checkUpdates" to "Check for updates", "checking" to "Checking…", "latest" to "You're up to date",
         "failed" to "Couldn't check for updates. Check your connection and try again.", "available" to "A newer Linka is ready",
@@ -321,7 +334,7 @@ private val words = mapOf(
         "all" to "Все", "pinned" to "Закреплённое", "links" to "Ссылки", "notes" to "Заметки", "items" to "шт.",
         "empty" to "Пока здесь пусто", "emptyBody" to "Сохрани запись выше или отправь текст в Linka из другого приложения. Переносишь данные из Linka 0.4.72? Экспортируй копию в старом приложении, затем импортируй её здесь: Настройки → Твои данные.",
         "private" to "Приватность по умолчанию", "privacyBody" to "Данные хранятся на устройстве. При необходимости создай резервную копию.",
-        "appearance" to "Внешний вид", "language" to "Язык приложения", "animations" to "Плавные анимации",
+        "appearance" to "Внешний вид", "language" to "Язык приложения", "animations" to "Плавные анимации", "ambientAudio" to "Атмосферный звук",
         "fontSize" to "Размер текста", "updateAlerts" to "Уведомления об обновлениях", "updateAlertsBody" to "Сообщать о новых версиях Linka для Android.", "notificationsEnabled" to "Уведомления разрешены на этом устройстве.", "notificationsBlocked" to "Android блокирует уведомления Linka. Разреши их в системных настройках.", "notificationSettings" to "Открыть настройки уведомлений", "testNotification" to "Отправить тестовое уведомление",
         "updates" to "Обновления приложения", "checkUpdates" to "Проверить обновления", "checking" to "Проверяем…", "latest" to "У тебя актуальная версия",
         "failed" to "Не удалось проверить обновления. Проверь подключение и повтори попытку.", "available" to "Доступна новая версия Linka",
@@ -352,7 +365,7 @@ private val words = mapOf(
         "all" to "Hamısı", "pinned" to "Bərkidilənlər", "links" to "Linklər", "notes" to "Qeydlər", "items" to "element",
         "empty" to "Hələ heç nə yoxdur", "emptyBody" to "Yuxarıdan qeyd saxla və ya başqa tətbiqdən mətni Linka-ya göndər. 0.4.72-dən keçirsən? Köhnə tətbiqdə ehtiyat nüsxəni ixrac et, sonra burada Parametrlər → Məlumatların bölməsindən idxal et.",
         "private" to "Məxfilik standartdır", "privacyBody" to "Məlumat bu cihazda saxlanılır. Lazım olduqda ehtiyat nüsxə yarat.",
-        "appearance" to "Görünüş", "language" to "Tətbiqin dili", "animations" to "Axıcı animasiyalar",
+        "appearance" to "Görünüş", "language" to "Tətbiqin dili", "animations" to "Axıcı animasiyalar", "ambientAudio" to "Atmosfer səsi",
         "fontSize" to "Mətn ölçüsü", "updateAlerts" to "Yeniləmə bildirişləri", "updateAlertsBody" to "Yeni Android versiyası çıxanda xəbər ver.", "notificationsEnabled" to "Bu cihazda bildirişlərə icazə verilib.", "notificationsBlocked" to "Android Linka bildirişlərini bloklayır. Sistem tənzimləmələrində icazə ver.", "notificationSettings" to "Bildiriş tənzimləmələrini aç", "testNotification" to "Test bildirişi göndər",
         "updates" to "Tətbiq yeniləmələri", "checkUpdates" to "Yeniləmələri yoxla", "checking" to "Yoxlanılır…", "latest" to "Ən son versiyadasan",
         "failed" to "Yeniləməni yoxlamaq mümkün olmadı. İnternet bağlantısını yoxla.", "available" to "Yeni Linka versiyası mövcuddur",
@@ -383,7 +396,7 @@ private val words = mapOf(
         "all" to "Tümü", "pinned" to "Sabitlenenler", "links" to "Bağlantılar", "notes" to "Notlar", "items" to "öğe",
         "empty" to "Henüz bir şey yok", "emptyBody" to "Yukarıdan kaydet veya başka uygulamadan metni Linka'ya paylaş. 0.4.72'den geçiş yapıyor musun? Eski uygulamada yedeği dışa aktar, sonra burada Ayarlar → Verilerin bölümünden içe aktar.",
         "private" to "Varsayılan olarak gizli", "privacyBody" to "Veriler bu cihazda tutulur. Gerektiğinde yedek dışa aktar.",
-        "appearance" to "Görünüm", "language" to "Uygulama dili", "animations" to "Akıcı animasyonlar",
+        "appearance" to "Görünüm", "language" to "Uygulama dili", "animations" to "Akıcı animasyonlar", "ambientAudio" to "Ortam sesi",
         "fontSize" to "Metin boyutu", "updateAlerts" to "Güncelleme bildirimleri", "updateAlertsBody" to "Yeni Android sürümü çıktığında bildir.", "notificationsEnabled" to "Bu cihazda bildirimlere izin verildi.", "notificationsBlocked" to "Android Linka bildirimlerini engelliyor. Sistem ayarlarından izin ver.", "notificationSettings" to "Bildirim ayarlarını aç", "testNotification" to "Test bildirimi gönder",
         "updates" to "Uygulama güncellemeleri", "checkUpdates" to "Güncellemeleri kontrol et", "checking" to "Kontrol ediliyor…", "latest" to "Güncelsin",
         "failed" to "Güncellemeler kontrol edilemedi. Bağlantını kontrol edip tekrar dene.", "available" to "Yeni Linka sürümü hazır",
@@ -493,7 +506,149 @@ private val extraWords = mapOf(
         "syncLatest" to "Son eşitleme", "syncOpen" to "Bulut eşitlemesini kur", "syncOffline" to "Hesapsız devam et"
     )
 )
+private fun localizeUpdateNotes(raw: String, lang: String): String {
+    val source = raw.lines().map { it.trim().removePrefix("•").removePrefix("-").removePrefix("*").trim() }.filter { it.isNotBlank() }
+    val lines = mutableListOf<String>()
+    if (source.any { it.contains("signing key", true) || it.contains("migration from Linka 0.4.72", true) }) {
+        lines += when (lang) {
+            "ru" -> "Важно: эта версия устанавливается рядом со старой Linka. Экспортируй резервную копию в старом приложении и импортируй её здесь перед удалением старой версии."
+            "az" -> "Vacib: bu versiya köhnə Linka ilə yanaşı quraşdırılır. Köhnə tətbiqdən ehtiyat nüsxəni ixrac et və onu burada idxal etmədən əvvəlki versiyanı silmə."
+            "tr" -> "Önemli: bu sürüm eski Linka'nın yanına kurulur. Eski uygulamadan yedek dışa aktar ve eski sürümü kaldırmadan önce burada içe aktar."
+            else -> "Important: this version installs alongside old Linka. Export a backup from the old app and import it here before removing the old version."
+        }
+    }
+    source.forEach { line ->
+        val lower = line.lowercase(Locale.ROOT)
+        val translated = when {
+            "ambient sphere" in lower || "pulsing sphere" in lower -> when (lang) {
+                "ru" -> "Добавлена медленно пульсирующая фиолетово-графитовая сфера на фоне."
+                "az" -> "Arxa fona yavaş nəbz vuran bənövşəyi-qrafit kürə əlavə edildi."
+                "tr" -> "Arka plana yavaşça nabız atan mor-grafit küre eklendi."
+                else -> "Added a slowly pulsing violet-graphite ambient sphere."
+            }
+            "transparent navigation" in lower || "spring navigation" in lower || "navigation pill" in lower -> when (lang) {
+                "ru" -> "Нижняя навигация стала прозрачной; активный раздел плавно перемещается с упругим откликом."
+                "az" -> "Alt naviqasiya şəffaf oldu; aktiv bölmə yumşaq animasiya ilə hərəkət edir."
+                "tr" -> "Alt gezinme şeffaflaştı; etkin bölüm yumuşak bir animasyonla hareket ediyor."
+                else -> "Made bottom navigation translucent with a smooth, spring-like active state."
+            }
+            "ambient sound" in lower || "synth pad" in lower -> when (lang) {
+                "ru" -> "Добавлен необязательный тихий атмосферный синтезаторный фон; он выключен по умолчанию."
+                "az" -> "İstəyə bağlı sakit atmosfer sintezator səsi əlavə edildi; standart olaraq sönülüdür."
+                "tr" -> "İsteğe bağlı, sakin bir ortam synth sesi eklendi; varsayılan olarak kapalıdır."
+                else -> "Added optional, quiet ambient synth audio; disabled by default."
+            }
+            "notification" in lower -> when (lang) {
+                "ru" -> "Уточнены уведомления и отображение состояния обновлений."
+                "az" -> "Bildirişlər və yeniləmə statusunun göstərilməsi təkmilləşdirildi."
+                "tr" -> "Bildirimler ve güncelleme durumunun gösterimi iyileştirildi."
+                else -> "Improved notification and update-status feedback."
+            }
+            "release notes" in lower || "localized update" in lower -> when (lang) {
+                "ru" -> "Сведения об изменениях отображаются на выбранном языке."
+                "az" -> "Dəyişiklik qeydləri seçilmiş dildə göstərilir."
+                "tr" -> "Sürüm notları seçilen dilde gösterilir."
+                else -> "Release notes now follow the selected app language."
+            }
+            "shorter, calmer page transitions" in lower || "visual jumping" in lower -> when (lang) {
+                "ru" -> "Переходы между разделами стали короче и плавнее."
+                "az" -> "Bölmələr arasındakı keçidlər qısaldıldı və yumşaldıldı."
+                "tr" -> "Bölümler arası geçişler kısaltıldı ve yumuşatıldı."
+                else -> "Shorter, calmer transitions between sections."
+            }
+            "inbox renders" in lower || "limited batch" in lower -> when (lang) {
+                "ru" -> "Список загружает записи партиями, снижая нагрузку при запуске."
+                "az" -> "Siyahı başlanğıc yükünü azaltmaq üçün qeydləri hissə-hissə göstərir."
+                "tr" -> "Gelen kutusu açılış yükünü azaltmak için kayıtları gruplar halinde gösterir."
+                else -> "The inbox renders items in batches to reduce initial work."
+            }
+            "r8" in lower || "resource shrinking" in lower -> when (lang) {
+                "ru" -> "Оптимизирована сборка Android: уменьшены код и ресурсы приложения."
+                "az" -> "Android yığımı optimallaşdırıldı: kod və resursların ölçüsü azaldıldı."
+                "tr" -> "Android derlemesi optimize edildi; kod ve kaynak boyutu küçültüldü."
+                else -> "Optimized the Android build with code and resource shrinking."
+            }
+            "highest supported refresh rate" in lower -> when (lang) {
+                "ru" -> "Приложение запрашивает максимальную поддерживаемую частоту экрана; фактическая частота зависит от устройства."
+                "az" -> "Tətbiq ekranın dəstəklədiyi ən yüksək yenilənmə tezliyini istəyir; faktiki tezlik cihazdan asılıdır."
+                "tr" -> "Uygulama ekranın desteklediği en yüksek yenileme hızını ister; gerçek hız cihaza bağlıdır."
+                else -> "Requests the display's highest supported refresh rate; actual FPS depends on the device."
+            }
+            "motion remains native" in lower || "disabled in settings" in lower -> when (lang) {
+                "ru" -> "Анимации можно отключить в настройках."
+                "az" -> "Animasiyaları parametrlərdə söndürmək olar."
+                "tr" -> "Animasyonlar ayarlardan kapatılabilir."
+                else -> "Animations can be disabled in Settings."
+            }
+            else -> null
+        }
+        val displayLine = translated ?: line
+        if (displayLine !in lines) lines += displayLine
+    }
+    if (lines.isEmpty()) {
+        return when (lang) {
+            "ru" -> "• Более плавная навигация и улучшенная работа интерфейса\n• Уточнены уведомления и проверка обновлений"
+            "az" -> "• Daha hamar naviqasiya və təkmilləşdirilmiş interfeys\n• Bildirişlər və yeniləmə yoxlaması yaxşılaşdırıldı"
+            "tr" -> "• Daha akıcı gezinme ve iyileştirilmiş arayüz\n• Bildirimler ve güncelleme denetimi iyileştirildi"
+            else -> "• Smoother navigation and interface refinements\n• Improved notifications and update checks"
+        }
+    }
+    return lines.take(8).joinToString("\n") { "• $it" }
+}
+
 private fun tr(lang: String, key: String) = words[lang]?.get(key) ?: extraWords[lang]?.get(key) ?: words["en"]?.get(key) ?: extraWords["en"]?.get(key) ?: key
+
+/**
+ * Quiet locally-generated ambient pad. Optional, offline, and intentionally subtle.
+ */
+private object AmbientAudioEngine {
+    @Volatile private var track: AudioTrack? = null
+
+    @Synchronized fun start() {
+        if (track?.playState == AudioTrack.PLAYSTATE_PLAYING) return
+        stop()
+        val sampleRate = 44_100
+        val seconds = 12
+        val frames = sampleRate * seconds
+        val pcm = ShortArray(frames * 2)
+        for (i in 0 until frames) {
+            val t = i.toDouble() / sampleRate
+            val swell = 0.55 + 0.20 * kotlin.math.sin(2.0 * Math.PI * t / seconds)
+            val pad = kotlin.math.sin(2.0 * Math.PI * 110.0 * t) * 0.38 +
+                kotlin.math.sin(2.0 * Math.PI * 164.81 * t) * 0.25 +
+                kotlin.math.sin(2.0 * Math.PI * 220.0 * t) * 0.16 +
+                kotlin.math.sin(2.0 * Math.PI * 329.63 * t) * 0.07
+            val value = (pad * swell * 0.085 * Short.MAX_VALUE).toInt().coerceIn(-32768, 32767).toShort()
+            pcm[i * 2] = value
+            pcm[i * 2 + 1] = value
+        }
+        val bytes = ByteArray(pcm.size * 2)
+        for (i in pcm.indices) {
+            val v = pcm[i].toInt()
+            bytes[i * 2] = (v and 0xff).toByte()
+            bytes[i * 2 + 1] = ((v shr 8) and 0xff).toByte()
+        }
+        val audio = AudioTrack.Builder()
+            .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
+            .setAudioFormat(AudioFormat.Builder().setSampleRate(sampleRate).setEncoding(AudioFormat.ENCODING_PCM_16BIT).setChannelMask(AudioFormat.CHANNEL_OUT_STEREO).build())
+            .setBufferSizeInBytes(bytes.size)
+            .setTransferMode(AudioTrack.MODE_STATIC)
+            .build()
+        val written = audio.write(bytes, 0, bytes.size)
+        if (written <= 0) { audio.release(); return }
+        audio.setVolume(0.7f)
+        audio.setLoopPoints(0, frames, -1)
+        audio.play()
+        track = audio
+    }
+
+    @Synchronized fun stop() {
+        runCatching { track?.pause() }
+        runCatching { track?.flush() }
+        runCatching { track?.release() }
+        track = null
+    }
+}
 
 class MainActivity : ComponentActivity() {
     private var incomingSharedText by mutableStateOf("")
@@ -656,6 +811,7 @@ class MainActivity : ComponentActivity() {
             var language by remember { mutableStateOf(prefs().getString(LANGUAGE_KEY, "") ?: "") }
             var accepted by remember { mutableStateOf(prefs().getString(TERMS_KEY, "") == TERMS_VERSION) }
             var animations by remember { mutableStateOf(prefs().getBoolean(ANIMATIONS_KEY, true) && !android.provider.Settings.Global.getFloat(contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f).equals(0f)) }
+            var ambientAudio by remember { mutableStateOf(prefs().getBoolean(AMBIENT_AUDIO_KEY, false)) }
             var density by remember { mutableStateOf(prefs().getString(DENSITY_KEY, "standard") ?: "standard") }
             var effects by remember { mutableStateOf(prefs().getString(EFFECTS_KEY, "balanced") ?: "balanced") }
             var fontScale by remember { mutableFloatStateOf(prefs().getFloat(FONT_SCALE_KEY, 1f).coerceIn(.9f, 1.2f)) }
@@ -686,6 +842,7 @@ class MainActivity : ComponentActivity() {
                     accent = accent, setAccent = { accent = it; prefs().edit().putString(ACCENT_KEY, it).apply() },
                     language = language, setLanguage = { language = it; prefs().edit().putString(LANGUAGE_KEY, it).apply() },
                     animations = animations, setAnimations = { animations = it; prefs().edit().putBoolean(ANIMATIONS_KEY, it).apply() },
+                    ambientAudio = ambientAudio, setAmbientAudio = { ambientAudio = it; prefs().edit().putBoolean(AMBIENT_AUDIO_KEY, it).apply() },
                     density = density, setDensity = { density = it; prefs().edit().putString(DENSITY_KEY, it).apply() },
                     effects = effects, setEffects = { effects = it; prefs().edit().putString(EFFECTS_KEY, it).apply() },
                     fontScale = fontScale, setFontScale = { fontScale = it; prefs().edit().putFloat(FONT_SCALE_KEY, it).apply() },
@@ -736,6 +893,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         appInForeground = true
+        if (prefs().getBoolean(AMBIENT_AUDIO_KEY, false)) AmbientAudioEngine.start()
         notificationsAllowed = canPostNotifications()
         val now = System.currentTimeMillis()
         val lastForegroundCheck = prefs().getLong("last_foreground_update_check", 0L)
@@ -761,6 +919,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onPause() {
         appInForeground = false
+        AmbientAudioEngine.stop()
         super.onPause()
     }
 
@@ -1029,7 +1188,7 @@ class MainActivity : ComponentActivity() {
 private fun LinkaApp(
     sharedText: String, sharedTrigger: Int, pairingTrigger: Int, oauthTrigger: Int, load: () -> List<Capture>, save: (List<Capture>) -> Unit, copy: (String) -> Unit, open: (String) -> Unit,
     theme: String, setTheme: (String) -> Unit, accent: String, setAccent: (String) -> Unit, language: String, setLanguage: (String) -> Unit,
-    animations: Boolean, setAnimations: (Boolean) -> Unit, density: String, setDensity: (String) -> Unit, effects: String, setEffects: (String) -> Unit, fontScale: Float, setFontScale: (Float) -> Unit,
+    animations: Boolean, setAnimations: (Boolean) -> Unit, ambientAudio: Boolean, setAmbientAudio: (Boolean) -> Unit, density: String, setDensity: (String) -> Unit, effects: String, setEffects: (String) -> Unit, fontScale: Float, setFontScale: (Float) -> Unit,
     alerts: Boolean, notificationPermissionGranted: Boolean, openNotificationSettings: () -> Unit, sendTestNotification: () -> Unit, setAlerts: (Boolean) -> Unit, updateInfo: UpdateInfo?, updateStatus: String, checking: Boolean,
     checkUpdates: () -> Unit, openUpdate: (UpdateInfo) -> Unit,
     autoDownload: Boolean, setAutoDownload: (Boolean) -> Unit, downloadProgress: Int, downloadingUpdate: Boolean,
@@ -1045,6 +1204,11 @@ private fun LinkaApp(
     val main = if (dark) DT else LT
     val muted = if (dark) DM else LM
     val context = LocalContext.current
+    val sphereAccent = MaterialTheme.colorScheme.primary
+    LaunchedEffect(ambientAudio) { if (ambientAudio) AmbientAudioEngine.start() else AmbientAudioEngine.stop() }
+    DisposableEffect(Unit) { onDispose { AmbientAudioEngine.stop() } }
+    val ambientTransition = rememberInfiniteTransition(label = "linka-sphere")
+    val ambientPulse by ambientTransition.animateFloat(initialValue = 0f, targetValue = 1f, animationSpec = infiniteRepeatable(animation = tween(durationMillis = 15_000, easing = LinearEasing), repeatMode = RepeatMode.Reverse), label = "sphere-pulse")
     var captures by remember { mutableStateOf(load()) }
     var draft by remember { mutableStateOf(sharedText) }
     var editingId by remember { mutableStateOf<String?>(null) }
@@ -1316,7 +1480,7 @@ private fun LinkaApp(
         containerColor = bg,
         contentWindowInsets = WindowInsets.statusBars,
         bottomBar = {
-            NavigationBar(containerColor = panel.copy(alpha = .96f), tonalElevation = 0.dp, windowInsets = WindowInsets.navigationBars) {
+            NavigationBar(modifier = Modifier.background(Brush.verticalGradient(listOf(Color.Transparent, panel.copy(alpha = .76f)))), containerColor = Color.Transparent, tonalElevation = 0.dp, windowInsets = WindowInsets.navigationBars) {
                 val items = listOf(
                     Triple(0, Icons.Outlined.Home, tr(lang, "home")),
                     Triple(1, Icons.Outlined.Inbox, tr(lang, "inbox")),
@@ -1324,9 +1488,16 @@ private fun LinkaApp(
                     Triple(3, Icons.Outlined.Settings, tr(lang, "settings"))
                 )
                 items.forEach { (id, icon, label) ->
-                    NavigationBarItem(selected = tab == id, onClick = { tab = id },
-                        icon = { Icon(icon, contentDescription = label, modifier = Modifier.size(21.dp)) },
-                        label = { Text(label, fontSize = 10.sp * fontScale, maxLines = 1) }, alwaysShowLabel = true)
+                    val selected = tab == id
+                    val iconScale by androidx.compose.animation.core.animateFloatAsState(targetValue = if (selected) 1.08f else 1f, animationSpec = spring(dampingRatio = .58f, stiffness = 520f), label = "nav-impact-$id")
+                    NavigationBarItem(selected = selected, onClick = { tab = id },
+                        icon = {
+                            Box(Modifier.size(44.dp, 30.dp).graphicsLayer { scaleX = iconScale; scaleY = iconScale }.background(if (selected) sphereAccent.copy(alpha = .20f) else Color.Transparent, CircleShape), contentAlignment = Alignment.Center) {
+                                Icon(icon, contentDescription = label, modifier = Modifier.size(21.dp))
+                            }
+                        },
+                        label = { Text(label, fontSize = 10.sp * fontScale, maxLines = 1) }, alwaysShowLabel = true,
+                        colors = androidx.compose.material3.NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent, selectedIconColor = sphereAccent, unselectedIconColor = muted, selectedTextColor = main, unselectedTextColor = muted))
                 }
             }
         }
@@ -1353,7 +1524,33 @@ private fun LinkaApp(
                         else -> listOf(Color(0xFFFFFEFC), LB, Color(0xFFF1EFEB))
                     }
                 )
-            ).verticalScroll(rememberScrollState()).imePadding()
+            ).drawBehind {
+                if (theme != "oled" && effects != "quiet" && animations) {
+                    val center = Offset(size.width * .52f, size.height * .13f)
+                    val radius = size.width * (.27f + .012f * ambientPulse)
+                    val strength = if (effects == "atmosphere") .19f else .10f
+                    val glowRadius = radius * 1.85f
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            listOf(sphereAccent.copy(alpha = strength * .68f), Color(0xFF7564B5).copy(alpha = strength * .34f), Color.Transparent),
+                            center = center, radius = glowRadius
+                        ), radius = glowRadius, center = center
+                    )
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            listOf(sphereAccent.copy(alpha = strength + .025f * ambientPulse), Color(0xFF4B3A7A).copy(alpha = strength * .74f), Color(0xFF181321).copy(alpha = strength * .35f), Color.Transparent),
+                            center = center, radius = radius
+                        ), radius = radius, center = center
+                    )
+                    val highlight = Offset(center.x - radius * .32f, center.y - radius * .34f)
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            listOf(Color.White.copy(alpha = .075f), sphereAccent.copy(alpha = .035f), Color.Transparent),
+                            center = highlight, radius = radius * .62f
+                        ), radius = radius * .62f, center = highlight
+                    )
+                }
+            }.verticalScroll(rememberScrollState()).imePadding()
                 .padding(horizontal = 18.dp).padding(top = 14.dp, bottom = 28.dp),
                 verticalArrangement = Arrangement.spacedBy(when (density) { "compact" -> 10.dp; "spacious" -> 19.dp; else -> 14.dp })) {
                 Header(lang, main, muted, panel, border) { tab = 3 }
@@ -1472,6 +1669,7 @@ private fun LinkaApp(
                             }
                             SettingLine(Icons.Outlined.Language, tr(lang, "language"), languages.first { it.first == lang }.second, main, muted) { languageDialog = true }
                             SettingSwitch(tr(lang, "animations"), animations, setAnimations, main, muted)
+                            SettingSwitch(tr(lang, "ambientAudio"), ambientAudio, setAmbientAudio, main, muted)
                             Text(if (lang == "ru") "Интенсивность эффектов" else if (lang == "az") "Effektlərin intensivliyi" else if (lang == "tr") "Efekt yoğunluğu" else "Visual effects", color = muted, fontSize = 11.sp)
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 listOf("quiet" to (if (lang == "ru") "Тихо" else if (lang == "az") "Sakit" else if (lang == "tr") "Sakin" else "Quiet"), "balanced" to (if (lang == "ru") "Баланс" else if (lang == "az") "Balans" else if (lang == "tr") "Dengeli" else "Balanced"), "atmosphere" to (if (lang == "ru") "Атмосфера" else if (lang == "az") "Atmosfer" else if (lang == "tr") "Atmosfer" else "Atmosphere")).forEach { (v, label) ->
@@ -1585,7 +1783,7 @@ private fun LinkaApp(
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(tr(lang, "updateBody"), color = muted, fontSize = 13.sp, lineHeight = 19.sp)
                     Text(tr(lang, "updateChanges"), color = main, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                    Text(updateInfo.changes, color = muted, fontSize = 12.sp, lineHeight = 18.sp)
+                    Text(localizeUpdateNotes(updateInfo.changes, lang), color = muted, fontSize = 12.sp, lineHeight = 18.sp)
                 }
             },
             confirmButton = {
