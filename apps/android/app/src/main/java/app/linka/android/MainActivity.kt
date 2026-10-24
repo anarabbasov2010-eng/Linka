@@ -1811,7 +1811,7 @@ private fun LinkaApp(
                         Row(Modifier.fillMaxWidth().clickable { playerExpanded = true }.padding(start = 12.dp, end = 5.dp, top = 7.dp, bottom = 7.dp),
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                             Surface(color = linkaAccent.copy(alpha = .14f), shape = RoundedCornerShape(11.dp)) {
-                                Icon(Icons.Outlined.Tune, null, tint = sphereAccent, modifier = Modifier.padding(9.dp).size(18.dp))
+                                Icon(Icons.Outlined.Tune, null, tint = linkaAccent, modifier = Modifier.padding(9.dp).size(18.dp))
                             }
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                 Text(activeMusicTrack.name, color = main, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
@@ -1848,7 +1848,7 @@ private fun LinkaApp(
                     val iconScale by androidx.compose.animation.core.animateFloatAsState(targetValue = if (selected) 1.08f else 1f, animationSpec = spring(dampingRatio = .58f, stiffness = 520f), label = "nav-impact-$id")
                     NavigationBarItem(selected = selected, onClick = { tab = id },
                         icon = {
-                            Box(Modifier.size(44.dp, 30.dp).graphicsLayer { scaleX = iconScale; scaleY = iconScale }.background(if (selected) sphereAccent.copy(alpha = .20f) else Color.Transparent, CircleShape), contentAlignment = Alignment.Center) {
+                            Box(Modifier.size(44.dp, 30.dp).graphicsLayer { scaleX = iconScale; scaleY = iconScale }.background(if (selected) linkaAccent.copy(alpha = .20f) else Color.Transparent, CircleShape), contentAlignment = Alignment.Center) {
                                 Icon(icon, contentDescription = label, modifier = Modifier.size(21.dp))
                             }
                         },
@@ -2217,7 +2217,7 @@ private fun LinkaApp(
                 Text(if (lang == "ru") "ПЛЕЙЛИСТ" else "PLAYLIST", color = muted, fontSize = 10.sp, letterSpacing = 1.2.sp)
                 musicTracks.forEachIndexed { index, item ->
                     TextButton(onClick = { musicIndex = index; prefs.edit().putInt(ATMOSPHERE_MUSIC_INDEX_KEY, index).putBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true).apply(); musicEnabled = true }, modifier = Modifier.fillMaxWidth()) {
-                        Text((if (index == musicIndex) "♫  " else (index + 1).toString() + "  ") + item.name, color = if (index == musicIndex) sphereAccent else muted,
+                        Text((if (index == musicIndex) "♫  " else (index + 1).toString() + "  ") + item.name, color = if (index == musicIndex) linkaAccent else muted,
                             fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
