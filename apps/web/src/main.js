@@ -5,7 +5,7 @@ import { initLinkaAtmosphere, openAtmosphereSettings } from "./atmosphere.js";
 import { initLinkaDocuments } from "./documents.js";
 import { initLinkaSignature } from "./signature-theme.js";
 import {
-  addDeletedId, disconnectCloud, getCloudConfig, getCloudSession,
+  addDeletedId, addDeletedIds, removeDeletedIds, disconnectCloud, getCloudConfig, getCloudSession,
   getOtpCooldown, readDeletedIds, requestEmailOtp, saveCloudConfig, syncCloudCaptures, mergeCloudCaptures,
   verifyEmailOtp, readLinkaProfile, saveLinkaProfile, beginQrPairing, claimQrPairing,
   startGoogleOAuth, completeGoogleOAuthCallback
@@ -753,7 +753,13 @@ bulkToolbar.addEventListener("click", async event => {
     const removed = selected;
     captures = captures.filter(item => !selectedIds.has(item.id));
     if (!persist()) { render(); return; }
-    removed.forEach(item => addDeletedId(item.id));
+    if (!addDeletedIds(removed.map(item => item.id))) {
+      captures = [...captures, ...removed].sort((a, b) => Number(b.pinned) - Number(a.pinned) || Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0));
+      if (!persist()) say("Could not safely record cloud deletion markers. Export a backup and pause cloud sync before continuing.");
+      else say("Deletion cancelled because the cloud deletion markers could not be saved.");
+      render();
+      return;
+    }
     scheduleCloudSync();
     selectedIds.clear(); selectionMode = false;
     if (editingId && !captures.some(item => item.id === editingId)) resetEditor();
@@ -774,7 +780,13 @@ list.addEventListener("click",async event=>{
   else if(action==="delete"){
     captures=captures.filter(entry=>entry.id!==id);
     if (!persist()) { render(); return; }
-    addDeletedId(id);
+    if (!addDeletedId(id)) {
+      captures = [...captures.filter(entry => entry.id !== id), item].sort((a,b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt);
+      if (!persist()) say("Could not safely record the cloud deletion marker. Export a backup and pause cloud sync before continuing.");
+      else say("Deletion cancelled because the cloud deletion marker could not be saved.");
+      render();
+      return;
+    }
     scheduleCloudSync();
     if(editingId===id)resetEditor();
     render();say("Запись удалена");
@@ -782,11 +794,16 @@ list.addEventListener("click",async event=>{
       message: "Запись удалена",
       actionLabel: "Отменить",
       onAction: () => {
-        const deleted = readDeletedIds();
+        const beforeUndo = captures.map(entry => ({ ...entry }));
         captures = [...captures.filter(entry => entry.id !== id), item].sort((a,b) => b.updatedAt - a.updatedAt);
         if (!persist()) { render(); return; }
-        deleted.delete(id);
-        try { localStorage.setItem("linka.deletedIds.v1", JSON.stringify(Array.from(deleted))); } catch {}
+        if (!removeDeletedIds([id])) {
+          captures = beforeUndo;
+          if (!persist()) say("Could not safely roll back the undo. Export a backup and pause cloud sync before continuing.");
+          else say("Undo cancelled because the cloud deletion marker could not be removed.");
+          render();
+          return;
+        }
         scheduleCloudSync();
         render(); say("Удаление отменено");
       }
@@ -803,11 +820,16 @@ $("#import-button").addEventListener("click",()=>$("#import-file").click());
 $("#import-file").addEventListener("change",async event=>{
   const file=event.target.files?.[0];if(!file)return;
   try{const parsed=JSON.parse(await file.text());const imported=Array.isArray(parsed)?parsed:parsed.captures;if(!Array.isArray(imported))throw new Error("Invalid file");
-    const normalized=imported.map(item=>makeCapture(item.text,item)).filter(Boolean);const restoredIds=new Set(normalized.map(item=>item.id));const deleted=readDeletedIds();const map=new Map(captures.map(item=>[item.id,item]));normalized.forEach(item=>map.set(item.id,item));
+    const normalized=imported.map(item=>makeCapture(item.text,item)).filter(Boolean);const restoredIds=new Set(normalized.map(item=>item.id));const beforeImport=captures.map(item=>({...item}));const map=new Map(captures.map(item=>[item.id,item]));normalized.forEach(item=>map.set(item.id,item));
     captures=Array.from(map.values()).sort((a,b)=>b.updatedAt-a.updatedAt);
     if (persist()) {
-      restoredIds.forEach(id=>deleted.delete(id));
-      try { localStorage.setItem("linka.deletedIds.v1",JSON.stringify(Array.from(deleted))); } catch {}
+      if (!removeDeletedIds(restoredIds)) {
+        captures=beforeImport;
+        if (!persist()) say("Could not safely restore the previous library. Export a backup before continuing.");
+        else say("Import rolled back because old cloud deletion markers could not be removed.");
+        render();
+        return;
+      }
       scheduleCloudSync();
       render(); say("Imported "+normalized.length+" capture(s)");
     } else render();
