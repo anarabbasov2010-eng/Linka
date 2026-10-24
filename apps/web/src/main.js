@@ -1,6 +1,7 @@
 import { loadCaptures, saveCaptures, makeCapture, visibleCaptures } from "./store.js";
 import { initLinkaExperience } from "./experience.js";
 import { initVisualSystem, setLinkaAccent, setLinkaDensity, setLinkaEffects } from "./visual-system.js";
+import { initLinkaAtmosphere, openAtmosphereSettings } from "./atmosphere.js";
 import {
   addDeletedId, disconnectCloud, getCloudConfig, getCloudSession,
   getOtpCooldown, readDeletedIds, requestEmailOtp, saveCloudConfig, syncCloudCaptures,
@@ -675,6 +676,13 @@ function showНастройки() {
   content.append(windowsStatus);
   windowsПроверить.addEventListener("click",()=>{void checkWindowsInstaller(windowsStatus,windowsСкачать);});
 
+  const atmosphereRow=document.createElement("div"); atmosphereRow.className="setting-row";
+  const atmosphereMeta=document.createElement("div"); const atmosphereTitle=document.createElement("strong"); atmosphereTitle.textContent="Атмосфера и музыка";
+  const atmosphereDesc=document.createElement("p"); atmosphereDesc.textContent="Лесной фон, плёночное зерно, свой трек и плейлист";
+  atmosphereMeta.append(atmosphereTitle,atmosphereDesc);
+  const atmosphereOpen=document.createElement("button"); atmosphereOpen.type="button"; atmosphereOpen.className="ghost"; atmosphereOpen.textContent="Настроить";
+  atmosphereOpen.addEventListener("click",()=>{modalRoot.replaceChildren();openAtmosphereSettings();});
+  atmosphereRow.append(atmosphereMeta,atmosphereOpen); content.append(atmosphereRow);
   const agreementRow=document.createElement("div"); agreementRow.className="setting-row";
   const am=document.createElement("div"); const at=document.createElement("strong");at.textContent="Пользовательское соглашение";const ap=document.createElement("p");ap.textContent="Review the local-storage and privacy terms";am.append(at,ap);
   const view=document.createElement("button");view.type="button";view.className="ghost";view.textContent="Читать условия";
@@ -834,3 +842,4 @@ window.addEventListener("linka:appearance-theme", event => {
   if (["dark", "oled", "light", "system"].includes(mode)) applyTheme(mode);
 });
 initVisualSystem();
+void initLinkaAtmosphere().catch(error => console.warn("Linka atmosphere could not start", error));
