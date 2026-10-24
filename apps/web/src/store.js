@@ -1,4 +1,5 @@
 export const STORAGE_KEY = "linka.captures.v1";
+export const RECOVERY_KEY = "linka.captures.recovery.v1";
 
 export function normalizeCapture(item) {
   if (!item || typeof item !== "object") return null;
@@ -17,16 +18,99 @@ export function normalizeCapture(item) {
   };
 }
 
+function rememberCaptureRecovery(raw, storage) {
+  if (typeof raw !== "string") return;
+  try {
+    const currentRaw = storage?.getItem(RECOVERY_KEY);
+    const current = currentRaw ? JSON.parse(currentRaw) : null;
+    if (current && typeof current.raw === "string" && current.raw === raw) return;
+    storage?.setItem(RECOVERY_KEY, JSON.stringify({
+      raw,
+      reason: "capture-store-parse-error",
+      createdAt: Date.now(),
+      acknowledged: false
+    }));
+  } catch {
+    // Keep the original storage key untouched. The caller still blocks writes
+    // after detecting the malformed source, even if a second copy cannot fit.
+  }
+}
+
+/**
+ * Returns the preserved source when the capture store cannot be read.
+ * An acknowledged recovery record is retained for manual export/diagnostics.
+ */
+export function getCaptureRecovery(storage = globalThis.localStorage) {
+  try {
+    const savedRaw = storage?.getItem(RECOVERY_KEY);
+    if (savedRaw) {
+      const saved = JSON.parse(savedRaw);
+      if (saved && typeof saved.raw === "string") return saved;
+    }
+    const raw = storage?.getItem(STORAGE_KEY);
+    if (raw == null || raw === "") return null;
+    try {
+      if (Array.isArray(JSON.parse(raw))) return null;
+    } catch {}
+    rememberCaptureRecovery(raw, storage);
+    const preserved = storage?.getItem(RECOVERY_KEY);
+    if (preserved) {
+      const value = JSON.parse(preserved);
+      if (value && typeof value.raw === "string") return value;
+    }
+    return { raw, reason: "capture-store-parse-error", createdAt: Date.now(), acknowledged: false, preservedSeparately: false };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Starts an empty library only after the malformed source has been preserved.
+ * The recovery payload remains available for export after the user continues.
+ */
+export function startFreshCaptureLibrary(storage = globalThis.localStorage) {
+  const recovery = getCaptureRecovery(storage);
+  if (!recovery || recovery.acknowledged) return false;
+  try {
+    let savedRaw = storage?.getItem(RECOVERY_KEY);
+    let saved = savedRaw ? JSON.parse(savedRaw) : null;
+    if (!saved || typeof saved.raw !== "string" || saved.raw !== recovery.raw) {
+      rememberCaptureRecovery(recovery.raw, storage);
+      savedRaw = storage?.getItem(RECOVERY_KEY);
+      saved = savedRaw ? JSON.parse(savedRaw) : null;
+    }
+    if (!saved || typeof saved.raw !== "string" || saved.raw !== recovery.raw) return false;
+    storage.setItem(STORAGE_KEY, "[]");
+    storage.setItem(RECOVERY_KEY, JSON.stringify({ ...saved, acknowledged: true, acknowledgedAt: Date.now() }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function loadCaptures(storage = globalThis.localStorage) {
   try {
     const raw = storage?.getItem(STORAGE_KEY);
-    const data = raw ? JSON.parse(raw) : [];
-    return Array.isArray(data) ? data.map(normalizeCapture).filter(Boolean) : [];
-  } catch { return []; }
+    if (raw == null || raw === "") return [];
+    const data = JSON.parse(raw);
+    if (!Array.isArray(data)) throw new Error("Capture storage is not an array");
+    return data.map(normalizeCapture).filter(Boolean);
+  } catch {
+    try {
+      const raw = storage?.getItem(STORAGE_KEY);
+      if (typeof raw === "string") rememberCaptureRecovery(raw, storage);
+    } catch {}
+    return [];
+  }
 }
 export function saveCaptures(items, storage = globalThis.localStorage) {
   try {
-    storage?.setItem(STORAGE_KEY, JSON.stringify(items.map(normalizeCapture).filter(Boolean).slice(0, 1000)));
+    if (!storage || typeof storage.setItem !== "function") return false;
+    const recovery = getCaptureRecovery(storage);
+    if (recovery && !recovery.acknowledged) return false;
+    // Never silently truncate a user's library. Quota errors are reported to
+    // the caller while the previous value remains intact.
+    storage.setItem(STORAGE_KEY, JSON.stringify(items.map(normalizeCapture).filter(Boolean)));
     return true;
   } catch { return false; }
 }
