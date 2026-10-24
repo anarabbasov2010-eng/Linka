@@ -22,7 +22,8 @@ function rememberCaptureRecovery(raw, storage) {
   if (typeof raw !== "string") return;
   try {
     const currentRaw = storage?.getItem(RECOVERY_KEY);
-    const current = currentRaw ? JSON.parse(currentRaw) : null;
+    let current = null;
+    try { current = currentRaw ? JSON.parse(currentRaw) : null; } catch {}
     if (current && typeof current.raw === "string" && current.raw === raw) return;
     storage?.setItem(RECOVERY_KEY, JSON.stringify({
       raw,
@@ -44,20 +45,27 @@ export function getCaptureRecovery(storage = globalThis.localStorage) {
   try {
     const savedRaw = storage?.getItem(RECOVERY_KEY);
     if (savedRaw) {
-      const saved = JSON.parse(savedRaw);
-      if (saved && typeof saved.raw === "string") return saved;
+      try {
+        const saved = JSON.parse(savedRaw);
+        if (saved && typeof saved.raw === "string") return saved;
+      } catch {}
     }
+  } catch {}
+
+  try {
     const raw = storage?.getItem(STORAGE_KEY);
     if (raw == null || raw === "") return null;
     try {
       if (Array.isArray(JSON.parse(raw))) return null;
     } catch {}
     rememberCaptureRecovery(raw, storage);
-    const preserved = storage?.getItem(RECOVERY_KEY);
-    if (preserved) {
-      const value = JSON.parse(preserved);
-      if (value && typeof value.raw === "string") return value;
-    }
+    try {
+      const preserved = storage?.getItem(RECOVERY_KEY);
+      if (preserved) {
+        const value = JSON.parse(preserved);
+        if (value && typeof value.raw === "string") return value;
+      }
+    } catch {}
     return { raw, reason: "capture-store-parse-error", createdAt: Date.now(), acknowledged: false, preservedSeparately: false };
   } catch {
     return null;
