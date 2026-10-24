@@ -125,7 +125,7 @@ export function mergeCloudCaptures(localCaptures, remoteCaptures, deletedIds, ma
     if (!item || typeof item.id !== "string" || !item.id || typeof item.text !== "string" || !item.text.trim()) continue;
     if (tombstones.has(item.id)) continue;
     const existing = mergedById.get(item.id);
-    if (!existing || Number(item.updatedAt || item.createdAt || 0) > Number(existing.updatedAt || existing.createdAt || 0)) {
+    if (!existing || Number(item.updatedAt || item.createdAt || 0) >= Number(existing.updatedAt || existing.createdAt || 0)) {
       mergedById.set(item.id, item);
     }
   }
