@@ -31,6 +31,9 @@ export function parseLinkaDocument(raw, fallbackTitle = "Открытый док
   }
   try {
     const parsed = JSON.parse(source);
+    if (Array.isArray(parsed)) {
+      throw new Error("Файл не является текстовым документом Linka (.linka).");
+    }
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
       if (parsed.format === LINKA_DOCUMENT_FORMAT && typeof parsed.text === "string") {
         return normalizeLinkaDocument(parsed, { title: fallbackTitle });
