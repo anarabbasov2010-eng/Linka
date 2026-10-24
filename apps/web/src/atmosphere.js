@@ -108,7 +108,7 @@ function typingAnimation(){
    const wrap=document.createElement("div");wrap.className="linka-type-stage";ta.parentNode.insertBefore(wrap,ta);wrap.append(ta);
    const mirror=document.createElement("div");mirror.className="linka-type-mirror";mirror.setAttribute("aria-hidden","true");
    const computed=getComputedStyle(ta);["fontFamily","fontSize","fontWeight","fontStyle","lineHeight","letterSpacing","textAlign","textIndent","paddingTop","paddingRight","paddingBottom","paddingLeft","boxSizing"].forEach(key=>mirror.style[key]=computed[key]);wrap.prepend(mirror);
-   let previous=ta.value, eraseTimer=0;
+   let previous=ta.value, eraseTimer=0, emptyTimer=0;
    const draw=(next,old=next,animate=false)=>{
      mirror.replaceChildren();mirror.style.opacity=next||old?"":"0";
      if(!next&&!old)return;
@@ -127,7 +127,13 @@ function typingAnimation(){
      mirror.append(fragment);mirror.scrollTop=ta.scrollTop;mirror.scrollLeft=ta.scrollLeft;
    };
    draw(ta.value);
-   ta.addEventListener("input",()=>{const next=ta.value;wrap.classList.toggle("is-typing",Boolean(next));draw(next,previous,true);previous=next});
+   ta.addEventListener("input",()=>{
+      const next=ta.value, old=previous;
+      if(next){clearTimeout(emptyTimer);wrap.classList.add("is-typing")}
+      else if(old){clearTimeout(emptyTimer);wrap.classList.add("is-typing");emptyTimer=setTimeout(()=>{if(!ta.value)wrap.classList.remove("is-typing")},235)}
+      else wrap.classList.remove("is-typing");
+      draw(next,old,true);previous=next;
+    });
    ta.addEventListener("focus",()=>{if(ta.value){wrap.classList.add("is-typing");draw(ta.value)}});
    ta.addEventListener("blur",()=>wrap.classList.remove("is-typing"));
    ta.addEventListener("scroll",()=>{mirror.scrollTop=ta.scrollTop;mirror.scrollLeft=ta.scrollLeft});
