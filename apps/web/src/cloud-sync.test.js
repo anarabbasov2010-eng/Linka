@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { completeGoogleOAuthCallback, getOtpCooldown, mergeCloudCaptures, readLinkaProfile, saveLinkaProfile } from "./cloud-sync.js";
+import { addDeletedIds, completeGoogleOAuthCallback, getOtpCooldown, mergeCloudCaptures, readDeletedIds, removeDeletedIds, readLinkaProfile, saveLinkaProfile, DELETED_IDS_KEY } from "./cloud-sync.js";
 
 test("cloud merge picks the newest copy, keeps pins, and orders newest first", () => {
   const remote = [
@@ -50,6 +50,21 @@ function memoryStorage() {
     removeItem(key) { values.delete(key); }
   };
 }
+
+test("bulk deletion markers are written atomically and can be removed for undo/import", () => {
+  const storage = memoryStorage();
+  assert.equal(addDeletedIds(["a", "b"], storage), true);
+  assert.deepEqual([...readDeletedIds(storage)].sort(), ["a", "b"]);
+  assert.equal(removeDeletedIds(["a"], storage), true);
+  assert.deepEqual([...readDeletedIds(storage)], ["b"]);
+  const failing = {
+    getItem(key) { return key === DELETED_IDS_KEY ? JSON.stringify(["kept"]) : null; },
+    setItem() { throw new Error("quota exceeded"); }
+  };
+  assert.equal(addDeletedIds(["c"], failing), false);
+  assert.equal(removeDeletedIds(["kept"], failing), false);
+  assert.deepEqual([...readDeletedIds(failing)], ["kept"]);
+});
 
 test("profile onboarding saves a cleaned display name and optional age", () => {
   const storage = memoryStorage();
