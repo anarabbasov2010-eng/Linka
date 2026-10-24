@@ -5,7 +5,7 @@ import { initLinkaAtmosphere, openAtmosphereSettings } from "./atmosphere.js";
 import { initLinkaDocuments } from "./documents.js";
 import { initLinkaSignature } from "./signature-theme.js";
 import {
-  addDeletedId, disconnectCloud, getCloudConfig, getCloudSession,
+  DELETED_IDS_KEY, disconnectCloud, getCloudConfig, getCloudSession,
   getOtpCooldown, readDeletedIds, requestEmailOtp, saveCloudConfig, syncCloudCaptures,
   verifyEmailOtp, readLinkaProfile, saveLinkaProfile, beginQrPairing, claimQrPairing,
   startGoogleOAuth, completeGoogleOAuthCallback
@@ -14,6 +14,9 @@ import QRCode from "qrcode";
 
 const $ = selector => document.querySelector(selector);
 const QUICK_DRAFT_KEY = "linka.quickDraft.v1";
+const TRASH_KEY = "linka.trash.v1";
+const TRASH_RECOVERY_KEY = "linka.trash.recovery.v1";
+const MAX_TRASH_ITEMS = 1000;
 const form = $("#capture-form");
 const draft = $("#capture-text");
 const saveButton = $("#save-button");
@@ -32,6 +35,12 @@ selectionButton.className = "ghost selection-mode-button";
 selectionButton.textContent = "Select items";
 selectionButton.setAttribute("aria-pressed", "false");
 $("#export-button").insertAdjacentElement("beforebegin", selectionButton);
+const trashButton = document.createElement("button");
+trashButton.type = "button";
+trashButton.className = "ghost";
+trashButton.textContent = "Trash / Корзина";
+trashButton.addEventListener("click", () => showTrashManager());
+$("#export-button").insertAdjacentElement("beforebegin", trashButton);
 const bulkToolbar = document.createElement("div");
 bulkToolbar.className = "bulk-toolbar";
 bulkToolbar.hidden = true;
@@ -178,6 +187,8 @@ function render() {
     bulkButton("Clear", "clear");
     bulkButton("Pin", "pin");
     bulkButton("Unpin", "unpin");
+    bulkButton("Archive", "archive");
+    bulkButton("Restore", "restore");
     bulkButton("Copy", "copy");
     bulkButton("Export", "export");
     bulkButton("Delete", "delete", true);
@@ -202,7 +213,7 @@ function render() {
     card.style.setProperty("--index", String(index));
     const head = document.createElement("div"); head.className = "item-head";
     const kind = document.createElement("span"); kind.className = "kind";
-    kind.textContent = item.pinned ? "Pinned" : (isLink(item.text) ? "Link" : "Note");
+    kind.textContent = item.archived ? "Archive" : (item.pinned ? "Pinned" : (isLink(item.text) ? "Link" : "Note"));
     if (selectionMode) {
       const selectItem = makeAction(selectedIds.has(item.id) ? "✓ Selected" : "Select", "select", item.id);
       selectItem.setAttribute("aria-pressed", String(selectedIds.has(item.id)));
@@ -223,6 +234,18 @@ function render() {
     }
     if (isLink(item.text) && item.previewTitle) { const title = document.createElement("p"); title.className = "item-title"; title.textContent = item.previewTitle; previewBits.push(title); }
     if (isLink(item.text) && item.previewDescription) { const description = document.createElement("p"); description.className = "item-description"; description.textContent = item.previewDescription; previewBits.push(description); }
+    if (item.tags?.length) {
+      const tagTray = document.createElement("div");
+      tagTray.className = "item-tags";
+      tagTray.style.cssText = "display:flex;flex-wrap:wrap;gap:6px;margin:8px 0";
+      item.tags.slice(0, 12).forEach(tag => {
+        const chip = document.createElement("span");
+        chip.textContent = "#" + tag;
+        chip.style.cssText = "padding:3px 8px;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:11px";
+        tagTray.append(chip);
+      });
+      previewBits.push(tagTray);
+    }
     if (isLink(item.text)) {
       const url = document.createElement("a");
       url.href = item.text.trim(); url.target = "_blank"; url.rel = "noopener noreferrer";
@@ -232,7 +255,13 @@ function render() {
     const foot = document.createElement("div"); foot.className = "item-foot";
     const date = document.createElement("span"); date.className = "date"; date.textContent = formatDate(item.updatedAt || item.createdAt);
     const actions = document.createElement("div"); actions.className = "actions";
-    actions.append(makeAction("Copy", "copy", item.id), makeAction("Edit", "edit", item.id), makeAction("Delete", "delete", item.id));
+    actions.append(
+      makeAction("Copy", "copy", item.id),
+      makeAction("Edit", "edit", item.id),
+      makeAction(item.archived ? "Restore" : "Archive", "archive", item.id),
+      makeAction("Tags", "tags", item.id),
+      makeAction("Delete", "delete", item.id)
+    );
     if (item.text.length > 240) {
       const expand = makeAction(expandedCards.has(item.id) ? "Show less" : "Read more", "expand", item.id);
       expand.setAttribute("aria-expanded", String(expandedCards.has(item.id)));
@@ -326,6 +355,212 @@ function modalShell(content, { dismissable = false } = {}) {
   }
   modalRoot.replaceChildren(layer);
   return layer;
+}
+function inspectTrash() {
+  let raw;
+  try { raw = localStorage.getItem(TRASH_KEY); }
+  catch { return { status: "unavailable", items: [], error: "Local storage is unavailable." }; }
+  if (raw == null) return { status: "empty", items: [], raw: null };
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.some(item => !item || typeof item.id !== "string" || typeof item.text !== "string")) {
+      throw new TypeError("Trash data is not a valid item array.");
+    }
+    return { status: parsed.length ? "ok" : "empty", items: parsed, raw };
+  } catch (error) {
+    try {
+      if (!localStorage.getItem(TRASH_RECOVERY_KEY)) {
+        localStorage.setItem(TRASH_RECOVERY_KEY, JSON.stringify({
+          capturedAt: Date.now(), raw, reason: String(error?.message || error)
+        }));
+      }
+    } catch {}
+    return { status: "corrupt", items: [], raw, error: String(error?.message || error) };
+  }
+}
+function writeTrash(items) {
+  const current = inspectTrash();
+  if (current.status === "corrupt" || current.status === "unavailable") return false;
+  try { localStorage.setItem(TRASH_KEY, JSON.stringify(items)); return true; }
+  catch { return false; }
+}
+function moveCapturesToTrash(items) {
+  const previousTrash = inspectTrash();
+  if (previousTrash.status === "corrupt" || previousTrash.status === "unavailable") return false;
+  const nextTrash = new Map(previousTrash.items.map(item => [item.id, item]));
+  const deletedAt = Date.now();
+  for (const item of items) nextTrash.set(item.id, { ...item, deletedAt });
+  if (nextTrash.size > MAX_TRASH_ITEMS) return false;
+  if (!writeTrash([...nextTrash.values()].sort((a, b) => Number(b.deletedAt || 0) - Number(a.deletedAt || 0)))) return false;
+
+  const oldTombstones = readDeletedIds();
+  const nextTombstones = new Set(oldTombstones);
+  for (const item of items) nextTombstones.add(item.id);
+  try {
+    localStorage.setItem(DELETED_IDS_KEY, JSON.stringify([...nextTombstones]));
+    const check = readDeletedIds();
+    if (items.some(item => !check.has(item.id))) throw new Error("Tombstone write was not retained.");
+  } catch {
+    writeTrash(previousTrash.items);
+    return false;
+  }
+
+  const previousCaptures = captures;
+  const nextCaptures = captures.filter(item => !items.some(deleted => deleted.id === item.id));
+  if (!saveCaptures(nextCaptures)) {
+    try { localStorage.setItem(DELETED_IDS_KEY, JSON.stringify([...oldTombstones])); } catch {}
+    writeTrash(previousTrash.items);
+    return false;
+  }
+  captures = nextCaptures;
+  scheduleCloudSync();
+  render();
+  return true;
+}
+function clearDeletedId(id) {
+  const deleted = readDeletedIds();
+  deleted.delete(id);
+  try {
+    localStorage.setItem(DELETED_IDS_KEY, JSON.stringify([...deleted]));
+    return !readDeletedIds().has(id);
+  } catch { return false; }
+}
+function removeTrashEntry(id) {
+  const current = inspectTrash();
+  if (current.status === "corrupt" || current.status === "unavailable") return false;
+  return writeTrash(current.items.filter(item => item.id !== id));
+}
+function restoreTrashItem(id) {
+  const current = inspectTrash();
+  if (current.status === "corrupt" || current.status === "unavailable") return false;
+  const item = current.items.find(entry => entry.id === id);
+  if (!item) return false;
+  const oldCaptures = captures;
+  const restored = { ...item };
+  delete restored.deletedAt;
+  const nextCaptures = [...captures.filter(entry => entry.id !== id), restored]
+    .sort((a, b) => Number(b.updatedAt || b.createdAt) - Number(a.updatedAt || a.createdAt));
+  if (!saveCaptures(nextCaptures)) return false;
+  if (!clearDeletedId(id)) {
+    saveCaptures(oldCaptures);
+    return false;
+  }
+  captures = nextCaptures;
+  // If quota prevents this write, the restored library copy and Trash copy both remain safe.
+  writeTrash(current.items.filter(entry => entry.id !== id));
+  scheduleCloudSync();
+  render();
+  return true;
+}
+function showTagEditor(item) {
+  const content = document.createElement("div");
+  const head = document.createElement("div"); head.className = "modal-head";
+  const logo = document.createElement("img"); logo.className = "modal-logo"; logo.src = "/linka-mark.svg"; logo.alt = "";
+  const meta = document.createElement("div");
+  const title = document.createElement("h2"); title.textContent = "Edit tags";
+  const subtitle = document.createElement("p"); subtitle.textContent = "Separate tags with commas, for example: design, read-later, project-a.";
+  meta.append(title, subtitle); head.append(logo, meta); content.append(head);
+
+  const label = document.createElement("label"); label.className = "linka-field";
+  const labelText = document.createElement("span"); labelText.textContent = "Tags";
+  const input = document.createElement("input"); input.type = "text"; input.maxLength = 2048;
+  input.value = (item.tags || []).join(", "); input.autocomplete = "off"; input.spellcheck = false;
+  label.append(labelText, input); content.append(label);
+
+  const actions = document.createElement("div"); actions.className = "linka-actions";
+  const cancel = document.createElement("button"); cancel.type = "button"; cancel.className = "ghost"; cancel.textContent = "Cancel";
+  cancel.addEventListener("click", () => modalRoot.replaceChildren());
+  const save = document.createElement("button"); save.type = "button"; save.className = "primary"; save.textContent = "Save tags";
+  save.addEventListener("click", () => {
+    const tags = [...new Set(input.value.split(",").map(tag => tag.trim().toLocaleLowerCase().replace(/\s+/g, "-").slice(0, 40)).filter(Boolean))].slice(0, 50);
+    const previous = captures;
+    const next = captures.map(entry => entry.id === item.id ? { ...entry, tags, updatedAt: Date.now() } : entry);
+    if (!saveCaptures(next)) { say("Could not save tags. Your library was left unchanged."); return; }
+    captures = next;
+    scheduleCloudSync();
+    render();
+    modalRoot.replaceChildren();
+    say("Tags saved");
+  });
+  actions.append(cancel, save); content.append(actions);
+  modalShell(content, { dismissable: true });
+  input.focus(); input.select();
+}
+function showTrashManager() {
+  const current = inspectTrash();
+  const content = document.createElement("div");
+  const head = document.createElement("div"); head.className = "modal-head";
+  const logo = document.createElement("img"); logo.className = "modal-logo"; logo.src = "/linka-mark.svg"; logo.alt = "";
+  const meta = document.createElement("div");
+  const title = document.createElement("h2"); title.textContent = "Trash";
+  const subtitle = document.createElement("p"); subtitle.textContent = "Deleted items stay here until restored or permanently removed.";
+  meta.append(title, subtitle); head.append(logo, meta); content.append(head);
+
+  if (current.status === "corrupt" || current.status === "unavailable") {
+    const warning = document.createElement("p"); warning.className = "linka-muted"; warning.setAttribute("role", "alert");
+    warning.textContent = "Trash could not be read. The original contents were preserved; new changes are disabled until recovery.";
+    content.append(warning);
+    if (current.status === "corrupt") {
+      const recover = document.createElement("button"); recover.type = "button"; recover.className = "ghost"; recover.textContent = "Download recovery data";
+      recover.addEventListener("click", () => {
+        try {
+          const raw = localStorage.getItem(TRASH_RECOVERY_KEY);
+          if (!raw) return;
+          const url = URL.createObjectURL(new Blob([raw], { type: "application/json" }));
+          const anchor = document.createElement("a"); anchor.href = url; anchor.download = "linka-trash-recovery.json"; anchor.click();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } catch {}
+      });
+      content.append(recover);
+    }
+  }
+
+  const rows = document.createElement("div"); rows.className = "trash-list";
+  if (!current.items.length) {
+    const empty = document.createElement("p"); empty.className = "linka-muted"; empty.textContent = "Trash is empty.";
+    rows.append(empty);
+  }
+  current.items.forEach(item => {
+    const row = document.createElement("article"); row.className = "trash-row";
+    row.style.cssText = "display:flex;flex-wrap:wrap;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)";
+    const copy = document.createElement("div"); copy.style.cssText = "flex:1;min-width:180px";
+    const text = document.createElement("p"); text.textContent = item.text.length > 300 ? item.text.slice(0, 300) + "…" : item.text;
+    text.style.cssText = "margin:0 0 6px;overflow-wrap:anywhere";
+    const date = document.createElement("small"); date.className = "linka-muted";
+    date.textContent = new Date(Number(item.deletedAt || Date.now())).toLocaleString();
+    copy.append(text, date);
+    const actions = document.createElement("div"); actions.className = "linka-actions";
+    const restore = document.createElement("button"); restore.type = "button"; restore.className = "ghost"; restore.textContent = "Restore";
+    restore.disabled = current.status === "corrupt" || current.status === "unavailable";
+    restore.addEventListener("click", () => {
+      if (!restoreTrashItem(item.id)) { say("Could not restore the item. Its Trash copy was kept."); return; }
+      modalRoot.replaceChildren(); say("Restored from Trash");
+    });
+    const remove = document.createElement("button"); remove.type = "button"; remove.className = "ghost"; remove.textContent = "Delete permanently";
+    remove.disabled = current.status === "corrupt" || current.status === "unavailable";
+    remove.addEventListener("click", () => {
+      if (!window.confirm("Permanently delete this item? This cannot be undone.")) return;
+      if (!removeTrashEntry(item.id)) { say("Could not update Trash; the original contents were preserved."); return; }
+      modalRoot.replaceChildren(); showTrashManager();
+    });
+    actions.append(restore, remove); row.append(copy, actions); rows.append(row);
+  });
+  content.append(rows);
+
+  const footer = document.createElement("div"); footer.className = "linka-actions";
+  if (current.items.length && current.status !== "corrupt" && current.status !== "unavailable") {
+    const empty = document.createElement("button"); empty.type = "button"; empty.className = "ghost"; empty.textContent = "Empty trash";
+    empty.addEventListener("click", () => {
+      if (!window.confirm("Permanently remove every item in Trash?")) return;
+      if (!writeTrash([])) { say("Could not empty Trash. The original data was preserved."); return; }
+      modalRoot.replaceChildren(); showTrashManager();
+    });
+    footer.append(empty);
+  }
+  const close = document.createElement("button"); close.type = "button"; close.className = "primary"; close.textContent = "Close";
+  close.addEventListener("click", () => modalRoot.replaceChildren());
+  footer.append(close); content.append(footer);
+  modalShell(content, { dismissable: true });
 }
 function addTermsBody(container) {
   const head = document.createElement("div"); head.className = "modal-head";
@@ -634,6 +869,12 @@ bulkToolbar.addEventListener("click", async event => {
     captures = captures.map(item => selectedIds.has(item.id) ? { ...item, pinned, updatedAt: now } : item);
     persist(); render(); say(pinned ? "Selected items pinned" : "Selected items unpinned"); return;
   }
+  if (action === "archive" || action === "restore") {
+    const archived = action === "archive", now = Date.now();
+    captures = captures.map(item => selectedIds.has(item.id) ? { ...item, archived, updatedAt: now } : item);
+    selectedIds.clear(); selectionMode = false;
+    persist(); render(); say(archived ? "Moved to Archive" : "Restored from Archive"); return;
+  }
   if (action === "copy") {
     const value = selected.map(item => item.text).join("\n\n");
     try { await navigator.clipboard.writeText(value); say("Copied " + selected.length + " selected item(s)"); }
@@ -656,12 +897,11 @@ bulkToolbar.addEventListener("click", async event => {
     say("Exported " + selected.length + " selected item(s)"); return;
   }
   if (action === "delete") {
-    if (!window.confirm("Delete " + selected.length + " selected item(s)? This cannot be undone from this dialog.")) return;
-    selected.forEach(item => addDeletedId(item.id));
-    captures = captures.filter(item => !selectedIds.has(item.id));
+    if (!window.confirm("Move " + selected.length + " selected item(s) to Trash? You can restore them later.")) return;
+    if (!moveCapturesToTrash(selected)) { say("Could not safely move items to Trash. The library is unchanged."); return; }
     selectedIds.clear(); selectionMode = false;
     if (editingId && !captures.some(item => item.id === editingId)) resetEditor();
-    persist(); render(); say("Selected items deleted");
+    render(); say("Moved selected items to Trash");
   }
 });
 list.addEventListener("click",async event=>{
@@ -675,21 +915,19 @@ list.addEventListener("click",async event=>{
   const item=captures.find(entry=>entry.id===id);if(!item)return;
   if(action==="expand"){if(expandedCards.has(id))expandedCards.delete(id);else expandedCards.add(id);render();}
   else if(action==="pin"){captures=captures.map(entry=>entry.id===id?{...entry,pinned:!entry.pinned,updatedAt:Date.now()}:entry);persist();render();say(item.pinned?"Откреплено":"Закреплено");}
+  else if(action==="archive"){
+    const archived=!item.archived;
+    captures=captures.map(entry=>entry.id===id?{...entry,archived,updatedAt:Date.now()}:entry);
+    persist();render();say(archived?"Moved to Archive":"Restored from Archive");
+  }
+  else if(action==="tags"){showTagEditor(item);}
   else if(action==="delete"){
-    addDeletedId(id);
-    captures=captures.filter(entry=>entry.id!==id);
+    if(!moveCapturesToTrash([item])){say("Could not safely move this item to Trash. The library is unchanged.");return;}
     if(editingId===id)resetEditor();
-    persist();render();say("Запись удалена");
+    say("Moved to Trash");
     window.dispatchEvent(new CustomEvent("linka:toast", { detail: {
-      message: "Запись удалена",
-      actionLabel: "Отменить",
-      onAction: () => {
-        const deleted = readDeletedIds();
-        deleted.delete(id);
-        try { localStorage.setItem("linka.deletedIds.v1", JSON.stringify(Array.from(deleted))); } catch {}
-        captures = [...captures.filter(entry => entry.id !== id), item].sort((a,b) => b.updatedAt - a.updatedAt).slice(0,1000);
-        persist(); render(); say("Удаление отменено");
-      }
+      message: "Moved to Trash", actionLabel: "Restore",
+      onAction: () => { if (!restoreTrashItem(id)) { say("Could not restore this item. Its Trash copy remains safe."); return; } say("Restored from Trash"); }
     }}));
   }
   else if(action==="edit"){editingId=id;draft.value=item.text;composeLabel.textContent="Edit capture";saveButton.textContent="Save changes ↗";saveButton.disabled=false;draft.focus();window.scrollTo({top:0,behavior:"smooth"});}
