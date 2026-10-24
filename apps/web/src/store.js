@@ -90,7 +90,7 @@ export function saveCaptures(items, storage = globalThis.localStorage, { allowRe
 
 export function parseSearchQuery(query = "") {
   const tokens = String(query).match(/"[^"]*"|\S+/g) || [];
-  const parsed = { text: [], type: "", pinned: false, site: "", before: null, after: null, tag: "", status: "", archived: false };
+  const parsed = { text: [], type: "", pinned: false, site: "", before: null, after: null, tag: "", status: "", archived: false, today: false };
   for (const raw of tokens) {
     const token = raw.replace(/^"|"$/g, "");
     const lower = token.toLocaleLowerCase();
@@ -98,6 +98,7 @@ export function parseSearchQuery(query = "") {
     if (lower === "is:archived" || lower === "in:archive") { parsed.archived = true; continue; }
     if (lower === "is:unread") { parsed.status = "unread"; continue; }
     if (lower === "is:important") { parsed.status = "important"; continue; }
+    if (lower === "is:today") { parsed.today = true; continue; }
     if (lower === "type:link" || lower === "type:note") { parsed.type = lower.slice(5); continue; }
     if (lower.startsWith("tag:") && lower.slice(4).trim()) { parsed.tag = lower.slice(4).trim(); continue; }
     if (lower.startsWith("status:") && VALID_STATUSES.has(lower.slice(7))) { parsed.status = lower.slice(7); continue; }
@@ -134,6 +135,15 @@ export function visibleCaptures(items, filter = "all", query = "") {
     if (isLink) { try { host = new URL(item.text).hostname.replace(/^www\./i, "").toLocaleLowerCase(); } catch {} }
     if (parsed.site && !(host === parsed.site || host.endsWith("." + parsed.site))) return false;
     const savedAt = Number(item.createdAt || item.updatedAt || 0);
+    if (filter === "today" || parsed.today) {
+      const activityAt = Number(item.updatedAt || item.createdAt || 0);
+      const activityDate = new Date(activityAt);
+      const now = new Date();
+      if (!Number.isFinite(activityAt) ||
+          activityDate.getFullYear() !== now.getFullYear() ||
+          activityDate.getMonth() !== now.getMonth() ||
+          activityDate.getDate() !== now.getDate()) return false;
+    }
     if (parsed.before !== null && !(savedAt < parsed.before)) return false;
     if (parsed.after !== null && !(savedAt >= parsed.after)) return false;
     const searchable = [item.text, item.previewTitle, item.previewDescription, host, ...(item.tags || [])].join(" ").toLocaleLowerCase();

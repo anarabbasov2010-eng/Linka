@@ -85,11 +85,17 @@ test("normalization does not silently truncate long capture text", () => {
   assert.equal(loadCaptures(storage)[0].text.length, 120_000);
 });
 
-test("search supports tags, status, and archive scope", () => {
+test("search supports tags, status, archive scope, and today's activity", () => {
   const items = [
     { id: "tagged", text: "Design notes", createdAt: 2, updatedAt: 2, tags: ["design-system"], status: "important" },
     { id: "archived", text: "Old research", createdAt: 1, updatedAt: 1, archived: true, tags: ["research"] }
   ];
   assert.deepEqual(visibleCaptures(items, "all", "tag:design-system is:important").map(item => item.id), ["tagged"]);
   assert.deepEqual(visibleCaptures(items, "all", "in:archive tag:research").map(item => item.id), ["archived"]);
+  const now = new Date();
+  const today = { id: "today", text: "Changed today", createdAt: 1, updatedAt: Date.now() };
+  const yesterdayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 12);
+  const yesterday = { id: "yesterday", text: "Changed yesterday", createdAt: 1, updatedAt: yesterdayDate.getTime() };
+  assert.deepEqual(visibleCaptures([today, yesterday], "today").map(item => item.id), ["today"]);
+  assert.deepEqual(visibleCaptures([today, yesterday], "all", "is:today").map(item => item.id), ["today"]);
 });

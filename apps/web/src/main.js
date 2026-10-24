@@ -214,6 +214,13 @@ function render() {
     const head = document.createElement("div"); head.className = "item-head";
     const kind = document.createElement("span"); kind.className = "kind";
     kind.textContent = item.archived ? "Archive" : (item.pinned ? "Pinned" : (isLink(item.text) ? "Link" : "Note"));
+    if (item.status && item.status !== "unread") {
+      const statusChip = document.createElement("span");
+      statusChip.className = "kind status-kind";
+      statusChip.textContent = ({ reading: "Reading", done: "Done", deferred: "Later", important: "Important" })[item.status] || item.status;
+      statusChip.style.marginLeft = "6px";
+      head.append(statusChip);
+    }
     if (selectionMode) {
       const selectItem = makeAction(selectedIds.has(item.id) ? "✓ Selected" : "Select", "select", item.id);
       selectItem.setAttribute("aria-pressed", String(selectedIds.has(item.id)));
@@ -259,6 +266,7 @@ function render() {
       makeAction("Copy", "copy", item.id),
       makeAction("Edit", "edit", item.id),
       makeAction(item.archived ? "Restore" : "Archive", "archive", item.id),
+      makeAction("Status", "status", item.id),
       makeAction("Tags", "tags", item.id),
       makeAction("Delete", "delete", item.id)
     );
@@ -485,6 +493,39 @@ function showTagEditor(item) {
   actions.append(cancel, save); content.append(actions);
   modalShell(content, { dismissable: true });
   input.focus(); input.select();
+}
+function showStatusEditor(item) {
+  const choices = [
+    ["unread", "Unread"],
+    ["reading", "Reading"],
+    ["done", "Done"],
+    ["deferred", "Read later"],
+    ["important", "Important"]
+  ];
+  const content = document.createElement("div");
+  const head = document.createElement("div"); head.className = "modal-head";
+  const logo = document.createElement("img"); logo.className = "modal-logo"; logo.src = "/linka-mark.svg"; logo.alt = "";
+  const meta = document.createElement("div");
+  const title = document.createElement("h2"); title.textContent = "Reading status";
+  const subtitle = document.createElement("p"); subtitle.textContent = "Track whether you have read, finished, or postponed this material.";
+  meta.append(title, subtitle); head.append(logo, meta); content.append(head);
+  const label = document.createElement("label"); label.className = "linka-field";
+  const labelText = document.createElement("span"); labelText.textContent = "Status";
+  const select = document.createElement("select"); select.className = "linka-select";
+  choices.forEach(([value, name]) => { const option = document.createElement("option"); option.value = value; option.textContent = name; select.append(option); });
+  select.value = choices.some(([value]) => value === item.status) ? item.status : "unread";
+  label.append(labelText, select); content.append(label);
+  const actions = document.createElement("div"); actions.className = "linka-actions";
+  const cancel = document.createElement("button"); cancel.type = "button"; cancel.className = "ghost"; cancel.textContent = "Cancel";
+  cancel.addEventListener("click", () => modalRoot.replaceChildren());
+  const save = document.createElement("button"); save.type = "button"; save.className = "primary"; save.textContent = "Save status";
+  save.addEventListener("click", () => {
+    const next = captures.map(entry => entry.id === item.id ? { ...entry, status: select.value, updatedAt: Date.now() } : entry);
+    if (!saveCaptures(next)) { say("Could not save the status. The previous library is unchanged."); return; }
+    captures = next; scheduleCloudSync(); render(); modalRoot.replaceChildren(); say("Status saved");
+  });
+  actions.append(cancel, save); content.append(actions);
+  modalShell(content, { dismissable: true });
 }
 function showTrashManager() {
   const current = inspectTrash();
@@ -921,6 +962,7 @@ list.addEventListener("click",async event=>{
     persist();render();say(archived?"Moved to Archive":"Restored from Archive");
   }
   else if(action==="tags"){showTagEditor(item);}
+  else if(action==="status"){showStatusEditor(item);}
   else if(action==="delete"){
     if(!moveCapturesToTrash([item])){say("Could not safely move this item to Trash. The library is unchanged.");return;}
     if(editingId===id)resetEditor();
