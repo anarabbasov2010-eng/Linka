@@ -207,6 +207,13 @@ internal const val MAX_CAPTURES = 500
 private const val RELEASES_API = "https://api.github.com/repos/anarabbasov2010-eng/Linka/releases/latest"
 private const val NOTIFICATION_CHANNEL = "linka_updates"
 private const val DEFAULT_FOREST_VIDEO = "https://videos.pexels.com/video-files/36928855/36928855-hd_1920_1080_30fps.mp4"
+private const val DEFAULT_FOREST_POSTER = "https://images.pexels.com/photos/28714654/pexels-photo-28714654.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop"
+private val FOREST_VIDEO_CANDIDATES = listOf(
+    DEFAULT_FOREST_VIDEO,
+    "https://videos.pexels.com/video-files/30312148/30312148-hd_1920_1080_30fps.mp4",
+    "https://videos.pexels.com/video-files/34222220/34222220-hd_1920_1080_30fps.mp4",
+    "https://videos.pexels.com/video-files/13838155/13838155-hd_1920_1080_30fps.mp4"
+)
 private const val DEFAULT_MUSIC_URL = "https://d2ol7oe51mr4n9.cloudfront.net/user_3JmiwECXBUAWkApdn0zWkiZ506q/b0a0c0c2-d5e6-4e44-8ffd-90a08e8319f3.mp3"
 private const val ATMOSPHERE_BACKGROUND_URI_KEY = "atmosphere_background_uri"
 private const val ATMOSPHERE_BACKGROUND_TYPE_KEY = "atmosphere_background_type"
@@ -233,6 +240,7 @@ private data class LinkPreview(val title: String, val description: String, val i
 private class LinkaAmbientVideoView(context: Context) : TextureView(context), TextureView.SurfaceTextureListener {
     private var source: String? = null
     private var wantedPlaying = false
+    private var candidateIndex = 0
     private var prepared = false
     private var player: MediaPlayer? = null
     private var videoSurface: Surface? = null
@@ -246,6 +254,7 @@ private class LinkaAmbientVideoView(context: Context) : TextureView(context), Te
         wantedPlaying = shouldPlay
         if (source != uri) {
             source = uri
+            candidateIndex = 0
             releasePlayer()
             if (isAvailable) preparePlayer()
             return
