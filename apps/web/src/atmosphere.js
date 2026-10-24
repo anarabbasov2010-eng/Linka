@@ -14,7 +14,7 @@ const $=(s,r=document)=>r.querySelector(s);
 const read=(k,d)=>{try{const v=localStorage.getItem(PREFIX+k);return v==null?d:JSON.parse(v)}catch{return d}};
 const write=(k,v)=>{try{localStorage.setItem(PREFIX+k,JSON.stringify(v))}catch{}};
 const uid=()=>crypto?.randomUUID?.()||("m"+Date.now().toString(36)+Math.random().toString(36).slice(2));
-const state={db:null,video:true,grain:true,music:true,volume:.14,playlist:[],index:0,audio:null,urls:new Map(),playing:false,background:null,reduced:false};
+const state={db:null,video:true,grain:true,music:false,volume:.14,playlist:[],index:0,audio:null,urls:new Map(),playing:false,background:null,reduced:false};
 function openDb(){return new Promise(resolve=>{if(!("indexedDB"in window))return resolve(null);const q=indexedDB.open(DB_NAME,1);q.onupgradeneeded=()=>{if(!q.result.objectStoreNames.contains(STORE))q.result.createObjectStore(STORE,{keyPath:"id"})};q.onsuccess=()=>resolve(q.result);q.onerror=()=>resolve(null)})}
 function db(id,mode,fn){return new Promise((resolve,reject)=>{if(!state.db)return reject(new Error("Локальное хранилище недоступно"));const t=state.db.transaction(STORE,mode),q=fn(t.objectStore(STORE));q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error)})}
 async function putMedia(id,file,kind){if(file.size>350*1024*1024)throw new Error("Файл должен быть меньше 350 МБ");await db(id,"readwrite",s=>s.put({id,name:file.name,type:file.type,blob:file,kind}))}
@@ -95,7 +95,7 @@ function renderPlayer(){const t=track();document.querySelectorAll("[data-player-
 function toast(msg){const status=$(".linka-atmosphere-state");if(status)status.textContent=msg;const app=$("#status");if(app){app.textContent=msg;app.style.opacity="1"}}
 function playing(v){state.playing=Boolean(v&&state.audio&&!state.audio.paused);renderPlayer()}
 async function loadTrack(i,autoplay=false){if(!state.playlist.length)state.playlist=[DEFAULT_TRACK];state.index=(i+state.playlist.length)%state.playlist.length;write("index",state.index);write("playlist",state.playlist);const t=track();if(t.localId&&!state.urls.has(t.localId)){const rec=await getMedia(t.localId);if(rec?.blob)state.urls.set(t.localId,URL.createObjectURL(rec.blob))}const a=state.audio;if(!a)return;a.pause();a.removeAttribute("src");a.load();const src=source(t);if(src){a.src=src;a.load()}a.volume=state.volume;renderPlayer();if(autoplay&&src){try{await a.play();playing(true)}catch{playing(false);toast("Нажми Play, чтобы начать воспроизведение.")}}else playing(false)}
-async function removeTrack(id){const i=state.playlist.findIndex(t=>t.id===id);if(i<0)return;const it=state.playlist[i];if(it.localId){const url=state.urls.get(it.localId);if(url)URL.revokeObjectURL(url);state.urls.delete(it.localId);try{await db(it.localId,"readwrite",s=>s.delete(it.localId))}catch{}}state.playlist.splice(i,1);if(!state.playlist.length)state.playlist=[DEFAULT_TRACK];if(i===state.index)await loadTrack(Math.min(i,state.playlist.length-1),false);else{if(i<state.index)state.index--;write("playlist",state.playlist)}renderPlayer()}
+async function removeTrack(id){const i=state.playlist.findIndex(t=>t.id===id);if(i<0)return;const it=state.playlist[i];if(it.localId){const url=state.urls.get(it.localId);if(url)URL.revokeObjectURL(url);state.urls.delete(it.localId);try{await db(it.localId,"readwrite",s=>s.delete(it.localId))}catch{}}state.playlist.splice(i,1);if(!state.playlist.length){state.playlist=[DEFAULT_TRACK];state.music=false;write("music",false)}if(i===state.index)await loadTrack(Math.min(i,state.playlist.length-1),false);else{if(i<state.index)state.index--;write("playlist",state.playlist)}renderPlayer()}
 function openPlayer(){const p=$(".linka-player-panel");if(!p)return;p.classList.add("open");p.setAttribute("aria-hidden","false");renderPlayer()}
 function closePlayer(){const p=$(".linka-player-panel");p?.classList.remove("open");p?.setAttribute("aria-hidden","true")}
 async function togglePlay(){const a=state.audio;if(!a)return;if(!a.src)await loadTrack(state.index,false);if(a.paused){try{await a.play();playing(true)}catch{toast("Не удалось открыть трек. Проверь подключение или выбери локальный файл.")}}else{a.pause();playing(false)}}
@@ -150,10 +150,13 @@ function typingAnimation(){
   state.audio.addEventListener("error",()=>{playing(false);toast("Не удалось загрузить музыку. Добавь MP3 с устройства или проверь соединение.")});
   state.volume=Number(read("volume",.14));if(!Number.isFinite(state.volume))state.volume=.14;state.volume=Math.min(1,Math.max(0,state.volume));
   const savedPlaylist=read("playlist",[]);
-  const userTracks=Array.isArray(savedPlaylist)?savedPlaylist.filter(t=>t&&t.id!==DEFAULT_TRACK.id&&t.id!=="linka-provided-track"):[];
-  state.playlist=[DEFAULT_TRACK,...userTracks];
-  state.index=0;
-  write("playlist",state.playlist);write("index",0);
+   const savedPlaylist=read("playlist",[]);
+   const userTracks=Array.isArray(savedPlaylist)?savedPlaylist.filter(t=>t&&t.id!==DEFAULT_TRACK.id&&t.id!=="linka-provided-track"):[];
+   state.playlist=[DEFAULT_TRACK,...userTracks];
+   const savedIndex=Number(read("index",userTracks.length?1:0));
+   state.index=userTracks.length?Math.max(1,Math.min(Number.isFinite(savedIndex)?Math.trunc(savedIndex):1,state.playlist.length-1)):0;
+   state.music=userTracks.length>0&&read("music",false)!==false;
+   write("playlist",state.playlist);write("index",state.index);write("music",state.music);
   for(const t of state.playlist){
     if(t.localId&&!state.urls.has(t.localId)){const rec=await getMedia(t.localId);if(rec?.blob)state.urls.set(t.localId,URL.createObjectURL(rec.blob))}
   }
@@ -172,7 +175,8 @@ function typingAnimation(){
       }
       if(added){
         state.index=Math.max(0,state.playlist.findIndex(item=>item.id===firstAddedId));
-        write("playlist",state.playlist);write("index",state.index);renderPlayer();
+        state.music=true;
+        write("playlist",state.playlist);write("index",state.index);write("music",true);renderPlayer();
         await loadTrack(state.index,true);
       }
       toast("Добавлено треков: "+added);
@@ -198,5 +202,11 @@ function armMusicStart(){
 }
 export function openAtmosphereSettings(){openSettings()}
 export async function initLinkaAtmosphere(){if(state.initialized)return;state.initialized=true;addStyles();state.reduced=matchMedia?.("(prefers-reduced-motion: reduce)")?.matches||false;const storedThemeVersion=read("themeVersion","");
-  if(storedThemeVersion!=="twilight-v2"){write("video",true);write("music",true);write("themeVersion","twilight-v2")}
-  state.video=read("video",true)!==false;state.grain=read("grain",true)!==false;state.music=read("music",true)!==false;state.db=await openDb();buildBackground();$("#linka-atmosphere").classList.toggle("disabled",!state.video);$("#linka-atmosphere").classList.toggle("no-grain",!state.grain);await loadBackground();createPlayer();await initAudio();armMusicStart();settingsTrigger();typingAnimation();document.addEventListener("visibilitychange",()=>{const v=$("#linka-atmosphere video");if(document.hidden){v?.pause();state.audio?.pause()}else if(state.video&&!state.reduced)v?.play().catch(()=>{})});window.addEventListener("linka:atmosphere-open",openSettings);document.addEventListener("keydown",e=>{if(e.key==="Escape")closePlayer()});window.addEventListener("beforeunload",()=>{state.audio?.pause();state.urls.forEach(u=>URL.revokeObjectURL(u));if(state.background?.url)URL.revokeObjectURL(state.background.url)});renderPlayer()}
+   if(storedThemeVersion!=="forest-studio-v3"){
+     write("video",true);write("grain",true);
+     const savedPlaylist=read("playlist",[]);
+     const hasPersonalTracks=Array.isArray(savedPlaylist)&&savedPlaylist.some(t=>t&&t.id!==DEFAULT_TRACK.id&&t.id!=="linka-provided-track");
+     write("music",Boolean(hasPersonalTracks&&read("music",false)));
+     write("themeVersion","forest-studio-v3");
+   }
+   state.video=read("video",true)!==false;state.grain=read("grain",true)!==false;state.music=read("music",false)!==false;state.db=await openDb();buildBackground();$("#linka-atmosphere").classList.toggle("disabled",!state.video);$("#linka-atmosphere").classList.toggle("no-grain",!state.grain);await loadBackground();createPlayer();await initAudio();armMusicStart();settingsTrigger();typingAnimation();document.addEventListener("visibilitychange",()=>{const v=$("#linka-atmosphere video");if(document.hidden)v?.pause();else if(state.video)v?.play().catch(()=>{})});
