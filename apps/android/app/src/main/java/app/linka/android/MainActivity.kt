@@ -169,18 +169,18 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import coil.compose.AsyncImage
 
-private val DB = Color(0xFF09090B)
-private val DS = Color(0xFF111114)
-private val DR = Color(0xFF1B1B21)
-private val DBR = Color(0xFF303039)
-private val DT = Color(0xFFEDEDF2)
-private val DM = Color(0xFF9696A3)
-private val LB = Color(0xFFF5F4F1)
-private val LS = Color(0xFFFFFEFC)
-private val LR = Color(0xFFF0EEE9)
-private val LBR = Color(0xFFDFDDD8)
-private val LT = Color(0xFF1A191F)
-private val LM = Color(0xFF73717D)
+private val DB = Color(0xFF0B120D)
+private val DS = Color(0xFF121C14)
+private val DR = Color(0xFF1B291D)
+private val DBR = Color(0xFF394938)
+private val DT = Color(0xFFE8DFC8)
+private val DM = Color(0xFFB3BDA9)
+private val LB = Color(0xFF0B120D)
+private val LS = Color(0xFF121C14)
+private val LR = Color(0xFF1B291D)
+private val LBR = Color(0xFF394938)
+private val LT = Color(0xFFE8DFC8)
+private val LM = Color(0xFFB3BDA9)
 private const val PREFS = "linka_local_v3"
 private const val CAPTURES_KEY = "captures"
 private const val THEME_KEY = "theme"
@@ -217,7 +217,14 @@ private val FOREST_VIDEO_CANDIDATES = listOf(
     "https://videos.pexels.com/video-files/36928736/36928736-hd_1920_1080_30fps.mp4",
     "https://videos.pexels.com/video-files/37426477/37426477-hd_1920_1080_30fps.mp4"
 )
-private const val DEFAULT_MUSIC_URL = "https://d2ol7oe51mr4n9.cloudfront.net/user_3JmiwECXBUAWkApdn0zWkiZ506q/b0a0c0c2-d5e6-4e44-8ffd-90a08e8319f3.mp3"
+private const val DEFAULT_MUSIC_URL = ""
+private const val LINKA_DOCUMENT_FORMAT = "linka-document"
+private const val LINKA_DOCUMENT_MAX_CHARS = 1_000_000
+private fun linkaDocumentFilename(value: String): String {
+    val safe = value.trim().replace(Regex("""[\\/:*?"<>|]"""), "-")
+        .trimEnd('.', ' ').take(100).ifBlank { "Linka document" }
+    return if (safe.endsWith(".linka", ignoreCase = true)) safe else "$safe.linka"
+}
 private const val ATMOSPHERE_BACKGROUND_URI_KEY = "atmosphere_background_uri"
 private const val ATMOSPHERE_BACKGROUND_TYPE_KEY = "atmosphere_background_type"
 private const val ATMOSPHERE_BACKGROUND_ENABLED_KEY = "atmosphere_background_enabled"
@@ -932,8 +939,8 @@ class MainActivity : ComponentActivity() {
         rememberPairingIntent(intent)
         checkForUpdate(true)
         setContent {
-            var theme by remember { mutableStateOf("dark") }
-            var accent by remember { mutableStateOf("violet") }
+            var theme by remember { mutableStateOf("forest") }
+            var accent by remember { mutableStateOf("forest") }
             var language by remember { mutableStateOf(prefs().getString(LANGUAGE_KEY, "") ?: "") }
             var accepted by remember { mutableStateOf(prefs().getString(TERMS_KEY, "") == TERMS_VERSION) }
             var animations by remember { mutableStateOf(prefs().getBoolean(ANIMATIONS_KEY, true) && !android.provider.Settings.Global.getFloat(contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f).equals(0f)) }
@@ -944,22 +951,17 @@ class MainActivity : ComponentActivity() {
             var alerts by remember { mutableStateOf(prefs().getBoolean(UPDATE_ALERTS_KEY, true)) }
             var autoDownload by remember { mutableStateOf(prefs().getBoolean(AUTO_DOWNLOAD_KEY, false)) }
             LaunchedEffect(Unit) {
-                prefs().edit().putString(THEME_KEY, "dark").putString(ACCENT_KEY, "violet")
+                prefs().edit().putString(THEME_KEY, "forest").putString(ACCENT_KEY, "forest")
                     .putString(EFFECTS_KEY, "atmosphere").putBoolean(AMBIENT_AUDIO_KEY, false).apply()
                 AmbientAudioEngine.stop()
             }
             val darkSystem = androidx.compose.foundation.isSystemInDarkTheme()
-            val dark = theme == "dark" || theme == "oled" || (theme == "system" && darkSystem)
-            val accentColor = when (accent) {
-                "blue" -> if (dark) Color(0xFF9CC5FF) else Color(0xFF356BB4)
-                "mint" -> if (dark) Color(0xFF8FE3CF) else Color(0xFF237A68)
-                "rose" -> if (dark) Color(0xFFFFB6D2) else Color(0xFFB14E78)
-                else -> if (dark) Color(0xFFC9C0FF) else Color(0xFF6554A6)
-            }
-            val backgroundColor = if (theme == "oled") Color.Black else DB
-            val surfaceColor = if (theme == "oled") Color(0xFF050507) else DS
-            val raisedColor = if (theme == "oled") Color(0xFF111116) else DR
-            val outlineColor = if (theme == "oled") Color(0xFF26242D) else DBR
+            val dark = true
+            val accentColor = Color(0xFFB59A69)
+            val backgroundColor = DB
+            val surfaceColor = DS
+            val raisedColor = DR
+            val outlineColor = DBR
             MaterialTheme(colorScheme = if (dark) darkColorScheme(
                 background = backgroundColor, surface = surfaceColor, primary = accentColor, onPrimary = Color(0xFF171323), onBackground = DT, onSurface = DT, surfaceVariant = raisedColor, outline = outlineColor
             ) else lightColorScheme(
@@ -1372,10 +1374,10 @@ private fun LinkaApp(
     var atmosphereBackgroundType by remember { mutableStateOf(prefs.getString(ATMOSPHERE_BACKGROUND_TYPE_KEY, "") ?: "") }
     var atmosphereBackgroundEnabled by remember { mutableStateOf(if (atmospherePrefsMigrated) prefs.getBoolean(ATMOSPHERE_BACKGROUND_ENABLED_KEY, true) else true) }
     var atmosphereGrainEnabled by remember { mutableStateOf(prefs.getBoolean(ATMOSPHERE_GRAIN_ENABLED_KEY, true)) }
-    var musicEnabled by remember { mutableStateOf(if (atmospherePrefsMigrated) prefs.getBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true) else true) }
+    var musicEnabled by remember { mutableStateOf(if (atmospherePrefsMigrated) prefs.getBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, false) else false) }
     var playerExpanded by remember { mutableStateOf(false) }
     var musicVolume by remember { mutableFloatStateOf(prefs.getFloat(ATMOSPHERE_MUSIC_VOLUME_KEY, .14f).coerceIn(0f, 1f)) }
-    val defaultAtmosphereTrack = remember { AtmosphereTrack("linka-default", "как всё заебало..", DEFAULT_MUSIC_URL, true) }
+    val defaultAtmosphereTrack = remember { AtmosphereTrack("linka-default", "Выбери свой трек", DEFAULT_MUSIC_URL, true) }
     val restoredMusicTracks = remember {
         runCatching {
             val array = JSONArray(prefs.getString(ATMOSPHERE_MUSIC_PLAYLIST_KEY, "[]") ?: "[]")
@@ -1399,7 +1401,7 @@ private fun LinkaApp(
         if (!atmospherePrefsMigrated) {
             prefs.edit().putBoolean("atmosphere_theme_v2_migrated", true)
                 .putBoolean(ATMOSPHERE_BACKGROUND_ENABLED_KEY, true)
-                .putBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true)
+                .putBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, false)
                 .putBoolean(ATMOSPHERE_GRAIN_ENABLED_KEY, true)
                 .putInt(ATMOSPHERE_MUSIC_INDEX_KEY, 0)
                 .putBoolean(AMBIENT_AUDIO_KEY, false)
@@ -1596,7 +1598,7 @@ private fun LinkaApp(
         runCatching { musicPlayer?.release() }
         musicPlayer = null
         musicPlaying = false
-        if (!accepted || language.isBlank() || !musicEnabled || !appInForeground) return@LaunchedEffect
+        if (!accepted || language.isBlank() || !musicEnabled || !appInForeground || activeMusicTrack.uri.isBlank()) return@LaunchedEffect
         try {
             val player = MediaPlayer()
             musicPlayer = player
@@ -1851,7 +1853,8 @@ private fun LinkaApp(
                             fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 5.dp, bottom = 1.dp))
                         Column(verticalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.padding(bottom = 5.dp)) {
                             Text(tr(lang, "hero"), color = main, fontSize = 33.sp * fontScale, lineHeight = 38.sp * fontScale,
-                                fontWeight = FontWeight.SemiBold, letterSpacing = (-1.7).sp)
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+                                fontWeight = FontWeight.Medium, letterSpacing = (-1.1).sp)
                             Text(tr(lang, "heroBody"), color = muted, fontSize = 13.sp * fontScale, lineHeight = 19.sp * fontScale)
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -2063,7 +2066,7 @@ private fun LinkaApp(
                                 Text(if (lang == "ru") "Громкость музыки" else "Music volume", color = main, fontSize = 12.sp, modifier = Modifier.weight(1f))
                                 Text((musicVolume * 100).toInt().toString() + "%", color = muted, fontSize = 10.sp)
                             }
-                            Slider(value = musicVolume, onValueChange = { volume -> musicVolume = volume.coerceIn(0f, .4f) }, valueRange = 0f..0.4f)
+                            Slider(value = musicVolume, onValueChange = { volume -> musicVolume = volume.coerceIn(0f, 1f) }, valueRange = 0f..1f)
                             Button(onClick = { playerExpanded = true }, modifier = Modifier.fillMaxWidth().height(44.dp),
                                 shape = RoundedCornerShape(13.dp), colors = ButtonDefaults.buttonColors(containerColor = raised, contentColor = main)) {
                                 Text(if (lang == "ru") "Открыть музыкальный плеер" else "Open music player", fontSize = 12.sp)
@@ -2176,7 +2179,9 @@ private fun LinkaApp(
                     Text("‹", color = muted, fontSize = 18.sp)
                 }
                 IconButton(onClick = {
-                    if (!musicEnabled) {
+                    if (activeMusicTrack.uri.isBlank()) {
+                        musicPicker.launch(arrayOf("audio/*"))
+                    } else if (!musicEnabled) {
                         musicEnabled = true
                         prefs.edit().putBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true).apply()
                     } else if (musicPlaying) {
@@ -2208,7 +2213,8 @@ private fun LinkaApp(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = { changeMusicTrack(-1) }) { Text("‹", color = main, fontSize = 24.sp) }
                     Button(onClick = {
-                        if (!musicEnabled) { musicEnabled = true; prefs.edit().putBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true).apply() }
+                        if (activeMusicTrack.uri.isBlank()) musicPicker.launch(arrayOf("audio/*"))
+                        else if (!musicEnabled) { musicEnabled = true; prefs.edit().putBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true).apply() }
                         else if (musicPlaying) { runCatching { musicPlayer?.pause() }; musicPlaying = false }
                         else { runCatching { musicPlayer?.start(); musicPlaying = true } }
                     }, shape = RoundedCornerShape(15.dp), colors = ButtonDefaults.buttonColors(containerColor = main, contentColor = bg)) {
@@ -2220,7 +2226,7 @@ private fun LinkaApp(
                     Text(if (lang == "ru") "Громкость" else "Volume", color = muted, fontSize = 11.sp, modifier = Modifier.weight(1f))
                     Text((musicVolume * 100).toInt().toString() + "%", color = muted, fontSize = 10.sp)
                 }
-                Slider(value = musicVolume, onValueChange = { musicVolume = it.coerceIn(0f, .4f) }, valueRange = 0f..0.4f)
+                Slider(value = musicVolume, onValueChange = { musicVolume = it.coerceIn(0f, 1f) }, valueRange = 0f..1f)
                 Text(if (lang == "ru") "ПЛЕЙЛИСТ" else "PLAYLIST", color = muted, fontSize = 10.sp, letterSpacing = 1.2.sp)
                 musicTracks.forEachIndexed { index, item ->
                     TextButton(onClick = { musicIndex = index; prefs.edit().putInt(ATMOSPHERE_MUSIC_INDEX_KEY, index).putBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true).apply(); musicEnabled = true }, modifier = Modifier.fillMaxWidth()) {
@@ -2564,7 +2570,7 @@ private fun Header(lang: String, main: Color, muted: Color, panel: Color, border
             androidx.compose.foundation.Image(painterResource(R.drawable.linka_mark), "Linka logo", Modifier.size(47.dp).padding(4.dp))
         }
         Column {
-            Text("linka", color = main, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-1.4).sp)
+            Text("linka", color = main, fontSize = 22.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Serif, fontWeight = FontWeight.Medium, letterSpacing = (-.6).sp)
             Text(tr(lang, "tagline"), color = muted, fontSize = 8.sp, letterSpacing = 1.2.sp)
         }
         Spacer(Modifier.weight(1f))
@@ -2604,7 +2610,7 @@ private fun InlineNotice(message: String, panel: Color, border: Color, main: Col
 
 @Composable
 private fun SectionTitle(title: String, main: Color, modifier: Modifier = Modifier) {
-    Text(title, modifier = modifier, color = main, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+    Text(title, modifier = modifier, color = main, fontFamily = androidx.compose.ui.text.font.FontFamily.Serif, fontSize = 16.sp, fontWeight = FontWeight.Medium)
 }
 @Composable
 private fun FilterRow(lang: String, selected: String, onSelected: (String) -> Unit) {
@@ -2733,7 +2739,7 @@ private fun SettingsGroup(title: String, panel: Color, border: Color, main: Colo
                 Surface(color = MaterialTheme.colorScheme.primary.copy(alpha = .14f), shape = RoundedCornerShape(6.dp)) {
                     Box(Modifier.size(width = 4.dp, height = 18.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(6.dp)))
                 }
-                Text(title, color = main, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-.2).sp)
+                Text(title, color = main, fontFamily = androidx.compose.ui.text.font.FontFamily.Serif, fontSize = 15.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.sp)
             }
             content()
         }
