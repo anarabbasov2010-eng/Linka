@@ -933,7 +933,7 @@ function mountWebNavigation() {
   const nav = make("nav", "web-side-nav");
   nav.setAttribute("aria-label", "Library sections");
   const entries = [
-    ["all", "▦", tr("inbox")], ["pinned", "⌖", tr("pinned")],
+    ["all", "▦", tr("inbox")], ["pinned", "⌖", tr("pinned")], ["read-later", "◷", tr("later")],
     ["links", "↗", tr("links")], ["notes", "Aa", tr("notes")],
     ["search", "⌕", tr("search")], ["capture", "+", tr("quick")],
     ["account", "○", tr("account")], ["settings", "⚙", tr("settings")]
@@ -959,7 +959,7 @@ function mountWebNavigation() {
     node.querySelector(".web-nav-glyph").textContent = glyph;
     node.querySelector(".web-nav-label").textContent = label;
     node.addEventListener("click", () => {
-      if (["all", "pinned", "links", "notes"].includes(key)) {
+      if (["all", "pinned", "read-later", "links", "notes"].includes(key)) {
         document.querySelector('[data-filter="' + key + '"]')?.click();
         activate(key);
         document.querySelector(".workspace")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -992,10 +992,10 @@ function mountWebNavigation() {
 function updateWebNavLabels() {
   const lang = langCode();
   const labels = {
-    en: { all: "Inbox", pinned: "Pinned", links: "Links", notes: "Notes", search: "Search", capture: "New capture", account: "Account", settings: "Settings" },
-    ru: { all: "Входящие", pinned: "Закреплённое", links: "Ссылки", notes: "Заметки", search: "Поиск", capture: "Сохранить", account: "Аккаунт", settings: "Настройки" },
-    az: { all: "Gələnlər", pinned: "Sabitlənmiş", links: "Linklər", notes: "Qeydlər", search: "Axtar", capture: "Yadda saxla", account: "Hesab", settings: "Parametrlər" },
-    tr: { all: "Gelen kutusu", pinned: "Sabitlenen", links: "Bağlantılar", notes: "Notlar", search: "Ara", capture: "Kaydet", account: "Hesap", settings: "Ayarlar" }
+    en: { all: "Inbox", pinned: "Pinned", "read-later": "Read later", links: "Links", notes: "Notes", search: "Search", capture: "New capture", account: "Account", settings: "Settings" },
+    ru: { all: "Входящие", pinned: "Закреплённое", "read-later": "Сохранить на потом", links: "Ссылки", notes: "Заметки", search: "Поиск", capture: "Сохранить", account: "Аккаунт", settings: "Настройки" },
+    az: { all: "Gələnlər", pinned: "Sabitlənmiş", "read-later": "Sonra oxu", links: "Linklər", notes: "Qeydlər", search: "Axtar", capture: "Yadda saxla", account: "Hesab", settings: "Parametrlər" },
+    tr: { all: "Gelen kutusu", pinned: "Sabitlenen", "read-later": "Daha sonra oku", links: "Bağlantılar", notes: "Notlar", search: "Ara", capture: "Kaydet", account: "Hesap", settings: "Ayarlar" }
   };
   const selected = labels[lang] || labels.en;
   document.querySelectorAll(".web-nav-item[data-nav]").forEach(node => {
