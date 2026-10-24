@@ -1,5 +1,15 @@
 # Changelog
 
+## Next — Linka interface refinement
+
+- Android: added a slow, very subtle orbital drift and restrained rim-light detail to the existing ambient sphere; quiet mode and OLED black remain unaffected.
+- Android: section changes now combine a small directional slide, fade and spring timing instead of relying on vertical movement alone.
+- Android: appearance, accent, effects and density options now scroll horizontally on narrow screens rather than being clipped or compressed.
+- Android: pinned captures receive a clearer accent state, unpinned cards use quieter elevation, and settings groups have a compact accent marker.
+- Windows/Web: refined the shared Tauri/Web visual layer with a restrained moving navigation rail, clearer active states, consistent touch targets, focus rings, smoother surface transitions and more careful narrow-window layout.
+- Added a 200-item interface improvement roadmap, clearly separating the first implemented wave from future ideas.
+- Validation: GitHub Actions checks and installable builds must pass before this branch is treated as release-ready.
+
 ## 0.4.130 — 2026-10-23
 
 - Начат полный редизайн нативного Android-приложения, а не только веб-интерфейса.
