@@ -113,6 +113,16 @@ export function readDeletedIds(storage = globalThis.localStorage) {
     return new Set(Array.isArray(parsed) ? parsed.filter(x => typeof x === "string" && x) : []);
   } catch { return new Set(); }
 }
+export function setDeletedIds(ids, storage = globalThis.localStorage) {
+  const clean = [...new Set([...(ids || [])].filter(id => typeof id === "string" && id).map(id => id.slice(0, 200)))];
+  try {
+    if (!storage || typeof storage.setItem !== "function") return false;
+    storage.setItem(DELETED_IDS_KEY, JSON.stringify(clean));
+    return true;
+  } catch {
+    return false;
+  }
+}
 export function addDeletedIds(ids, storage = globalThis.localStorage) {
   const deleted = readDeletedIds(storage);
   for (const id of ids || []) {
