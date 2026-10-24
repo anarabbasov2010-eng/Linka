@@ -207,7 +207,7 @@ internal const val MAX_CAPTURES = 500
 private const val RELEASES_API = "https://api.github.com/repos/anarabbasov2010-eng/Linka/releases/latest"
 private const val NOTIFICATION_CHANNEL = "linka_updates"
 private const val DEFAULT_FOREST_VIDEO = "https://videos.pexels.com/video-files/36928855/36928855-hd_1920_1080_30fps.mp4"
-private const val DEFAULT_MUSIC_URL = "https://d2ol7oe51mr4n9.cloudfront.net/user_3JmiwECXBUAWkApdn0zWkiZ506q/0990a53d-b19a-4abf-98fe-599af0e82bbf.mp3"
+private const val DEFAULT_MUSIC_URL = "https://d2ol7oe51mr4n9.cloudfront.net/user_3JmiwECXBUAWkApdn0zWkiZ506q/b0a0c0c2-d5e6-4e44-8ffd-90a08e8319f3.mp3"
 private const val ATMOSPHERE_BACKGROUND_URI_KEY = "atmosphere_background_uri"
 private const val ATMOSPHERE_BACKGROUND_TYPE_KEY = "atmosphere_background_type"
 private const val ATMOSPHERE_BACKGROUND_ENABLED_KEY = "atmosphere_background_enabled"
@@ -910,17 +910,22 @@ class MainActivity : ComponentActivity() {
         rememberPairingIntent(intent)
         checkForUpdate(true)
         setContent {
-            var theme by remember { mutableStateOf(prefs().getString(THEME_KEY, "dark") ?: "dark") }
-            var accent by remember { mutableStateOf(prefs().getString(ACCENT_KEY, "violet") ?: "violet") }
+            var theme by remember { mutableStateOf("dark") }
+            var accent by remember { mutableStateOf("violet") }
             var language by remember { mutableStateOf(prefs().getString(LANGUAGE_KEY, "") ?: "") }
             var accepted by remember { mutableStateOf(prefs().getString(TERMS_KEY, "") == TERMS_VERSION) }
             var animations by remember { mutableStateOf(prefs().getBoolean(ANIMATIONS_KEY, true) && !android.provider.Settings.Global.getFloat(contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f).equals(0f)) }
-            var ambientAudio by remember { mutableStateOf(prefs().getBoolean(AMBIENT_AUDIO_KEY, false)) }
+            var ambientAudio by remember { mutableStateOf(false) }
             var density by remember { mutableStateOf(prefs().getString(DENSITY_KEY, "standard") ?: "standard") }
-            var effects by remember { mutableStateOf(prefs().getString(EFFECTS_KEY, "balanced") ?: "balanced") }
+            var effects by remember { mutableStateOf("atmosphere") }
             var fontScale by remember { mutableFloatStateOf(prefs().getFloat(FONT_SCALE_KEY, 1f).coerceIn(.9f, 1.2f)) }
             var alerts by remember { mutableStateOf(prefs().getBoolean(UPDATE_ALERTS_KEY, true)) }
             var autoDownload by remember { mutableStateOf(prefs().getBoolean(AUTO_DOWNLOAD_KEY, false)) }
+            LaunchedEffect(Unit) {
+                prefs().edit().putString(THEME_KEY, "dark").putString(ACCENT_KEY, "violet")
+                    .putString(EFFECTS_KEY, "atmosphere").putBoolean(AMBIENT_AUDIO_KEY, false).apply()
+                AmbientAudioEngine.stop()
+            }
             val darkSystem = androidx.compose.foundation.isSystemInDarkTheme()
             val dark = theme == "dark" || theme == "oled" || (theme == "system" && darkSystem)
             val accentColor = when (accent) {
@@ -942,13 +947,13 @@ class MainActivity : ComponentActivity() {
                     sharedText = incomingSharedText, sharedTrigger = incomingSharedToken, pairingTrigger = incomingPairingToken, oauthTrigger = incomingOAuthToken,
                     load = { loadCaptures() }, save = { saveCaptures(it) },
                     copy = { copyText(it) }, open = { openExternal(it) },
-                    theme = theme, setTheme = { theme = it; prefs().edit().putString(THEME_KEY, it).apply() },
-                    accent = accent, setAccent = { accent = it; prefs().edit().putString(ACCENT_KEY, it).apply() },
+                    theme = theme, setTheme = { },
+                    accent = accent, setAccent = { },
                     language = language, setLanguage = { language = it; prefs().edit().putString(LANGUAGE_KEY, it).apply() },
                     animations = animations, setAnimations = { animations = it; prefs().edit().putBoolean(ANIMATIONS_KEY, it).apply() },
-                    ambientAudio = ambientAudio, setAmbientAudio = { ambientAudio = it; prefs().edit().putBoolean(AMBIENT_AUDIO_KEY, it).apply() },
+                    ambientAudio = ambientAudio, setAmbientAudio = { },
                     density = density, setDensity = { density = it; prefs().edit().putString(DENSITY_KEY, it).apply() },
-                    effects = effects, setEffects = { effects = it; prefs().edit().putString(EFFECTS_KEY, it).apply() },
+                    effects = effects, setEffects = { },
                     fontScale = fontScale, setFontScale = { fontScale = it; prefs().edit().putFloat(FONT_SCALE_KEY, it).apply() },
                     alerts = alerts, notificationPermissionGranted = notificationsAllowed, openNotificationSettings = { openNotificationSettings() }, sendTestNotification = { sendTestNotification() }, setAlerts = { enabled ->
                         if (enabled && Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -1308,8 +1313,8 @@ private fun LinkaApp(
     val main = if (dark) DT else LT
     val muted = if (dark) DM else LM
     val context = LocalContext.current
-    val sphereAccent = MaterialTheme.colorScheme.primary
-    LaunchedEffect(ambientAudio) { if (ambientAudio) AmbientAudioEngine.start() else AmbientAudioEngine.stop() }
+    val linkaAccent = MaterialTheme.colorScheme.primary
+    LaunchedEffect(ambientAudio) { AmbientAudioEngine.stop() }
     DisposableEffect(Unit) { onDispose { AmbientAudioEngine.stop() } }
     val ambientTransition = rememberInfiniteTransition(label = "linka-sphere")
     val ambientPulse by ambientTransition.animateFloat(initialValue = 0f, targetValue = 1f, animationSpec = infiniteRepeatable(animation = tween(durationMillis = 15_000, easing = LinearEasing), repeatMode = RepeatMode.Reverse), label = "sphere-pulse")
@@ -1363,8 +1368,7 @@ private fun LinkaApp(
         }.getOrDefault(emptyList())
     }
     var musicTracks by remember {
-        mutableStateOf(if (restoredMusicTracks.any { it.id == defaultAtmosphereTrack.id }) restoredMusicTracks
-            else listOf(defaultAtmosphereTrack) + restoredMusicTracks.filterNot { it.builtin })
+        mutableStateOf(listOf(defaultAtmosphereTrack) + restoredMusicTracks.filterNot { it.id == defaultAtmosphereTrack.id || it.builtin })
     }
     var musicIndex by remember { mutableIntStateOf(prefs.getInt(ATMOSPHERE_MUSIC_INDEX_KEY, 0).coerceAtLeast(0)) }
     var musicPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
@@ -1376,6 +1380,7 @@ private fun LinkaApp(
         tracks.forEach { array.put(JSONObject().put("id", it.id).put("name", it.name).put("uri", it.uri).put("builtin", it.builtin)) }
         prefs.edit().putString(ATMOSPHERE_MUSIC_PLAYLIST_KEY, array.toString()).apply()
     }
+    LaunchedEffect(musicTracks) { persistMusicTracks(musicTracks) }
     fun changeMusicTrack(step: Int) {
         if (musicTracks.size <= 1) {
             runCatching { musicPlayer?.seekTo(0); musicPlayer?.start(); musicPlaying = true }
@@ -1730,10 +1735,10 @@ private fun LinkaApp(
         if (atmosphereBackgroundEnabled && theme != "oled") {
             if (atmosphereBackgroundUri.isNotBlank() && atmosphereBackgroundType.startsWith("image/")) {
                 AsyncImage(model = Uri.parse(atmosphereBackgroundUri), contentDescription = null, contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().graphicsLayer { alpha = .25f })
+                    modifier = Modifier.fillMaxSize().graphicsLayer { alpha = .72f })
             } else {
                 AndroidView(
-                    modifier = Modifier.fillMaxSize().graphicsLayer { alpha = .24f },
+                    modifier = Modifier.fillMaxSize().graphicsLayer { alpha = .68f },
                     factory = { viewContext -> LinkaAmbientVideoView(viewContext).apply { tag = backgroundSource; configure(backgroundSource, appInForeground) } },
                     update = { view ->
                         view.tag = backgroundSource
@@ -1742,7 +1747,7 @@ private fun LinkaApp(
                 )
             }
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(
-                Color.Black.copy(alpha = .34f), Color.Black.copy(alpha = .58f), Color.Black.copy(alpha = .88f)
+                Color.Black.copy(alpha = .16f), Color.Black.copy(alpha = .34f), Color.Black.copy(alpha = .62f)
             ))))
             if (atmosphereGrainEnabled && effects != "quiet") {
                 Box(Modifier.fillMaxSize().drawBehind {
@@ -1769,7 +1774,7 @@ private fun LinkaApp(
                     ) {
                         Row(Modifier.fillMaxWidth().clickable { playerExpanded = true }.padding(start = 12.dp, end = 5.dp, top = 7.dp, bottom = 7.dp),
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                            Surface(color = sphereAccent.copy(alpha = .14f), shape = RoundedCornerShape(11.dp)) {
+                            Surface(color = linkaAccent.copy(alpha = .14f), shape = RoundedCornerShape(11.dp)) {
                                 Icon(Icons.Outlined.Tune, null, tint = sphereAccent, modifier = Modifier.padding(9.dp).size(18.dp))
                             }
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -1836,51 +1841,7 @@ private fun LinkaApp(
                 } else fadeIn(tween(durationMillis = 90)) togetherWith fadeOut(tween(durationMillis = 90))
             }, label = "linka-page"
         ) { page ->
-            Column(Modifier.fillMaxSize().background(Color.Transparent).drawBehind {
-                if (theme != "oled" && effects != "quiet" && animations) {
-                    val orbitAngle = ambientOrbit * (2.0 * Math.PI)
-                    val center = Offset(
-                        size.width * (.52f + .018f * kotlin.math.sin(orbitAngle).toFloat()),
-                        size.height * (.13f + .009f * kotlin.math.cos(orbitAngle).toFloat())
-                    )
-                    val radius = size.width * (.265f + .014f * ambientPulse)
-                    val strength = if (effects == "atmosphere") .19f else .10f
-                    val glowRadius = radius * 1.85f
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            listOf(sphereAccent.copy(alpha = strength * .68f), Color(0xFF7564B5).copy(alpha = strength * .34f), Color.Transparent),
-                            center = center, radius = glowRadius
-                        ), radius = glowRadius, center = center
-                    )
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            listOf(sphereAccent.copy(alpha = strength + .025f * ambientPulse), Color(0xFF4B3A7A).copy(alpha = strength * .74f), Color(0xFF181321).copy(alpha = strength * .35f), Color.Transparent),
-                            center = center, radius = radius
-                        ), radius = radius, center = center
-                    )
-                    val highlight = Offset(center.x - radius * .32f, center.y - radius * .34f)
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            listOf(Color.White.copy(alpha = .075f), sphereAccent.copy(alpha = .035f), Color.Transparent),
-                            center = highlight, radius = radius * .62f
-                        ), radius = radius * .62f, center = highlight
-                    )
-                    if (effects == "atmosphere") {
-                        drawCircle(
-                            color = sphereAccent.copy(alpha = .055f + .012f * ambientPulse),
-                            radius = radius * 1.15f,
-                            center = center,
-                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.1.dp.toPx())
-                        )
-                        drawCircle(
-                            color = Color.White.copy(alpha = .018f),
-                            radius = radius * .91f,
-                            center = center,
-                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = .7.dp.toPx())
-                        )
-                    }
-                }
-            }.verticalScroll(rememberScrollState()).imePadding()
+            Column(Modifier.fillMaxSize().background(Color.Transparent).verticalScroll(rememberScrollState()).imePadding()
                 .padding(horizontal = 18.dp).padding(top = 14.dp, bottom = 28.dp),
                 verticalArrangement = Arrangement.spacedBy(when (density) { "compact" -> 10.dp; "spacious" -> 19.dp; else -> 14.dp })) {
                 Header(lang, main, muted, panel, border) { tab = 3 }
@@ -2055,31 +2016,16 @@ private fun LinkaApp(
                     else -> {
                         Text(tr(lang, "settings"), color = main, fontSize = 28.sp * fontScale, fontWeight = FontWeight.Medium, letterSpacing = (-1).sp)
                         Text(tr(lang, "manage"), color = muted, fontSize = 12.sp * fontScale)
-                        SettingsGroup(tr(lang, "appearance"), panel, border, main) {
-                            Text(tr(lang, "appearance"), color = main, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                            Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                                listOf("dark" to tr(lang, "themeDark"), "oled" to "OLED Black", "light" to tr(lang, "themeLight"), "system" to tr(lang, "themeSystem")).forEach { (v, label) ->
-                                    FilterChip(selected = theme == v, onClick = { setTheme(v) }, label = { Text(label, fontSize = 11.sp) })
-                                }
-                            }
-                            Text(if (lang == "ru") "Акцентный цвет" else if (lang == "az") "Vurğu rəngi" else if (lang == "tr") "Vurgu rengi" else "Accent color", color = muted, fontSize = 11.sp)
-                            Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                listOf("violet" to "Violet", "blue" to "Blue", "mint" to "Mint", "rose" to "Rose").forEach { (v, label) ->
-                                    FilterChip(selected = accent == v, onClick = { setAccent(v) }, label = { Text(label, fontSize = 10.sp) })
-                                }
-                            }
+                        SettingsGroup(if (lang == "ru") "Основные параметры" else if (lang == "az") "Əsas parametrlər" else if (lang == "tr") "Temel ayarlar" else "General settings", panel, border, main) {
                             SettingLine(Icons.Outlined.Language, tr(lang, "language"), languages.first { it.first == lang }.second, main, muted) { languageDialog = true }
                             SettingSwitch(tr(lang, "animations"), animations, setAnimations, main, muted)
-                            SettingSwitch(tr(lang, "ambientAudio"), ambientAudio, setAmbientAudio, main, muted)
-                            Text(if (lang == "ru") "Интенсивность эффектов" else if (lang == "az") "Effektlərin intensivliyi" else if (lang == "tr") "Efekt yoğunluğu" else "Visual effects", color = muted, fontSize = 11.sp)
-                            Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                listOf("quiet" to (if (lang == "ru") "Тихо" else if (lang == "az") "Sakit" else if (lang == "tr") "Sakin" else "Quiet"), "balanced" to (if (lang == "ru") "Баланс" else if (lang == "az") "Balans" else if (lang == "tr") "Dengeli" else "Balanced"), "atmosphere" to (if (lang == "ru") "Атмосфера" else if (lang == "az") "Atmosfer" else if (lang == "tr") "Atmosfer" else "Atmosphere")).forEach { (v, label) ->
-                                    FilterChip(selected = effects == v, onClick = { setEffects(v) }, label = { Text(label, fontSize = 10.sp) })
-                                }
-                            }
                             Text(if (lang == "ru") "Плотность интерфейса" else if (lang == "az") "İnterfeys sıxlığı" else if (lang == "tr") "Arayüz yoğunluğu" else "Interface density", color = muted, fontSize = 11.sp)
                             Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                listOf("compact" to (if (lang == "ru") "Компактно" else if (lang == "az") "Yığcam" else if (lang == "tr") "Kompakt" else "Compact"), "standard" to (if (lang == "ru") "Стандарт" else if (lang == "az") "Standart" else if (lang == "tr") "Standart" else "Standard"), "spacious" to (if (lang == "ru") "Свободно" else if (lang == "az") "Geniş" else if (lang == "tr") "Geniş" else "Spacious")).forEach { (v, label) ->
+                                listOf(
+                                    "compact" to (if (lang == "ru") "Компактно" else if (lang == "az") "Yığcam" else if (lang == "tr") "Kompakt" else "Compact"),
+                                    "standard" to (if (lang == "ru") "Стандарт" else if (lang == "az") "Standart" else if (lang == "tr") "Standart" else "Standard"),
+                                    "spacious" to (if (lang == "ru") "Свободно" else if (lang == "az") "Geniş" else if (lang == "tr") "Geniş" else "Spacious")
+                                ).forEach { (v, label) ->
                                     FilterChip(selected = density == v, onClick = { setDensity(v) }, label = { Text(label, fontSize = 10.sp) })
                                 }
                             }
