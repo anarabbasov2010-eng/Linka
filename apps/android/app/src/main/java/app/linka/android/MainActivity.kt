@@ -165,7 +165,9 @@ import java.util.UUID
 import java.time.LocalDate
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withContext
 import coil.compose.AsyncImage
 
@@ -1369,6 +1371,13 @@ private fun LinkaApp(
     var profileDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    var linkaDocumentDialog by remember { mutableStateOf(false) }
+    var linkaDocumentTitle by remember { mutableStateOf(if (lang == "ru") "Новый документ" else "New document") }
+    var linkaDocumentText by remember { mutableStateOf("") }
+    var linkaDocumentId by remember { mutableStateOf(UUID.randomUUID().toString()) }
+    var linkaDocumentCreatedAt by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var pendingLinkaDocumentJson by remember { mutableStateOf("") }
+    var linkaDraftRestored by remember { mutableStateOf(false) }
     val atmospherePrefsMigrated = prefs.getBoolean("atmosphere_theme_v2_migrated", false)
     var atmosphereBackgroundUri by remember { mutableStateOf(prefs.getString(ATMOSPHERE_BACKGROUND_URI_KEY, "") ?: "") }
     var atmosphereBackgroundType by remember { mutableStateOf(prefs.getString(ATMOSPHERE_BACKGROUND_TYPE_KEY, "") ?: "") }
@@ -1522,6 +1531,93 @@ private fun LinkaApp(
                     else if (lang == "az") "Qeydləri ixrac etmək olmadı"
                     else if (lang == "tr") "Kayıtlar dışa aktarılamadı" else "Could not export selected items"
             }
+        }
+    }
+
+    val linkaDocumentOpenLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching {
+                val raw = context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
+                    ?: error("Не удалось прочитать файл")
+                require(raw.length <= 5_000_000) { "Файл больше 5 МБ текста и не может быть открыт в редакторе." }
+                val displayName = runCatching {
+                    context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                        if (cursor.moveToFirst()) cursor.getString(0) else null
+                    }
+                }.getOrNull().orEmpty()
+                val fallbackTitle = displayName.substringBeforeLast('.', displayName).ifBlank {
+                    if (lang == "ru") "Открытый документ" else "Opened document"
+                }
+                val parsed = runCatching { JSONObject(raw) }.getOrNull()
+                if (raw.trimStart().startsWith("[") || parsed?.has("captures") == true) {
+                    error(if (lang == "ru") "Это резервная копия Linka, а не текстовый документ .linka." else "This is a Linka backup, not a .linka text document.")
+                }
+                if (parsed?.has("format") == true && parsed.optString("format") != LINKA_DOCUMENT_FORMAT) {
+                    error(if (lang == "ru") "Неизвестный формат документа Linka." else "Unknown Linka document format.")
+                }
+                if (parsed?.optString("format") == LINKA_DOCUMENT_FORMAT) {
+                    require(parsed.optInt("version", 1) == 1) { "Эта версия документа не поддерживается." }
+                    linkaDocumentId = parsed.optString("id").ifBlank { UUID.randomUUID().toString() }
+                    linkaDocumentTitle = parsed.optString("title").ifBlank { fallbackTitle }.take(180)
+                    linkaDocumentText = parsed.optString("text", "").take(5_000_000)
+                    linkaDocumentCreatedAt = parsed.optLong("createdAt", System.currentTimeMillis())
+                } else {
+                    linkaDocumentId = UUID.randomUUID().toString()
+                    linkaDocumentTitle = fallbackTitle.take(180)
+                    linkaDocumentText = raw
+                    linkaDocumentCreatedAt = System.currentTimeMillis()
+                }
+                linkaDocumentDialog = true
+                message = if (lang == "ru") "Документ открыт" else "Document opened"
+            }.onFailure {
+                message = it.message ?: if (lang == "ru") "Не удалось открыть документ" else "Could not open document"
+            }
+        }
+    }
+    val linkaDocumentSaveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/vnd.linka.document+json")) { uri ->
+        if (uri != null) {
+            runCatching {
+                require(pendingLinkaDocumentJson.isNotBlank()) { "Нет данных для сохранения." }
+                val output = context.contentResolver.openOutputStream(uri) ?: error("Не удалось открыть файл для записи")
+                output.bufferedWriter(Charsets.UTF_8).use { it.write(pendingLinkaDocumentJson) }
+                message = if (lang == "ru") "Файл .linka сохранён" else "Saved .linka document"
+                linkaDocumentDialog = false
+            }.onFailure {
+                message = it.message ?: if (lang == "ru") "Не удалось сохранить .linka" else "Could not save .linka"
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        val rawDraft = withContext(Dispatchers.IO) {
+            runCatching {
+                File(context.filesDir, "linka-document-draft.json").takeIf { it.isFile && it.length() <= 6_000_000L }?.readText(Charsets.UTF_8)
+            }.getOrNull()
+        }
+        if (!rawDraft.isNullOrBlank()) {
+            runCatching {
+                val draftJson = JSONObject(rawDraft)
+                if (draftJson.optString("format") == LINKA_DOCUMENT_FORMAT && draftJson.optInt("version", 1) == 1) {
+                    linkaDocumentId = draftJson.optString("id").ifBlank { UUID.randomUUID().toString() }
+                    linkaDocumentTitle = draftJson.optString("title").ifBlank { if (lang == "ru") "Новый документ" else "New document" }.take(180)
+                    linkaDocumentText = draftJson.optString("text", "").take(5_000_000)
+                    linkaDocumentCreatedAt = draftJson.optLong("createdAt", System.currentTimeMillis())
+                }
+            }
+        }
+        linkaDraftRestored = true
+    }
+    LaunchedEffect(linkaDocumentDialog, linkaDocumentId, linkaDocumentTitle, linkaDocumentText, linkaDocumentCreatedAt, linkaDraftRestored) {
+        if (!linkaDocumentDialog || !linkaDraftRestored) return@LaunchedEffect
+        delay(420L)
+        val snapshot = runCatching {
+            JSONObject().put("format", LINKA_DOCUMENT_FORMAT).put("version", 1)
+                .put("id", linkaDocumentId).put("title", linkaDocumentTitle.ifBlank { "Linka document" }.take(180))
+                .put("text", linkaDocumentText.take(5_000_000))
+                .put("createdAt", linkaDocumentCreatedAt).put("updatedAt", System.currentTimeMillis()).toString(2)
+        }.getOrDefault("")
+        if (snapshot.isNotBlank()) withContext(Dispatchers.IO) {
+            runCatching { File(context.filesDir, "linka-document-draft.json").writeText(snapshot, Charsets.UTF_8) }
         }
     }
 
@@ -2075,6 +2171,25 @@ private fun LinkaApp(
                                 Text(if (lang == "ru") "Добавить треки с устройства" else "Add tracks from this device", color = muted, fontSize = 11.sp)
                             }
                         }
+                        SettingsGroup(if (lang == "ru") "Документы Linka · .linka" else if (lang == "az") "Linka sənədləri · .linka" else if (lang == "tr") "Linka belgeleri · .linka" else "Linka documents · .linka", panel, border, main) {
+                            SettingLine(Icons.Outlined.NoteAlt,
+                                if (lang == "ru") "Создать текстовый документ" else if (lang == "az") "Mətn sənədi yarat" else if (lang == "tr") "Metin belgesi oluştur" else "Create text document",
+                                if (lang == "ru") "Редактор с локальным автосохранением" else "Editor with local autosave",
+                                main, muted) {
+                                linkaDocumentId = UUID.randomUUID().toString()
+                                linkaDocumentCreatedAt = System.currentTimeMillis()
+                                linkaDocumentTitle = if (lang == "ru") "Новый документ" else "New document"
+                                linkaDocumentText = ""
+                                linkaDocumentDialog = true
+                            }
+                            SettingLine(Icons.Outlined.Inbox,
+                                if (lang == "ru") "Открыть файл .linka" else if (lang == "az") ".linka faylını aç" else if (lang == "tr") ".linka dosyasını aç" else "Open .linka file",
+                                if (lang == "ru") "Также можно открыть обычный текстовый файл" else "Plain-text files can also be opened",
+                                main, muted) {
+                                linkaDocumentOpenLauncher.launch(arrayOf("application/vnd.linka.document+json", "application/json", "text/plain", "text/*", "application/octet-stream"))
+                            }
+                            Text(if (lang == "ru") "Документы хранятся отдельно от библиотеки ссылок. Формат .linka можно переносить между устройствами." else "Documents are separate from your link inbox and can be moved between devices as .linka files.", color = muted, fontSize = 10.sp, lineHeight = 15.sp)
+                        }
                         SettingsGroup(tr(lang, "updates"), panel, border, main) {
                             SettingSwitch(tr(lang, "updateAlerts"), alerts, setAlerts, main, muted, tr(lang, "updateAlertsBody"))
                             if (alerts && !notificationPermissionGranted) {
@@ -2242,6 +2357,73 @@ private fun LinkaApp(
             }
         },
         confirmButton = { TextButton(onClick = { playerExpanded = false }) { Text(tr(lang, "done"), color = main) } }
+    )
+
+    if (linkaDocumentDialog) AlertDialog(
+        onDismissRequest = { linkaDocumentDialog = false },
+        containerColor = panel,
+        shape = RoundedCornerShape(24.dp),
+        title = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(if (lang == "ru") "Текстовый документ" else "Text document",
+                    color = main, fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+                    fontWeight = FontWeight.Medium, fontSize = 21.sp)
+                Text(".linka · " + if (lang == "ru") "автосохранение на устройстве" else "local autosave",
+                    color = muted, fontSize = 10.sp)
+            }
+        },
+        text = {
+            Column(Modifier.heightIn(max = 490.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = linkaDocumentTitle,
+                    onValueChange = { linkaDocumentTitle = it.take(180) },
+                    label = { Text(if (lang == "ru") "Название файла" else "Document title") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    textStyle = TextStyle(color = main, fontFamily = androidx.compose.ui.text.font.FontFamily.Serif, fontSize = 16.sp),
+                    colors = fieldColors(bg, border, main, muted)
+                )
+                OutlinedTextField(
+                    value = linkaDocumentText,
+                    onValueChange = { linkaDocumentText = it.take(5_000_000) },
+                    label = { Text(if (lang == "ru") "Текст" else "Text") },
+                    placeholder = { Text(if (lang == "ru") "Начни писать…" else "Start writing…") },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 200.dp),
+                    minLines = 8,
+                    maxLines = 14,
+                    shape = RoundedCornerShape(15.dp),
+                    textStyle = TextStyle(color = main, fontFamily = androidx.compose.ui.text.font.FontFamily.Serif, fontSize = 14.sp * fontScale, lineHeight = 22.sp * fontScale),
+                    colors = fieldColors(bg, border, main, muted)
+                )
+                Text(if (lang == "ru") "Черновик сохраняется локально. Для передачи на компьютер нажми «Сохранить .linka»." else "Draft autosaves locally. Choose Save .linka to move it to a computer or another device.",
+                    color = muted, fontSize = 10.sp, lineHeight = 15.sp)
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val now = System.currentTimeMillis()
+                    val title = linkaDocumentTitle.trim().ifBlank { if (lang == "ru") "Документ Linka" else "Linka document" }.take(180)
+                    pendingLinkaDocumentJson = JSONObject()
+                        .put("format", LINKA_DOCUMENT_FORMAT)
+                        .put("version", 1)
+                        .put("id", linkaDocumentId)
+                        .put("title", title)
+                        .put("text", linkaDocumentText.take(5_000_000))
+                        .put("createdAt", linkaDocumentCreatedAt)
+                        .put("updatedAt", now).toString(2) + "\n"
+                    linkaDocumentSaveLauncher.launch(linkaDocumentFilename(title))
+                },
+                shape = RoundedCornerShape(13.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = main, contentColor = bg)
+            ) { Text(if (lang == "ru") "Сохранить .linka" else "Save .linka", fontSize = 12.sp) }
+        },
+        dismissButton = {
+            TextButton(onClick = { linkaDocumentDialog = false }) {
+                Text(if (lang == "ru") "Закрыть" else "Close", color = muted, fontSize = 12.sp)
+            }
+        }
     )
 
     if (accepted && updateInfo != null && !updatePromptDismissed) {
