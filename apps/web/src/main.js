@@ -277,6 +277,16 @@ function compareVersions(a, b) {
 function render() {
   for (const id of selectedIds) if (!captures.some(item => item.id === id)) selectedIds.delete(id);
   const shown = visibleCaptures(captures, activeFilter, search.value);
+  const tagOptions = $("#linka-tag-options");
+  if (tagOptions) {
+    const tags = [...new Map(captures.flatMap(item => item.tags || []).map(tag => [tag.toLocaleLowerCase(), tag])).values()].sort((a, b) => a.localeCompare(b));
+    tagOptions.replaceChildren(...tags.map(tag => { const option = document.createElement("option"); option.value = tag; return option; }));
+  }
+  const collectionOptions = $("#linka-collection-options");
+  if (collectionOptions) {
+    const collections = [...new Set(captures.map(item => item.collection).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    collectionOptions.replaceChildren(...collections.map(value => { const option = document.createElement("option"); option.value = value; return option; }));
+  }
   count.textContent = captures.length + (captures.length === 1 ? " item" : " items");
   selectionButton.textContent = selectionMode ? "Exit selection" : "Select items";
   selectionButton.setAttribute("aria-pressed", String(selectionMode));
@@ -324,7 +334,7 @@ function render() {
     card.style.setProperty("--index", String(index));
     const head = document.createElement("div"); head.className = "item-head";
     const kind = document.createElement("span"); kind.className = "kind";
-    kind.textContent = item.pinned ? "Pinned" : (isLink(item.text) ? "Link" : "Note");
+    kind.textContent = item.pinned ? "Pinned" : (item.readLater ? "Read later" : (isLink(item.text) ? "Link" : "Note"));
     if (selectionMode) {
       const selectItem = makeAction(selectedIds.has(item.id) ? "✓ Selected" : "Select", "select", item.id);
       selectItem.setAttribute("aria-pressed", String(selectedIds.has(item.id)));
@@ -351,16 +361,47 @@ function render() {
       url.className = "open-link"; url.textContent = "Open link ↗";
       body.append(document.createElement("br"), url);
     }
+    let meta = null;
+    if ((item.tags && item.tags.length) || item.collection) {
+      meta = document.createElement("div");
+      meta.className = "item-meta";
+      for (const tag of item.tags || []) {
+        const tagButton = document.createElement("button");
+        tagButton.type = "button"; tagButton.className = "item-tag"; tagButton.textContent = "#" + tag;
+        tagButton.title = "Search this tag";
+        tagButton.addEventListener("click", () => {
+          search.value = "tag:" + tag; activeFilter = "all";
+          filters.forEach(filter => filter.classList.toggle("active", filter.dataset.filter === activeFilter));
+          render(); search.focus();
+        });
+        meta.append(tagButton);
+      }
+      if (item.collection) {
+        const collectionButton = document.createElement("button");
+        collectionButton.type = "button"; collectionButton.className = "item-collection"; collectionButton.textContent = item.collection;
+        collectionButton.title = "Show this collection";
+        collectionButton.addEventListener("click", () => {
+          search.value = "in:" + item.collection; activeFilter = "all";
+          filters.forEach(filter => filter.classList.toggle("active", filter.dataset.filter === activeFilter));
+          render(); search.focus();
+        });
+        meta.append(collectionButton);
+      }
+    }
     const foot = document.createElement("div"); foot.className = "item-foot";
     const date = document.createElement("span"); date.className = "date"; date.textContent = formatDate(item.updatedAt || item.createdAt);
     const actions = document.createElement("div"); actions.className = "actions";
-    actions.append(makeAction("Copy", "copy", item.id), makeAction("Edit", "edit", item.id), makeAction("Delete", "delete", item.id));
+    actions.append(makeAction("Copy", "copy", item.id), makeAction(item.readLater ? "Remove later" : "Read later", "later", item.id), makeAction("Edit", "edit", item.id), makeAction("Delete", "delete", item.id));
     if (item.text.length > 240) {
       const expand = makeAction(expandedCards.has(item.id) ? "Show less" : "Read more", "expand", item.id);
       expand.setAttribute("aria-expanded", String(expandedCards.has(item.id)));
       actions.prepend(expand);
     }
-    foot.append(date, actions); card.append(head, ...previewBits, body, foot); list.append(card);
+    foot.append(date, actions);
+    card.append(head, ...previewBits, body);
+    if (meta) card.append(meta);
+    card.append(foot);
+    list.append(card);
   });
 }
 function showSearchSpace(initial = "") {
@@ -855,6 +896,7 @@ list.addEventListener("click",async event=>{
   const item=captures.find(entry=>entry.id===id);if(!item)return;
   if(action==="expand"){if(expandedCards.has(id))expandedCards.delete(id);else expandedCards.add(id);render();}
   else if(action==="pin"){captures=captures.map(entry=>entry.id===id?{...entry,pinned:!entry.pinned,updatedAt:Date.now()}:entry);if(!persist()){render();return;}render();say(item.pinned?"Откреплено":"Закреплено");}
+  else if(action==="later"){captures=captures.map(entry=>entry.id===id?{...entry,readLater:!entry.readLater,updatedAt:Date.now()}:entry);if(!persist()){render();return;}render();say(item.readLater?"Removed from read later":"Saved for later");}
   else if(action==="delete"){
     captures=captures.filter(entry=>entry.id!==id);
     if (!persist()) { render(); return; }
