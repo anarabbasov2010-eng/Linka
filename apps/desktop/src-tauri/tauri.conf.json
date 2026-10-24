@@ -21,7 +21,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data: blob: https:; connect-src 'self' https://api.github.com https://*.supabase.co"
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: https://videos.pexels.com https://d2ol7oe51mr4n9.cloudfront.net; connect-src 'self' https://api.github.com https://*.supabase.co"
     }
   },
   "bundle": {
