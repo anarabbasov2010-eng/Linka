@@ -122,3 +122,21 @@ test("search supports tags, collections and read-later operators", () => {
   assert.deepEqual(visibleCaptures(items, "read-later").map(item => item.id), ["design"]);
   assert.deepEqual(visibleCaptures(items, "all", "tag:travel in:personal").map(item => item.id), ["travel"]);
 });
+
+test("archive and trash filters keep records recoverable and separate", () => {
+  const items = [
+    makeCapture("Active note", { id: "active" }),
+    makeCapture("Archived note", { id: "archived", archivedAt: 10 }),
+    makeCapture("Trashed note", { id: "trashed", trashedAt: 20 })
+  ];
+  assert.deepEqual(visibleCaptures(items, "all").map(item => item.id), ["active"]);
+  assert.deepEqual(visibleCaptures(items, "archive").map(item => item.id), ["archived"]);
+  assert.deepEqual(visibleCaptures(items, "trash").map(item => item.id), ["trashed"]);
+  assert.deepEqual(visibleCaptures(items, "all", "is:archived").map(item => item.id), ["archived"]);
+  assert.deepEqual(visibleCaptures(items, "all", "is:trash").map(item => item.id), ["trashed"]);
+  const saved = memoryStorage();
+  assert.equal(saveCaptures(items, saved), true);
+  assert.deepEqual(loadCaptures(saved).map(item => [item.id, item.archivedAt, item.trashedAt]), [
+    ["active", 0, 0], ["archived", 10, 0], ["trashed", 0, 20]
+  ]);
+});
