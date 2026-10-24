@@ -5,10 +5,10 @@ const FOREST_VIDEO_CANDIDATES=[
   "https://videos.pexels.com/video-files/30312149/30312149-hd_1920_1080_30fps.mp4",
   "https://videos.pexels.com/video-files/34381048/34381048-hd_1920_1080_30fps.mp4",
   "https://videos.pexels.com/video-files/30312148/30312148-hd_1920_1080_30fps.mp4",
-  "https://videos.pexels.com/video-files/34222220/34222220-hd_1920_1080_30fps.mp4",
-  "https://videos.pexels.com/video-files/13838155/13838155-hd_1920_1080_30fps.mp4"
+  "https://videos.pexels.com/video-files/36928736/36928736-hd_1920_1080_30fps.mp4",
+  "https://videos.pexels.com/video-files/37426477/37426477-hd_1920_1080_30fps.mp4"
 ];
-const DEFAULT_FOREST_POSTER="https://images.pexels.com/photos/28714654/pexels-photo-28714654.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop";
+const DEFAULT_FOREST_POSTER="https://images.pexels.com/videos/36928855/free-video-36928855.jpg?fit=crop&w=1920&h=1080&auto=compress&cs=tinysrgb";
 const DB_NAME="linka-atmosphere-v1", STORE="media", PREFIX="linka.atmosphere.";
 const $=(s,r=document)=>r.querySelector(s);
 const read=(k,d)=>{try{const v=localStorage.getItem(PREFIX+k);return v==null?d:JSON.parse(v)}catch{return d}};
