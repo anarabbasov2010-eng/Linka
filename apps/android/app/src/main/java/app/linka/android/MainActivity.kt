@@ -35,9 +35,12 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.clickable
@@ -1209,6 +1212,7 @@ private fun LinkaApp(
     DisposableEffect(Unit) { onDispose { AmbientAudioEngine.stop() } }
     val ambientTransition = rememberInfiniteTransition(label = "linka-sphere")
     val ambientPulse by ambientTransition.animateFloat(initialValue = 0f, targetValue = 1f, animationSpec = infiniteRepeatable(animation = tween(durationMillis = 15_000, easing = LinearEasing), repeatMode = RepeatMode.Reverse), label = "sphere-pulse")
+    val ambientOrbit by ambientTransition.animateFloat(initialValue = 0f, targetValue = 1f, animationSpec = infiniteRepeatable(animation = tween(durationMillis = 32_000, easing = LinearEasing), repeatMode = RepeatMode.Restart), label = "sphere-orbit")
     var captures by remember { mutableStateOf(load()) }
     var draft by remember { mutableStateOf(sharedText) }
     var editingId by remember { mutableStateOf<String?>(null) }
@@ -1222,6 +1226,10 @@ private fun LinkaApp(
     var visibleLimit by remember { mutableIntStateOf(30) }
     var deleting by remember { mutableStateOf<Capture?>(null) }
     var clearDialog by remember { mutableStateOf(false) }
+    var selectionMode by remember { mutableStateOf(false) }
+    var selectedCaptureIds by remember { mutableStateOf(setOf<String>()) }
+    var bulkDeleteDialog by remember { mutableStateOf(false) }
+    var pendingExportJson by remember { mutableStateOf("[]") }
     var cloudDialog by remember { mutableStateOf(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(SYNC_REFRESH_KEY, "").isNullOrBlank()) }
     var cloudConfigExpanded by remember { mutableStateOf(false) }
     var emailSignInExpanded by remember { mutableStateOf(false) }
@@ -1312,6 +1320,22 @@ private fun LinkaApp(
             message = tr(lang, "importSuccess")
         }.onFailure { message = tr(lang, "importFailed") }
     }
+    val selectedExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) {
+            runCatching {
+                val output = context.contentResolver.openOutputStream(uri) ?: error("Could not open destination")
+                output.bufferedWriter(Charsets.UTF_8).use { it.write(pendingExportJson) }
+                message = if (lang == "ru") "Выбранные записи экспортированы"
+                    else if (lang == "az") "Seçilmiş qeydlər ixrac edildi"
+                    else if (lang == "tr") "Seçilen kayıtlar dışa aktarıldı" else "Selected items exported"
+            }.onFailure {
+                message = if (lang == "ru") "Не удалось экспортировать записи"
+                    else if (lang == "az") "Qeydləri ixrac etmək olmadı"
+                    else if (lang == "tr") "Kayıtlar dışa aktarılamadı" else "Could not export selected items"
+            }
+        }
+    }
+
     fun commit(list: List<Capture>) {
         val normalized = list.sortedWith(compareByDescending<Capture> { it.pinned }.thenByDescending { it.updatedAt }).take(MAX_CAPTURES)
         val nextIds = normalized.map { it.id }.toSet()
@@ -1467,6 +1491,10 @@ private fun LinkaApp(
         cloudBusy = false
     }
     val visible = filterCaptures(captures, filter, if (tab == 2) query else "")
+    LaunchedEffect(captures) {
+        val validIds = captures.map { it.id }.toSet()
+        selectedCaptureIds = selectedCaptureIds.intersect(validIds)
+    }
     val oldCaptures = captures.filter { it.updatedAt < System.currentTimeMillis() - 7L * 24L * 60L * 60L * 1000L }
     val resurfaced = if (oldCaptures.isEmpty()) null else oldCaptures[LocalDate.now().dayOfYear % oldCaptures.size]
     LaunchedEffect(tab, filter, query) { visibleLimit = 30 }
@@ -1505,9 +1533,19 @@ private fun LinkaApp(
         AnimatedContent(
             targetState = tab, modifier = Modifier.fillMaxSize().padding(padding),
             transitionSpec = {
-                if (animations) (fadeIn(tween(durationMillis = 170)) + slideInVertically(tween(durationMillis = 190)) { it / 70 }) togetherWith
-                    (fadeOut(tween(durationMillis = 120)) + slideOutVertically(tween(durationMillis = 130)) { -it / 90 })
-                else fadeIn(tween(durationMillis = 90)) togetherWith fadeOut(tween(durationMillis = 90))
+                if (animations) {
+                    val forward = targetState > initialState
+                    (fadeIn(tween(durationMillis = 190)) +
+                        slideInHorizontally(animationSpec = spring(dampingRatio = .92f, stiffness = 420f)) { width ->
+                            if (forward) width / 22 else -width / 22
+                        } +
+                        slideInVertically(tween(durationMillis = 210)) { height -> height / 90 }) togetherWith
+                        (fadeOut(tween(durationMillis = 135)) +
+                            slideOutHorizontally(tween(durationMillis = 160)) { width ->
+                                if (forward) -width / 34 else width / 34
+                            } +
+                            slideOutVertically(tween(durationMillis = 145)) { height -> -height / 120 })
+                } else fadeIn(tween(durationMillis = 90)) togetherWith fadeOut(tween(durationMillis = 90))
             }, label = "linka-page"
         ) { page ->
             Column(Modifier.fillMaxSize().background(
@@ -1526,8 +1564,12 @@ private fun LinkaApp(
                 )
             ).drawBehind {
                 if (theme != "oled" && effects != "quiet" && animations) {
-                    val center = Offset(size.width * .52f, size.height * .13f)
-                    val radius = size.width * (.27f + .012f * ambientPulse)
+                    val orbitAngle = ambientOrbit * (2.0 * Math.PI)
+                    val center = Offset(
+                        size.width * (.52f + .018f * kotlin.math.sin(orbitAngle).toFloat()),
+                        size.height * (.13f + .009f * kotlin.math.cos(orbitAngle).toFloat())
+                    )
+                    val radius = size.width * (.265f + .014f * ambientPulse)
                     val strength = if (effects == "atmosphere") .19f else .10f
                     val glowRadius = radius * 1.85f
                     drawCircle(
@@ -1549,6 +1591,20 @@ private fun LinkaApp(
                             center = highlight, radius = radius * .62f
                         ), radius = radius * .62f, center = highlight
                     )
+                    if (effects == "atmosphere") {
+                        drawCircle(
+                            color = sphereAccent.copy(alpha = .055f + .012f * ambientPulse),
+                            radius = radius * 1.15f,
+                            center = center,
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.1.dp.toPx())
+                        )
+                        drawCircle(
+                            color = Color.White.copy(alpha = .018f),
+                            radius = radius * .91f,
+                            center = center,
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = .7.dp.toPx())
+                        )
+                    }
                 }
             }.verticalScroll(rememberScrollState()).imePadding()
                 .padding(horizontal = 18.dp).padding(top = 14.dp, bottom = 28.dp),
@@ -1636,6 +1692,59 @@ private fun LinkaApp(
                             textStyle = TextStyle(color = main, fontSize = 13.sp * fontScale), shape = RoundedCornerShape(18.dp),
                             colors = fieldColors(panel, border, main, muted))
                         FilterRow(lang, filter, { filter = it })
+                        if (page == 1) {
+                            val selectedItems = captures.filter { it.id in selectedCaptureIds }
+                            val bulkLabels = when (lang) {
+                                "ru" -> listOf("Выбрать", "Видимые", "Копировать", "Закрепить", "Открепить", "Экспорт", "Удалить", "Снять выбор")
+                                "az" -> listOf("Seç", "Görünənlər", "Kopyala", "Bərkid", "Aç", "İxrac et", "Sil", "Seçimi sil")
+                                "tr" -> listOf("Seç", "Görünenler", "Kopyala", "Sabitle", "Sabitlemeyi kaldır", "Dışa aktar", "Sil", "Seçimi temizle")
+                                else -> listOf("Select", "Visible", "Copy", "Pin", "Unpin", "Export", "Delete", "Clear")
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                TextButton(onClick = {
+                                    selectionMode = !selectionMode
+                                    if (!selectionMode) selectedCaptureIds = emptySet()
+                                }) {
+                                    Text(if (selectionMode) bulkLabels[7] else bulkLabels[0], color = if (selectionMode) MaterialTheme.colorScheme.primary else muted, fontSize = 11.sp)
+                                }
+                                if (selectionMode) {
+                                    Text("${selectedCaptureIds.size}", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                    TextButton(onClick = { selectedCaptureIds = selectedCaptureIds + visible.map { it.id } }) { Text(bulkLabels[1], color = muted, fontSize = 11.sp) }
+                                    TextButton(onClick = {
+                                        if (selectedItems.isNotEmpty()) {
+                                            copy(selectedItems.joinToString("\n\n") { it.text })
+                                            message = tr(lang, "copied")
+                                        }
+                                    }) { Text(bulkLabels[2], color = muted, fontSize = 11.sp) }
+                                    TextButton(onClick = {
+                                        if (selectedItems.isNotEmpty()) commit(captures.map { if (it.id in selectedCaptureIds) it.copy(pinned = true, updatedAt = System.currentTimeMillis()) else it })
+                                    }) { Text(bulkLabels[3], color = muted, fontSize = 11.sp) }
+                                    TextButton(onClick = {
+                                        if (selectedItems.isNotEmpty()) commit(captures.map { if (it.id in selectedCaptureIds) it.copy(pinned = false, updatedAt = System.currentTimeMillis()) else it })
+                                    }) { Text(bulkLabels[4], color = muted, fontSize = 11.sp) }
+                                    TextButton(onClick = {
+                                        if (selectedItems.isNotEmpty()) {
+                                            pendingExportJson = JSONArray().apply {
+                                                selectedItems.forEach { item ->
+                                                    put(JSONObject().put("id", item.id).put("text", item.text)
+                                                        .put("createdAt", item.createdAt).put("updatedAt", item.updatedAt)
+                                                        .put("pinned", item.pinned).put("previewTitle", item.previewTitle)
+                                                        .put("previewDescription", item.previewDescription).put("previewImageUrl", item.previewImageUrl))
+                                                }
+                                            }.toString(2)
+                                            selectedExportLauncher.launch("linka-selection.json")
+                                        }
+                                    }) { Text(bulkLabels[5], color = muted, fontSize = 11.sp) }
+                                    TextButton(onClick = { if (selectedCaptureIds.isNotEmpty()) bulkDeleteDialog = true }) {
+                                        Text(bulkLabels[6], color = Color(0xFFDA6969), fontSize = 11.sp)
+                                    }
+                                }
+                            }
+                        }
                         Text("${visible.size} ${tr(lang, "items")}", color = muted, fontSize = 11.sp)
                         if (visible.isEmpty()) EmptyState(lang, panel, border, main, muted, if (page == 2 && query.isNotBlank()) "noResults" else "empty")
                         else visible.take(visibleLimit).forEach { c -> CaptureCard(c, lang, panel, raised, border, main, muted, fontScale, density, animations,
@@ -1643,7 +1752,12 @@ private fun LinkaApp(
                             onCopy = { copy(it.text); message = tr(lang, "copied") }, onOpen = { open(it.text) },
                             onEdit = { draft = it.text; editingId = it.id; tab = 0; message = tr(lang, "edit") },
                             onDelete = { deleting = it },
-                            onPreviewLoaded = { item, preview -> commit(captures.map { c -> if (c.id == item.id) c.copy(previewTitle = preview.title, previewDescription = preview.description, previewImageUrl = preview.imageUrl) else c }) })
+                            onPreviewLoaded = { item, preview -> commit(captures.map { c -> if (c.id == item.id) c.copy(previewTitle = preview.title, previewDescription = preview.description, previewImageUrl = preview.imageUrl) else c }) },
+                             selectable = page == 1 && selectionMode,
+                             selected = c.id in selectedCaptureIds,
+                             onSelect = { item ->
+                                 selectedCaptureIds = if (item.id in selectedCaptureIds) selectedCaptureIds - item.id else selectedCaptureIds + item.id
+                             })
                         }
                         if (visible.size > visibleLimit) {
                             TextButton(onClick = { visibleLimit = (visibleLimit + 30).coerceAtMost(visible.size) }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
@@ -1656,13 +1770,13 @@ private fun LinkaApp(
                         Text(tr(lang, "manage"), color = muted, fontSize = 12.sp * fontScale)
                         SettingsGroup(tr(lang, "appearance"), panel, border, main) {
                             Text(tr(lang, "appearance"), color = main, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                            Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                                 listOf("dark" to tr(lang, "themeDark"), "oled" to "OLED Black", "light" to tr(lang, "themeLight"), "system" to tr(lang, "themeSystem")).forEach { (v, label) ->
                                     FilterChip(selected = theme == v, onClick = { setTheme(v) }, label = { Text(label, fontSize = 11.sp) })
                                 }
                             }
                             Text(if (lang == "ru") "Акцентный цвет" else if (lang == "az") "Vurğu rəngi" else if (lang == "tr") "Vurgu rengi" else "Accent color", color = muted, fontSize = 11.sp)
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 listOf("violet" to "Violet", "blue" to "Blue", "mint" to "Mint", "rose" to "Rose").forEach { (v, label) ->
                                     FilterChip(selected = accent == v, onClick = { setAccent(v) }, label = { Text(label, fontSize = 10.sp) })
                                 }
@@ -1671,13 +1785,13 @@ private fun LinkaApp(
                             SettingSwitch(tr(lang, "animations"), animations, setAnimations, main, muted)
                             SettingSwitch(tr(lang, "ambientAudio"), ambientAudio, setAmbientAudio, main, muted)
                             Text(if (lang == "ru") "Интенсивность эффектов" else if (lang == "az") "Effektlərin intensivliyi" else if (lang == "tr") "Efekt yoğunluğu" else "Visual effects", color = muted, fontSize = 11.sp)
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 listOf("quiet" to (if (lang == "ru") "Тихо" else if (lang == "az") "Sakit" else if (lang == "tr") "Sakin" else "Quiet"), "balanced" to (if (lang == "ru") "Баланс" else if (lang == "az") "Balans" else if (lang == "tr") "Dengeli" else "Balanced"), "atmosphere" to (if (lang == "ru") "Атмосфера" else if (lang == "az") "Atmosfer" else if (lang == "tr") "Atmosfer" else "Atmosphere")).forEach { (v, label) ->
                                     FilterChip(selected = effects == v, onClick = { setEffects(v) }, label = { Text(label, fontSize = 10.sp) })
                                 }
                             }
                             Text(if (lang == "ru") "Плотность интерфейса" else if (lang == "az") "İnterfeys sıxlığı" else if (lang == "tr") "Arayüz yoğunluğu" else "Interface density", color = muted, fontSize = 11.sp)
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 listOf("compact" to (if (lang == "ru") "Компактно" else if (lang == "az") "Yığcam" else if (lang == "tr") "Kompakt" else "Compact"), "standard" to (if (lang == "ru") "Стандарт" else if (lang == "az") "Standart" else if (lang == "tr") "Standart" else "Standard"), "spacious" to (if (lang == "ru") "Свободно" else if (lang == "az") "Geniş" else if (lang == "tr") "Geniş" else "Spacious")).forEach { (v, label) ->
                                     FilterChip(selected = density == v, onClick = { setDensity(v) }, label = { Text(label, fontSize = 10.sp) })
                                 }
@@ -2032,6 +2146,23 @@ private fun LinkaApp(
         title = { Text(tr(lang, "delete"), color = main) }, text = { Text(deleting!!.text.take(180), color = muted) },
         confirmButton = { TextButton(onClick = { commit(captures.filterNot { it.id == deleting!!.id }); deleting = null; message = tr(lang, "deleted") }) { Text(tr(lang, "delete"), color = Color(0xFFDA6969)) } },
         dismissButton = { TextButton(onClick = { deleting = null }) { Text(tr(lang, "cancel"), color = muted) } })
+    if (bulkDeleteDialog) AlertDialog(
+        onDismissRequest = { bulkDeleteDialog = false },
+        containerColor = panel,
+        title = { Text(if (lang == "ru") "Удалить выбранные записи?" else if (lang == "az") "Seçilmiş qeydlər silinsin?" else if (lang == "tr") "Seçilen kayıtlar silinsin mi?" else "Delete selected items?", color = main) },
+        text = { Text(if (lang == "ru") "Будет удалено записей: ${selectedCaptureIds.size}. Это действие синхронизируется с аккаунтом." else if (lang == "az") "Silinəcək qeydlər: ${selectedCaptureIds.size}. Bu dəyişiklik hesabla sinxronlaşdırılacaq." else if (lang == "tr") "Silinecek kayıt sayısı: ${selectedCaptureIds.size}. Bu işlem hesapla eşitlenecek." else "Items to delete: ${selectedCaptureIds.size}. This change will sync with your account.", color = muted, fontSize = 12.sp, lineHeight = 18.sp) },
+        confirmButton = {
+            TextButton(onClick = {
+                val ids = selectedCaptureIds
+                commit(captures.filterNot { it.id in ids })
+                selectedCaptureIds = emptySet()
+                selectionMode = false
+                bulkDeleteDialog = false
+                message = if (lang == "ru") "Выбранные записи удалены" else if (lang == "az") "Seçilmiş qeydlər silindi" else if (lang == "tr") "Seçilen kayıtlar silindi" else "Selected items deleted"
+            }) { Text(tr(lang, "delete"), color = Color(0xFFDA6969)) }
+        },
+        dismissButton = { TextButton(onClick = { bulkDeleteDialog = false }) { Text(tr(lang, "cancel"), color = muted) } }
+    )
     if (clearDialog) AlertDialog(onDismissRequest = { clearDialog = false }, containerColor = panel,
         title = { Text(tr(lang, "clearData"), color = main) }, text = { Text(tr(lang, "clearConfirm"), color = muted, fontSize = 13.sp, lineHeight = 19.sp) },
         confirmButton = { TextButton(onClick = { commit(emptyList()); clearDialog = false; message = ""; query = "" }) { Text(tr(lang, "deleteAll"), color = Color(0xFFDA6969)) } },
@@ -2073,7 +2204,7 @@ private fun LanguageWelcome(dark: Boolean, animations: Boolean, onContinue: (Str
 @Composable
 private fun Header(lang: String, main: Color, muted: Color, panel: Color, border: Color, onSettings: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Surface(shape = RoundedCornerShape(16.dp), color = panel.copy(alpha = .96f), border = BorderStroke(1.dp, border)) {
+        Surface(shape = RoundedCornerShape(16.dp), color = panel.copy(alpha = .88f), border = BorderStroke(1.dp, border.copy(alpha = .85f)), shadowElevation = 5.dp) {
             androidx.compose.foundation.Image(painterResource(R.drawable.linka_mark), "Linka logo", Modifier.size(47.dp).padding(4.dp))
         }
         Column {
@@ -2132,7 +2263,10 @@ private fun FilterRow(lang: String, selected: String, onSelected: (String) -> Un
 private fun CaptureCard(
     capture: Capture, lang: String, panel: Color, raised: Color, border: Color, main: Color, muted: Color, scale: Float, density: String, animations: Boolean,
     onPin: (Capture) -> Unit, onCopy: (Capture) -> Unit, onOpen: (Capture) -> Unit, onEdit: (Capture) -> Unit, onDelete: (Capture) -> Unit,
-    onPreviewLoaded: (Capture, LinkPreview) -> Unit
+    onPreviewLoaded: (Capture, LinkPreview) -> Unit,
+    selectable: Boolean = false,
+    selected: Boolean = false,
+    onSelect: (Capture) -> Unit = {}
 ) {
     val link = capture.text.startsWith("http://", true) || capture.text.startsWith("https://", true)
     var expanded by remember(capture.id) { mutableStateOf(false) }
@@ -2142,14 +2276,35 @@ private fun CaptureCard(
             fetchLinkPreview(capture.text)?.let { onPreviewLoaded(capture, it) }
         }
     }
-    Card(colors = CardDefaults.cardColors(containerColor = if (capture.pinned) raised else panel), border = BorderStroke(1.dp, border),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (capture.pinned) 2.dp else 1.dp),
-        shape = RoundedCornerShape(23.dp), modifier = Modifier.fillMaxWidth().then(if (animations) Modifier.animateContentSize(spring(dampingRatio = .82f, stiffness = 320f)) else Modifier)) {
+    val accentColor = MaterialTheme.colorScheme.primary
+    Card(
+        colors = CardDefaults.cardColors(containerColor = if (capture.pinned) raised.copy(alpha = .98f) else panel.copy(alpha = .93f)),
+        border = BorderStroke(1.dp, if (selected) accentColor.copy(alpha = .88f) else if (capture.pinned) accentColor.copy(alpha = .38f) else border.copy(alpha = .76f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (capture.pinned) 2.dp else 0.dp),
+        shape = RoundedCornerShape(23.dp),
+        modifier = Modifier.fillMaxWidth().then(if (animations) Modifier.animateContentSize(spring(dampingRatio = .86f, stiffness = 340f)) else Modifier)
+    ) {
         Column(Modifier.padding(when (density) { "compact" -> 12.dp; "spacious" -> 21.dp; else -> 15.dp }), verticalArrangement = Arrangement.spacedBy(when (density) { "compact" -> 6.dp; "spacious" -> 13.dp; else -> 9.dp })) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                Icon(if (link) Icons.Outlined.Link else Icons.Outlined.NoteAlt, null, tint = muted, modifier = Modifier.size(16.dp))
-                Text(if (capture.pinned) tr(lang, "pinned").uppercase() else tr(lang, captureTypeKey(capture)).uppercase(), color = muted, fontSize = 9.sp, letterSpacing = 1.sp)
+                Surface(
+                    color = accentColor.copy(alpha = if (capture.pinned) .15f else .075f),
+                    shape = RoundedCornerShape(9.dp)
+                ) {
+                    Icon(if (link) Icons.Outlined.Link else Icons.Outlined.NoteAlt, null,
+                        tint = if (capture.pinned) accentColor else muted,
+                        modifier = Modifier.padding(7.dp).size(15.dp))
+                }
+                Text(
+                    if (capture.pinned) tr(lang, "pinned").uppercase() else tr(lang, captureTypeKey(capture)).uppercase(),
+                    color = if (capture.pinned) accentColor else muted,
+                    fontSize = 9.sp, letterSpacing = 1.sp, fontWeight = FontWeight.SemiBold
+                )
                 Spacer(Modifier.weight(1f))
+                if (selectable) IconButton(onClick = { onSelect(capture) }, modifier = Modifier.size(30.dp)) {
+                    Icon(if (selected) Icons.Outlined.Check else Icons.Outlined.Add,
+                        contentDescription = if (selected) "Selected" else "Select item",
+                        tint = if (selected) accentColor else muted, modifier = Modifier.size(18.dp))
+                }
                 IconButton(onClick = { onPin(capture) }, modifier = Modifier.size(30.dp)) {
                     Icon(Icons.Outlined.PushPin, tr(lang, if (capture.pinned) "unpin" else "pin"), tint = if (capture.pinned) main else muted, modifier = Modifier.size(17.dp))
                 }
@@ -2218,7 +2373,12 @@ private fun PrivacyCard(lang: String, panel: Color, border: Color, main: Color, 
 private fun SettingsGroup(title: String, panel: Color, border: Color, main: Color, content: @Composable () -> Unit) {
     Card(colors = CardDefaults.cardColors(containerColor = panel.copy(alpha = .96f)), border = BorderStroke(1.dp, border.copy(alpha = .82f)), shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
-            Text(title, color = main, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                Surface(color = MaterialTheme.colorScheme.primary.copy(alpha = .14f), shape = RoundedCornerShape(6.dp)) {
+                    Box(Modifier.size(width = 4.dp, height = 18.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(6.dp)))
+                }
+                Text(title, color = main, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-.2).sp)
+            }
             content()
         }
     }

@@ -20,6 +20,19 @@ const status = $("#status");
 const composeLabel = $("#compose-label");
 const filters = Array.from(document.querySelectorAll("[data-filter]"));
 const modalRoot = $("#modal-root");
+const selectedIds = new Set();
+let selectionMode = false;
+const selectionButton = document.createElement("button");
+selectionButton.type = "button";
+selectionButton.className = "ghost selection-mode-button";
+selectionButton.textContent = "Select items";
+selectionButton.setAttribute("aria-pressed", "false");
+$("#export-button").insertAdjacentElement("beforebegin", selectionButton);
+const bulkToolbar = document.createElement("div");
+bulkToolbar.className = "bulk-toolbar";
+bulkToolbar.hidden = true;
+list.parentElement.insertBefore(bulkToolbar, list);
+search.title = "Search operators: type:link, type:note, is:pinned, site:example.com, before:YYYY-MM-DD, after:YYYY-MM-DD";
 const TERMS_VERSION = "2026-10-23-v2";
 const TERMS_TEXT = `
 Linka is a personal inbox for saving text and links on the device or browser profile where you use it.
@@ -108,8 +121,35 @@ function applyTheme(mode = themeMode) {
 applyTheme();
 
 function render() {
+  for (const id of selectedIds) if (!captures.some(item => item.id === id)) selectedIds.delete(id);
   const shown = visibleCaptures(captures, activeFilter, search.value);
   count.textContent = captures.length + (captures.length === 1 ? " item" : " items");
+  selectionButton.textContent = selectionMode ? "Exit selection" : "Select items";
+  selectionButton.setAttribute("aria-pressed", String(selectionMode));
+  selectionButton.classList.toggle("selection-mode-active", selectionMode);
+  bulkToolbar.hidden = !selectionMode;
+  bulkToolbar.replaceChildren();
+  if (selectionMode) {
+    const summary = document.createElement("span");
+    summary.className = "bulk-summary";
+    summary.textContent = selectedIds.size + " selected";
+    bulkToolbar.append(summary);
+    const bulkButton = (label, action, danger = false) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = danger ? "action bulk-danger" : "action";
+      button.dataset.bulkAction = action;
+      button.textContent = label;
+      bulkToolbar.append(button);
+    };
+    bulkButton("Select visible", "select-visible");
+    bulkButton("Clear", "clear");
+    bulkButton("Pin", "pin");
+    bulkButton("Unpin", "unpin");
+    bulkButton("Copy", "copy");
+    bulkButton("Export", "export");
+    bulkButton("Delete", "delete", true);
+  }
   list.replaceChildren();
   if (!shown.length) {
     const empty = document.createElement("div");
@@ -126,12 +166,18 @@ function render() {
   shown.forEach((item, index) => {
     const card = document.createElement("article");
     card.dataset.itemId = item.id;
-    card.className = "item" + (item.pinned ? " pinned" : "") + (expandedCards.has(item.id) ? " expanded" : "");
+    card.className = "item" + (item.pinned ? " pinned" : "") + (expandedCards.has(item.id) ? " expanded" : "") + (selectedIds.has(item.id) ? " is-selected" : "");
     card.style.setProperty("--index", String(index));
     const head = document.createElement("div"); head.className = "item-head";
     const kind = document.createElement("span"); kind.className = "kind";
     kind.textContent = item.pinned ? "Pinned" : (isLink(item.text) ? "Link" : "Note");
-    head.append(kind, makeAction(item.pinned ? "Unpin" : "Pin", "pin", item.id));
+    if (selectionMode) {
+      const selectItem = makeAction(selectedIds.has(item.id) ? "✓ Selected" : "Select", "select", item.id);
+      selectItem.setAttribute("aria-pressed", String(selectedIds.has(item.id)));
+      head.append(kind, selectItem, makeAction(item.pinned ? "Unpin" : "Pin", "pin", item.id));
+    } else {
+      head.append(kind, makeAction(item.pinned ? "Unpin" : "Pin", "pin", item.id));
+    }
     const body = document.createElement("p");
     body.className = "item-text" + (isLink(item.text) ? " link" : "");
     body.textContent = item.text;
@@ -185,10 +231,7 @@ function showSearchSpace(initial = "") {
   const layer = modalShell(content, { dismissable: true }); layer.classList.add("search-space-layer");
   function refresh() {
     const q = input.value.trim().toLocaleLowerCase();
-    const found = captures.filter(item => {
-      const host = isLink(item.text) ? (() => { try { return new URL(item.text).hostname.replace(/^www\./i, ""); } catch { return ""; } })() : "";
-      return !q || [item.text, item.previewTitle, item.previewDescription, host].join(" ").toLocaleLowerCase().includes(q);
-    }).sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || Number(b.updatedAt || b.createdAt) - Number(a.updatedAt || a.createdAt)).slice(0, 80);
+    const found = visibleCaptures(captures, "all", input.value).slice(0, 80);
     count.textContent = q ? (found.length + " matching " + (found.length === 1 ? "item" : "items")) : ("Recently saved · " + found.length);
     results.replaceChildren();
     if (!found.length) {
@@ -655,9 +698,68 @@ search.addEventListener("input",render);
 filters.forEach(button=>button.addEventListener("click",()=>{
   activeFilter=button.dataset.filter;filters.forEach(item=>item.classList.toggle("active",item===button));render();
 }));
+selectionButton.addEventListener("click", () => {
+  selectionMode = !selectionMode;
+  selectedIds.clear();
+  render();
+  if (selectionMode) say("Select the items you want to manage together");
+});
+bulkToolbar.addEventListener("click", async event => {
+  const button = event.target.closest("button[data-bulk-action]");
+  if (!button) return;
+  const action = button.dataset.bulkAction;
+  const selected = captures.filter(item => selectedIds.has(item.id));
+  if (action === "select-visible") {
+    visibleCaptures(captures, activeFilter, search.value).forEach(item => selectedIds.add(item.id));
+    render(); return;
+  }
+  if (action === "clear") { selectedIds.clear(); selectionMode = false; render(); return; }
+  if (!selected.length) { say("Select at least one item first"); return; }
+  if (action === "pin" || action === "unpin") {
+    const pinned = action === "pin";
+    const now = Date.now();
+    captures = captures.map(item => selectedIds.has(item.id) ? { ...item, pinned, updatedAt: now } : item);
+    persist(); render(); say(pinned ? "Selected items pinned" : "Selected items unpinned"); return;
+  }
+  if (action === "copy") {
+    const value = selected.map(item => item.text).join("\n\n");
+    try { await navigator.clipboard.writeText(value); say("Copied " + selected.length + " selected item(s)"); }
+    catch {
+      const fallback = document.createElement("textarea");
+      fallback.value = value; fallback.setAttribute("readonly", ""); fallback.style.position = "fixed";
+      fallback.style.opacity = "0"; document.body.append(fallback); fallback.select();
+      const copied = (() => { try { return document.execCommand("copy"); } catch { return false; } })();
+      fallback.remove();
+      say(copied ? "Copied " + selected.length + " selected item(s)" : "Clipboard access is unavailable in this window");
+    }
+    return;
+  }
+  if (action === "export") {
+    const blob = new Blob([JSON.stringify(selected, null, 2)], { type: "application/json" });
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl; anchor.download = "linka-selection.json"; anchor.click();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    say("Exported " + selected.length + " selected item(s)"); return;
+  }
+  if (action === "delete") {
+    if (!window.confirm("Delete " + selected.length + " selected item(s)? This cannot be undone from this dialog.")) return;
+    selected.forEach(item => addDeletedId(item.id));
+    captures = captures.filter(item => !selectedIds.has(item.id));
+    selectedIds.clear(); selectionMode = false;
+    if (editingId && !captures.some(item => item.id === editingId)) resetEditor();
+    persist(); render(); say("Selected items deleted");
+  }
+});
 list.addEventListener("click",async event=>{
   const button=event.target.closest("button[data-action]");if(!button)return;
-  const {action,id}=button.dataset;const item=captures.find(entry=>entry.id===id);if(!item)return;
+  const {action,id}=button.dataset;
+  if (action === "select") {
+    selectionMode = true;
+    if (selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
+    render(); return;
+  }
+  const item=captures.find(entry=>entry.id===id);if(!item)return;
   if(action==="expand"){if(expandedCards.has(id))expandedCards.delete(id);else expandedCards.add(id);render();}
   else if(action==="pin"){captures=captures.map(entry=>entry.id===id?{...entry,pinned:!entry.pinned,updatedAt:Date.now()}:entry);persist();render();say(item.pinned?"Откреплено":"Закреплено");}
   else if(action==="delete"){
