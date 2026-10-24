@@ -61,6 +61,9 @@ function addStyles() {
     .linka-doc-type-mirror,.linka-doc-body { box-sizing:border-box; width:100%; min-height:220px; max-height:45vh; margin:0; padding:17px 17px 20px; border:0; border-radius:15px; font:400 15px/1.86 "Palatino Linotype","Book Antiqua",Georgia,serif; letter-spacing:.008em; white-space:pre-wrap; overflow-wrap:anywhere; tab-size:4; }
     .linka-doc-type-mirror { position:absolute; inset:0; overflow:auto; pointer-events:none; color:#e8dfc8; z-index:0; }
     .linka-doc-body { position:relative; z-index:1; display:block; resize:vertical; outline:none; color:transparent; -webkit-text-fill-color:transparent; caret-color:#d3bd8c; background:transparent; }
+    .linka-doc-body-wrap.plain-text-mode .linka-doc-type-mirror { display:none; }
+    .linka-doc-body-wrap.plain-text-mode .linka-doc-body { color:#e8dfc8; -webkit-text-fill-color:#e8dfc8; }
+    .linka-doc-body-wrap.plain-text-mode .linka-doc-body::selection { color:#111; -webkit-text-fill-color:#111; }
     .linka-doc-body::selection { background:rgba(181,154,105,.32); color:transparent; }
     .linka-doc-letter { display:inline; animation:linka-doc-letter-in .2s cubic-bezier(.2,.8,.2,1) both; }
     .linka-doc-gone { display:inline; animation:linka-doc-letter-out .19s ease both; }
@@ -142,11 +145,19 @@ function setStatus(message, isError = false) {
 function createMirrorAnimation(textarea, mirror) {
   const computed = getComputedStyle(textarea);
   ["fontFamily","fontSize","fontWeight","fontStyle","lineHeight","letterSpacing","textAlign","textIndent","paddingTop","paddingRight","paddingBottom","paddingLeft","boxSizing","tabSize"].forEach(key => { mirror.style[key] = computed[key]; });
+  const wrapper = textarea.closest(".linka-doc-body-wrap");
+  const MAX_ANIMATED_CHARS = 3000;
   let previous = textarea.value;
   let clearGhostTimer = 0;
   const draw = (value, before = value, animate = false) => {
+    const plainTextMode = value.length > MAX_ANIMATED_CHARS || before.length > MAX_ANIMATED_CHARS;
+    wrapper?.classList.toggle("plain-text-mode", plainTextMode);
     mirror.replaceChildren();
+    if (plainTextMode) return;
     if (!value && !before) return;
+
+    // Keep unchanged content in text nodes. Only the inserted/deleted fragment
+    // receives spans, instead of creating one element per character per input.
     const prefix = reducedMotion() ? value.length : (() => { let i = 0; while (i < value.length && i < before.length && value[i] === before[i]) i++; return i; })();
     let suffix = 0;
     while (suffix < value.length - prefix && suffix < before.length - prefix && value[value.length - 1 - suffix] === before[before.length - 1 - suffix]) suffix++;
@@ -159,14 +170,15 @@ function createMirrorAnimation(textarea, mirror) {
       if (className === "linka-doc-letter") span.style.animationDelay = Math.min(Math.max(index, 0) * 9, 90) + "ms";
       return span;
     };
-    for (let i = 0; i < prefix; i++) mirror.append(makeSpan(value[i], "", i));
+
+    if (prefix) mirror.append(document.createTextNode(value.slice(0, prefix)));
     if (animate && removed && !reducedMotion()) {
       [...removed].forEach((character, index) => mirror.append(makeSpan(character, "linka-doc-gone", index)));
       clearTimeout(clearGhostTimer);
       clearGhostTimer = setTimeout(() => draw(textarea.value), 210);
     }
     [...added].forEach((character, index) => mirror.append(makeSpan(character, animate && !reducedMotion() ? "linka-doc-letter" : "", index)));
-    for (let i = value.length - suffix; i < value.length; i++) if (i >= prefix) mirror.append(makeSpan(value[i], "", i));
+    if (suffix) mirror.append(document.createTextNode(value.slice(value.length - suffix)));
   };
   draw(textarea.value);
   textarea.addEventListener("input", () => {
@@ -267,7 +279,7 @@ function attachImportedFilePicker() {
     const file = event.target.files?.[0];
     if (!file) return;
     try {
-      if (file.size > 20 * 1024 * 1024) throw new Error("too-large");
+      if (file.size > 32 * 1024 * 1024) throw new Error("Файл больше 32 МиБ. Раздели документ на несколько файлов.");
       const parsed = parseLinkaDocument(await file.text(), file.name.replace(/\.[^.]+$/, "") || t("untitled"));
       currentDocument = await storeDocument(parsed);
       titleField.value = currentDocument.title;
