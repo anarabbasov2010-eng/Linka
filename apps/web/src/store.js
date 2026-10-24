@@ -1,6 +1,16 @@
 export const STORAGE_KEY = "linka.captures.v1";
 export const RECOVERY_KEY = "linka.captures.recovery.v1";
 
+function normalizeTags(value) {
+  const source = Array.isArray(value) ? value : (typeof value === "string" ? value.split(/[,;\n]+/) : []);
+  const tags = new Map();
+  for (const raw of source) {
+    const tag = String(raw || "").trim().replace(/^#+/, "").replace(/\s+/g, " ").slice(0, 40);
+    if (tag && !tags.has(tag.toLocaleLowerCase())) tags.set(tag.toLocaleLowerCase(), tag);
+  }
+  return [...tags.values()].slice(0, 24);
+}
+
 export function normalizeCapture(item) {
   if (!item || typeof item !== "object") return null;
   const text = typeof item.text === "string" ? item.text.trim() : "";
@@ -12,6 +22,9 @@ export function normalizeCapture(item) {
     createdAt: Number.isFinite(createdAt) && createdAt > 0 ? createdAt : Date.now(),
     updatedAt: Number(item.updatedAt || createdAt || Date.now()),
     pinned: Boolean(item.pinned),
+    readLater: Boolean(item.readLater),
+    tags: normalizeTags(item.tags),
+    collection: String(item.collection || "").trim().slice(0, 80),
     previewTitle: String(item.previewTitle || "").slice(0, 180),
     previewDescription: String(item.previewDescription || "").slice(0, 320),
     previewImageUrl: String(item.previewImageUrl || "").slice(0, 2048),
@@ -124,11 +137,14 @@ export function saveCaptures(items, storage = globalThis.localStorage) {
 }
 export function parseSearchQuery(query = "") {
   const tokens = String(query).match(/"[^"]*"|\S+/g) || [];
-  const parsed = { text: [], type: "", pinned: false, site: "", before: null, after: null };
+  const parsed = { text: [], type: "", pinned: false, readLater: false, tag: "", collection: "", site: "", before: null, after: null };
   for (const raw of tokens) {
     const token = raw.replace(/^"|"$/g, "");
     const lower = token.toLocaleLowerCase();
     if (lower === "is:pinned") { parsed.pinned = true; continue; }
+    if (lower === "is:later" || lower === "is:readlater") { parsed.readLater = true; continue; }
+    if (lower.startsWith("tag:") && lower.slice(4).trim()) { parsed.tag = lower.slice(4).trim().replace(/^#+/, ""); continue; }
+    if (lower.startsWith("in:") && lower.slice(3).trim()) { parsed.collection = lower.slice(3).trim(); continue; }
     if (lower === "type:link" || lower === "type:note") { parsed.type = lower.slice(5); continue; }
     if (lower.startsWith("site:") && lower.slice(5).trim()) {
       parsed.site = lower.slice(5).trim().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/$/, "");
@@ -154,7 +170,11 @@ export function visibleCaptures(items, filter = "all", query = "") {
     if (filter === "pinned" && !item.pinned) return false;
     if (filter === "links" && !isLink) return false;
     if (filter === "notes" && isLink) return false;
+    if (filter === "read-later" && !item.readLater) return false;
     if (parsed.pinned && !item.pinned) return false;
+    if (parsed.readLater && !item.readLater) return false;
+    if (parsed.tag && !(item.tags || []).some(tag => String(tag).toLocaleLowerCase().includes(parsed.tag))) return false;
+    if (parsed.collection && !String(item.collection || "").toLocaleLowerCase().includes(parsed.collection)) return false;
     if (parsed.type === "link" && !isLink) return false;
     if (parsed.type === "note" && isLink) return false;
     let host = "";
@@ -163,7 +183,7 @@ export function visibleCaptures(items, filter = "all", query = "") {
     const savedAt = Number(item.createdAt || item.updatedAt || 0);
     if (parsed.before !== null && !(savedAt < parsed.before)) return false;
     if (parsed.after !== null && !(savedAt >= parsed.after)) return false;
-    const searchable = [item.text, item.previewTitle, item.previewDescription, host].join(" ").toLocaleLowerCase();
+    const searchable = [item.text, item.previewTitle, item.previewDescription, host, ...(item.tags || []), item.collection || ""].join(" ").toLocaleLowerCase();
     return !parsed.text || searchable.includes(parsed.text);
   }).sort((a,b) => Number(b.pinned)-Number(a.pinned) || b.updatedAt-a.updatedAt);
 }
@@ -172,6 +192,7 @@ export function makeCapture(text, existing = {}) {
   return normalizeCapture({
     id:existing.id || `capture-${now}-${Math.random().toString(36).slice(2,8)}`,
     text, createdAt:existing.createdAt || now, updatedAt:now, pinned:existing.pinned || false,
+    readLater: Boolean(existing.readLater), tags: existing.tags || [], collection: existing.collection || "",
     previewTitle: existing.previewTitle || "", previewDescription: existing.previewDescription || "", previewImageUrl: existing.previewImageUrl || ""
   });
 }
