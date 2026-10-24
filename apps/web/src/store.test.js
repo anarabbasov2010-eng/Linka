@@ -34,6 +34,18 @@ test("invalid stored JSON is preserved and blocks writes until the user chooses 
   assert.equal(loadCaptures(storage)[0].text, "new data");
 });
 
+test("malformed recovery metadata does not prevent recovery of the original capture JSON", () => {
+  const storage = memoryStorage();
+  storage.setItem(RECOVERY_KEY, "{bad recovery metadata");
+  storage.setItem(STORAGE_KEY, "{original capture data");
+  assert.deepEqual(loadCaptures(storage), []);
+  assert.equal(getCaptureRecovery(storage).raw, "{original capture data");
+  assert.equal(JSON.parse(storage.getItem(RECOVERY_KEY)).raw, "{original capture data");
+  assert.equal(saveCaptures([makeCapture("replacement")], storage), false);
+  assert.equal(startFreshCaptureLibrary(storage), true);
+  assert.equal(saveCaptures([makeCapture("replacement")], storage), true);
+});
+
 test("filters links, notes, pinned items and search query", () => {
   const items = [
     makeCapture("https://example.com"),
