@@ -1280,6 +1280,7 @@ private fun LinkaApp(
     var musicPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
     var musicPlaying by remember { mutableStateOf(false) }
     val activeMusicTrack = musicTracks.getOrElse(musicIndex.coerceIn(0, musicTracks.lastIndex)) { musicTracks.first() }
+    val backgroundSource = atmosphereBackgroundUri.ifBlank { DEFAULT_FOREST_VIDEO }
     fun persistMusicTracks(tracks: List<AtmosphereTrack>) {
         val array = JSONArray()
         tracks.forEach { array.put(JSONObject().put("id", it.id).put("name", it.name).put("uri", it.uri).put("builtin", it.builtin)) }
@@ -1635,11 +1636,95 @@ private fun LinkaApp(
         return
     }
 
+    Box(Modifier.fillMaxSize()) {
+        if (atmosphereBackgroundEnabled && theme != "oled") {
+            if (atmosphereBackgroundUri.isNotBlank() && atmosphereBackgroundType.startsWith("image/")) {
+                AsyncImage(model = Uri.parse(atmosphereBackgroundUri), contentDescription = null, contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().graphicsLayer { alpha = .25f })
+            } else {
+                AndroidView(
+                    modifier = Modifier.fillMaxSize().graphicsLayer { alpha = .24f },
+                    factory = { viewContext ->
+                        VideoView(viewContext).apply {
+                            tag = backgroundSource
+                            setVideoURI(Uri.parse(backgroundSource))
+                            setOnPreparedListener { media ->
+                                media.isLooping = true
+                                media.setVolume(0f, 0f)
+                                if (appInForeground) start()
+                            }
+                        }
+                    },
+                    update = { view ->
+                        if (view.tag != backgroundSource) {
+                            view.tag = backgroundSource
+                            view.setVideoURI(Uri.parse(backgroundSource))
+                            view.setOnPreparedListener { media ->
+                                media.isLooping = true
+                                media.setVolume(0f, 0f)
+                                if (appInForeground) view.start()
+                            }
+                        }
+                        if (!appInForeground && view.isPlaying) view.pause()
+                        else if (appInForeground && !view.isPlaying) runCatching { view.start() }
+                    }
+                )
+            }
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(
+                Color.Black.copy(alpha = .34f), Color.Black.copy(alpha = .58f), Color.Black.copy(alpha = .88f)
+            ))))
+            if (atmosphereGrainEnabled && effects != "quiet") {
+                Box(Modifier.fillMaxSize().drawBehind {
+                    for (i in 0 until 180) {
+                        val x = (((i * 97) % 997) / 997f) * size.width + ambientOrbit * 12f
+                        val y = (((i * 193) % 991) / 991f) * size.height - ambientOrbit * 5f
+                        drawCircle(Color.White.copy(alpha = .022f), radius = (i % 3 + 1) * .24f, center = Offset(x % size.width, y.mod(size.height)))
+                    }
+                })
+            }
+        }
     Scaffold(
-        containerColor = bg,
+        containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets.statusBars,
         bottomBar = {
-            NavigationBar(modifier = Modifier.background(Brush.verticalGradient(listOf(Color.Transparent, panel.copy(alpha = .76f)))), containerColor = Color.Transparent, tonalElevation = 0.dp, windowInsets = WindowInsets.navigationBars) {
+            Column(Modifier.fillMaxWidth()) {
+                if (musicTracks.isNotEmpty()) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                        color = panel.copy(alpha = .88f),
+                        shape = RoundedCornerShape(18.dp),
+                        border = BorderStroke(1.dp, border.copy(alpha = .75f)),
+                        tonalElevation = 1.dp
+                    ) {
+                        Row(Modifier.fillMaxWidth().clickable { playerExpanded = true }.padding(start = 12.dp, end = 5.dp, top = 7.dp, bottom = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                            Surface(color = sphereAccent.copy(alpha = .14f), shape = RoundedCornerShape(11.dp)) {
+                                Icon(Icons.Outlined.Tune, null, tint = sphereAccent, modifier = Modifier.padding(9.dp).size(18.dp))
+                            }
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text(activeMusicTrack.name, color = main, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
+                                Text(if (musicPlaying) "Linka · играет" else if (musicEnabled) "Linka · готово к воспроизведению" else "Linka · музыка выключена",
+                                    color = muted, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                            TextButton(onClick = { changeMusicTrack(-1) }, contentPadding = PaddingValues(horizontal = 5.dp, vertical = 0.dp)) { Text("‹", color = muted, fontSize = 20.sp) }
+                            TextButton(onClick = {
+                                if (!musicEnabled) {
+                                    musicEnabled = true
+                                    prefs.edit().putBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true).apply()
+                                } else if (musicPlaying) {
+                                    runCatching { musicPlayer?.pause() }
+                                    musicPlaying = false
+                                } else {
+                                    runCatching { musicPlayer?.start(); musicPlaying = true }
+                                }
+                            }, contentPadding = PaddingValues(horizontal = 5.dp, vertical = 0.dp)) {
+                                Text(if (musicPlaying) "Ⅱ" else "▶", color = main, fontSize = 14.sp)
+                            }
+                            TextButton(onClick = { changeMusicTrack(1) }, contentPadding = PaddingValues(horizontal = 5.dp, vertical = 0.dp)) { Text("›", color = muted, fontSize = 20.sp) }
+                        }
+                    }
+                }
+                NavigationBar(modifier = Modifier.background(Brush.verticalGradient(listOf(Color.Transparent, panel.copy(alpha = .76f)))), containerColor = Color.Transparent, tonalElevation = 0.dp, windowInsets = WindowInsets.navigationBars) {
                 val items = listOf(
                     Triple(0, Icons.Outlined.Home, tr(lang, "home")),
                     Triple(1, Icons.Outlined.Inbox, tr(lang, "inbox")),
@@ -1658,6 +1743,7 @@ private fun LinkaApp(
                         label = { Text(label, fontSize = 10.sp * fontScale, maxLines = 1) }, alwaysShowLabel = true,
                         colors = androidx.compose.material3.NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent, selectedIconColor = sphereAccent, unselectedIconColor = muted, selectedTextColor = main, unselectedTextColor = muted))
                 }
+            }
             }
         }
     ) { padding ->
@@ -1679,21 +1765,7 @@ private fun LinkaApp(
                 } else fadeIn(tween(durationMillis = 90)) togetherWith fadeOut(tween(durationMillis = 90))
             }, label = "linka-page"
         ) { page ->
-            Column(Modifier.fillMaxSize().background(
-                Brush.verticalGradient(
-                    if (theme == "oled") listOf(Color.Black, Color.Black, Color.Black)
-                    else if (dark) when (effects) {
-                        "quiet" -> listOf(DB, DB, DB)
-                        "atmosphere" -> listOf(Color(0xFF1A1626), DB, Color(0xFF08080C))
-                        else -> listOf(Color(0xFF111016), DB, Color(0xFF08080C))
-                    }
-                    else when (effects) {
-                        "quiet" -> listOf(LB, LB, LB)
-                        "atmosphere" -> listOf(Color(0xFFF9F6FF), LB, Color(0xFFEEEAF6))
-                        else -> listOf(Color(0xFFFFFEFC), LB, Color(0xFFF1EFEB))
-                    }
-                )
-            ).drawBehind {
+            Column(Modifier.fillMaxSize().background(Color.Transparent).drawBehind {
                 if (theme != "oled" && effects != "quiet" && animations) {
                     val orbitAngle = ambientOrbit * (2.0 * Math.PI)
                     val center = Offset(
@@ -1933,6 +2005,43 @@ private fun LinkaApp(
                             }
                             Slider(value = fontScale, onValueChange = setFontScale, valueRange = .9f..1.2f, steps = 5)
                         }
+                        SettingsGroup(if (lang == "ru") "Атмосфера и звук" else if (lang == "az") "Atmosfer və səs" else if (lang == "tr") "Atmosfer ve ses" else "Atmosphere & sound", panel, border, main) {
+                            SettingSwitch(
+                                if (lang == "ru") "Фоновая музыка" else "Background music",
+                                musicEnabled,
+                                { enabled -> musicEnabled = enabled; prefs.edit().putBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, enabled).apply() },
+                                main, muted, if (lang == "ru") "Твой трек по умолчанию и плейлист" else "Your soundtrack and playlist"
+                            )
+                            SettingSwitch(
+                                if (lang == "ru") "Видео леса на закате" else "Forest-at-dusk video",
+                                atmosphereBackgroundEnabled,
+                                { enabled -> atmosphereBackgroundEnabled = enabled; prefs.edit().putBoolean(ATMOSPHERE_BACKGROUND_ENABLED_KEY, enabled).apply() },
+                                main, muted, if (lang == "ru") "Медленное движение и затемнение под текст" else "Slow movement, darkened for readability"
+                            )
+                            SettingSwitch(
+                                if (lang == "ru") "Плёночное зерно" else "Film grain",
+                                atmosphereGrainEnabled,
+                                { enabled -> atmosphereGrainEnabled = enabled; prefs.edit().putBoolean(ATMOSPHERE_GRAIN_ENABLED_KEY, enabled).apply() },
+                                main, muted, if (lang == "ru") "Едва заметная текстура без резких помех" else "A subtle texture without harsh noise"
+                            )
+                            SettingLine(Icons.Outlined.Tune, if (lang == "ru") "Свои фото или видео" else "Choose a photo or video",
+                                if (atmosphereBackgroundUri.isBlank()) (if (lang == "ru") "Сейчас — лес на закате" else "Using the forest backdrop") else atmosphereBackgroundType,
+                                main, muted) { backgroundPicker.launch(arrayOf("image/*", "video/*")) }
+                            SettingLine(Icons.Outlined.Tune, if (lang == "ru") "Музыка и плейлист" else "Music and playlist",
+                                activeMusicTrack.name, main, muted) { playerExpanded = true }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(if (lang == "ru") "Громкость музыки" else "Music volume", color = main, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                                Text((musicVolume * 100).toInt().toString() + "%", color = muted, fontSize = 10.sp)
+                            }
+                            Slider(value = musicVolume, onValueChange = { volume -> musicVolume = volume.coerceIn(0f, .4f) }, valueRange = 0f..0.4f)
+                            Button(onClick = { playerExpanded = true }, modifier = Modifier.fillMaxWidth().height(44.dp),
+                                shape = RoundedCornerShape(13.dp), colors = ButtonDefaults.buttonColors(containerColor = raised, contentColor = main)) {
+                                Text(if (lang == "ru") "Открыть музыкальный плеер" else "Open music player", fontSize = 12.sp)
+                            }
+                            TextButton(onClick = { musicPicker.launch(arrayOf("audio/*")) }, modifier = Modifier.align(Alignment.Start)) {
+                                Text(if (lang == "ru") "Добавить треки с устройства" else "Add tracks from this device", color = muted, fontSize = 11.sp)
+                            }
+                        }
                         SettingsGroup(tr(lang, "updates"), panel, border, main) {
                             SettingSwitch(tr(lang, "updateAlerts"), alerts, setAlerts, main, muted, tr(lang, "updateAlertsBody"))
                             if (alerts && !notificationPermissionGranted) {
@@ -2012,6 +2121,49 @@ private fun LinkaApp(
             }
         }
     }
+    }
+
+    if (playerExpanded) AlertDialog(
+        onDismissRequest = { playerExpanded = false },
+        containerColor = panel,
+        shape = RoundedCornerShape(24.dp),
+        title = { Text(if (lang == "ru") "Linka · Музыка" else "Linka · Music", color = main, fontWeight = FontWeight.SemiBold) },
+        text = {
+            Column(Modifier.heightIn(max = 470.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(activeMusicTrack.name, color = main, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                Text(if (lang == "ru") "Твой звук. Твой темп. Ничего лишнего." else "Your soundtrack. Your pace. Nothing extra.", color = muted, fontSize = 11.sp)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { changeMusicTrack(-1) }) { Text("‹", color = main, fontSize = 24.sp) }
+                    Button(onClick = {
+                        if (!musicEnabled) { musicEnabled = true; prefs.edit().putBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true).apply() }
+                        else if (musicPlaying) { runCatching { musicPlayer?.pause() }; musicPlaying = false }
+                        else { runCatching { musicPlayer?.start(); musicPlaying = true } }
+                    }, shape = RoundedCornerShape(15.dp), colors = ButtonDefaults.buttonColors(containerColor = main, contentColor = bg)) {
+                        Text(if (musicPlaying) "Пауза" else "Воспроизвести", fontSize = 12.sp)
+                    }
+                    TextButton(onClick = { changeMusicTrack(1) }) { Text("›", color = main, fontSize = 24.sp) }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(if (lang == "ru") "Громкость" else "Volume", color = muted, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                    Text((musicVolume * 100).toInt().toString() + "%", color = muted, fontSize = 10.sp)
+                }
+                Slider(value = musicVolume, onValueChange = { musicVolume = it.coerceIn(0f, .4f) }, valueRange = 0f..0.4f)
+                Text(if (lang == "ru") "ПЛЕЙЛИСТ" else "PLAYLIST", color = muted, fontSize = 10.sp, letterSpacing = 1.2.sp)
+                musicTracks.forEachIndexed { index, item ->
+                    TextButton(onClick = { musicIndex = index; prefs.edit().putInt(ATMOSPHERE_MUSIC_INDEX_KEY, index).putBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true).apply(); musicEnabled = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text((if (index == musicIndex) "♫  " else (index + 1).toString() + "  ") + item.name, color = if (index == musicIndex) sphereAccent else muted,
+                            fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                Button(onClick = { musicPicker.launch(arrayOf("audio/*")) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(13.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = raised, contentColor = main)) {
+                    Text(if (lang == "ru") "Добавить музыку с устройства" else "Add music from device", fontSize = 11.sp)
+                }
+                Text(if (lang == "ru") "Локальные треки хранятся на устройстве и не отправляются в синхронизацию Linka." else "Local tracks stay on this device and are not sent to Linka sync.", color = muted, fontSize = 10.sp, lineHeight = 15.sp)
+            }
+        },
+        confirmButton = { TextButton(onClick = { playerExpanded = false }) { Text(tr(lang, "done"), color = main) } }
+    )
 
     if (accepted && updateInfo != null && !updatePromptDismissed) {
         AlertDialog(
