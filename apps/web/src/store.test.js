@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { loadCaptures, saveCaptures, makeCapture, visibleCaptures, STORAGE_KEY, inspectCaptureStorage, getCaptureRecoveryData } from "./store.js";
+import { loadCaptures, saveCaptures, makeCapture, visibleCaptures, STORAGE_KEY, inspectCaptureStorage, getCaptureRecoveryData, canonicalizeCaptureUrl, splitCaptureBatch } from "./store.js";
 
 function memoryStorage() {
   const data = new Map();
@@ -98,4 +98,21 @@ test("search supports tags, status, archive scope, and today's activity", () => 
   const yesterday = { id: "yesterday", text: "Changed yesterday", createdAt: 1, updatedAt: yesterdayDate.getTime() };
   assert.deepEqual(visibleCaptures([today, yesterday], "today").map(item => item.id), ["today"]);
   assert.deepEqual(visibleCaptures([today, yesterday], "all", "is:today").map(item => item.id), ["today"]);
+});
+
+
+test("duplicate URL comparison ignores tracking parameters without rewriting stored URLs", () => {
+  assert.equal(
+    canonicalizeCaptureUrl("https://example.com/article?utm_source=newsletter&id=42#top"),
+    canonicalizeCaptureUrl("https://example.com/article?id=42")
+  );
+  assert.equal(canonicalizeCaptureUrl("not a URL"), "");
+});
+
+test("multi-link paste is split only when every non-empty line is an HTTP URL", () => {
+  assert.deepEqual(splitCaptureBatch("https://example.com/a\\n\\nhttps://example.com/b"), [
+    "https://example.com/a", "https://example.com/b"
+  ]);
+  assert.equal(splitCaptureBatch("A thought\\nhttps://example.com"), null);
+  assert.equal(splitCaptureBatch("https://example.com"), null);
 });

@@ -1,4 +1,4 @@
-import { loadCaptures, saveCaptures, makeCapture, visibleCaptures, getCaptureStorageStatus, getCaptureRecoveryData } from "./store.js";
+import { loadCaptures, saveCaptures, makeCapture, visibleCaptures, getCaptureStorageStatus, getCaptureRecoveryData, canonicalizeCaptureUrl, splitCaptureBatch } from "./store.js";
 import { initLinkaExperience } from "./experience.js";
 import { initVisualSystem } from "./visual-system.js";
 import { initLinkaAtmosphere, openAtmosphereSettings } from "./atmosphere.js";
@@ -238,6 +238,14 @@ function render() {
       cover.addEventListener("error", () => frame.remove(), { once: true }); frame.append(cover); previewBits.push(frame);
     }
     if (isLink(item.text) && item.previewTitle) { const title = document.createElement("p"); title.className = "item-title"; title.textContent = item.previewTitle; previewBits.push(title); }
+    else if (isLink(item.text)) {
+      try {
+        const url = new URL(item.text.trim());
+        const domainTitle = document.createElement("p"); domainTitle.className = "item-title";
+        domainTitle.textContent = url.hostname.replace(/^www\\./i, "");
+        previewBits.push(domainTitle);
+      } catch {}
+    }
     if (isLink(item.text) && item.previewDescription) { const description = document.createElement("p"); description.className = "item-description"; description.textContent = item.previewDescription; previewBits.push(description); }
     if (item.tags?.length) {
       const tagTray = document.createElement("div");
@@ -815,9 +823,34 @@ restoreQuickDraft();
 draft.addEventListener("input",()=>{saveButton.disabled=!draft.value.trim();saveQuickDraft();});
 draft.addEventListener("keydown",event=>{if((event.ctrlKey||event.metaKey)&&event.key==="Enter"&&draft.value.trim()){event.preventDefault();form.requestSubmit();}});
 form.addEventListener("submit",event=>{
-  event.preventDefault();const text=draft.value.trim();if(!text)return;
+  event.preventDefault();
+  const text=draft.value.trim(); if(!text)return;
   const previousCaptures=captures.slice();
   const existing=editingId?captures.find(item=>item.id===editingId):null;
+
+  if(!existing){
+    const batch=splitCaptureBatch(text);
+    if(batch && batch.length>1){
+      const known=new Set(captures.map(item=>canonicalizeCaptureUrl(item.text)).filter(Boolean));
+      const unique=new Map();
+      for(const url of batch){
+        const key=canonicalizeCaptureUrl(url);
+        if(key && !known.has(key) && !unique.has(key)) unique.set(key,url);
+      }
+      const duplicates=batch.length-unique.size;
+      if(!unique.size){say("All links in this block already appear in your library.");return;}
+      const prompt=`Save ${unique.size} new links as separate entries?${duplicates ? ` ${duplicates} duplicate or already-saved link(s) will be skipped.` : ""}`;
+      if(!window.confirm(prompt))return;
+      captures=[...Array.from(unique.values(),url=>makeCapture(url)),...captures];
+      if(!persist()){captures=previousCaptures;render();return;}
+      resetEditor();render();say(`Saved ${unique.size} links`);return;
+    }
+    const key=canonicalizeCaptureUrl(text);
+    if(key && captures.some(item=>canonicalizeCaptureUrl(item.text)===key)){
+      if(!window.confirm("This link appears to be already saved. Save another copy anyway?"))return;
+    }
+  }
+
   if(existing){captures=captures.map(item=>item.id===editingId?{...item,text,updatedAt:Date.now()}:item);}
   else{captures.unshift(makeCapture(text));}
   if(!persist()){captures=previousCaptures;render();return;}

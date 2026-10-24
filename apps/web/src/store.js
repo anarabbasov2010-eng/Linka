@@ -157,3 +157,29 @@ export function makeCapture(text, existing = {}) {
     status: existing.status || "unread", tags: existing.tags || [], previewTitle: existing.previewTitle || "",
     previewDescription: existing.previewDescription || "", previewImageUrl: existing.previewImageUrl || "" });
 }
+
+/** Canonical comparison key only; the saved URL itself is never rewritten. */
+export function canonicalizeCaptureUrl(value) {
+  const text = String(value || "").trim();
+  if (!/^https?:\/\//i.test(text)) return "";
+  try {
+    const url = new URL(text);
+    url.hash = "";
+    for (const key of [...url.searchParams.keys()]) {
+      const lower = key.toLowerCase();
+      if (lower.startsWith("utm_") || ["fbclid", "gclid", "mc_cid", "mc_eid", "igshid"].includes(lower)) {
+        url.searchParams.delete(key);
+      }
+    }
+    url.searchParams.sort();
+    return url.toString();
+  } catch {
+    return "";
+  }
+}
+
+/** Split a pasted block only when every non-empty line is an HTTP(S) URL. */
+export function splitCaptureBatch(value) {
+  const lines = String(value || "").split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  return lines.length > 1 && lines.every(line => Boolean(canonicalizeCaptureUrl(line))) ? lines : null;
+}
