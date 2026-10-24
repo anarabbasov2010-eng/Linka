@@ -58,7 +58,10 @@ let persistedCaptures = captures.map(item => ({ ...item }));
 const QUICK_DRAFT_KEY = "linka.captureDraft.v1";
 try {
   const savedDraft = localStorage.getItem(QUICK_DRAFT_KEY);
-  if (savedDraft && !draft.value) draft.value = savedDraft;
+  if (savedDraft && !draft.value) {
+    draft.value = savedDraft;
+    saveButton.disabled = !savedDraft.trim();
+  }
 } catch {}
 let activeFilter = "all";
 let editingId = null;
@@ -353,6 +356,7 @@ function makeAction(label, action, id) {
 }
 function resetEditor() {
   editingId = null; draft.value = ""; composeLabel.textContent = "Quick capture";
+  try { localStorage.removeItem(QUICK_DRAFT_KEY); } catch {}
   saveButton.innerHTML = 'Save to inbox <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg>';
   saveButton.disabled = true;
 }
@@ -707,7 +711,8 @@ bulkToolbar.addEventListener("click", async event => {
     const pinned = action === "pin";
     const now = Date.now();
     captures = captures.map(item => selectedIds.has(item.id) ? { ...item, pinned, updatedAt: now } : item);
-    persist(); render(); say(pinned ? "Selected items pinned" : "Selected items unpinned"); return;
+    if (!persist()) { render(); return; }
+    render(); say(pinned ? "Selected items pinned" : "Selected items unpinned"); return;
   }
   if (action === "copy") {
     const value = selected.map(item => item.text).join("\n\n");
@@ -752,7 +757,7 @@ list.addEventListener("click",async event=>{
   }
   const item=captures.find(entry=>entry.id===id);if(!item)return;
   if(action==="expand"){if(expandedCards.has(id))expandedCards.delete(id);else expandedCards.add(id);render();}
-  else if(action==="pin"){captures=captures.map(entry=>entry.id===id?{...entry,pinned:!entry.pinned,updatedAt:Date.now()}:entry);persist();render();say(item.pinned?"Откреплено":"Закреплено");}
+  else if(action==="pin"){captures=captures.map(entry=>entry.id===id?{...entry,pinned:!entry.pinned,updatedAt:Date.now()}:entry);if(!persist()){render();return;}render();say(item.pinned?"Откреплено":"Закреплено");}
   else if(action==="delete"){
     captures=captures.filter(entry=>entry.id!==id);
     if (!persist()) { render(); return; }
@@ -765,10 +770,12 @@ list.addEventListener("click",async event=>{
       actionLabel: "Отменить",
       onAction: () => {
         const deleted = readDeletedIds();
+        captures = [...captures.filter(entry => entry.id !== id), item].sort((a,b) => b.updatedAt - a.updatedAt);
+        if (!persist()) { render(); return; }
         deleted.delete(id);
         try { localStorage.setItem("linka.deletedIds.v1", JSON.stringify(Array.from(deleted))); } catch {}
-        captures = [...captures.filter(entry => entry.id !== id), item].sort((a,b) => b.updatedAt - a.updatedAt);
-        persist(); render(); say("Удаление отменено");
+        scheduleCloudSync();
+        render(); say("Удаление отменено");
       }
     }}));
   }
@@ -783,9 +790,14 @@ $("#import-button").addEventListener("click",()=>$("#import-file").click());
 $("#import-file").addEventListener("change",async event=>{
   const file=event.target.files?.[0];if(!file)return;
   try{const parsed=JSON.parse(await file.text());const imported=Array.isArray(parsed)?parsed:parsed.captures;if(!Array.isArray(imported))throw new Error("Invalid file");
-    const normalized=imported.map(item=>makeCapture(item.text,item)).filter(Boolean);const restoredIds=new Set(normalized.map(item=>item.id));const deleted=readDeletedIds();restoredIds.forEach(id=>deleted.delete(id));try{localStorage.setItem("linka.deletedIds.v1",JSON.stringify(Array.from(deleted)));}catch{}const map=new Map(captures.map(item=>[item.id,item]));normalized.forEach(item=>map.set(item.id,item));
+    const normalized=imported.map(item=>makeCapture(item.text,item)).filter(Boolean);const restoredIds=new Set(normalized.map(item=>item.id));const deleted=readDeletedIds();const map=new Map(captures.map(item=>[item.id,item]));normalized.forEach(item=>map.set(item.id,item));
     captures=Array.from(map.values()).sort((a,b)=>b.updatedAt-a.updatedAt);
-    if (persist()) { render(); say("Imported "+normalized.length+" capture(s)"); } else render();
+    if (persist()) {
+      restoredIds.forEach(id=>deleted.delete(id));
+      try { localStorage.setItem("linka.deletedIds.v1",JSON.stringify(Array.from(deleted))); } catch {}
+      scheduleCloudSync();
+      render(); say("Imported "+normalized.length+" capture(s)");
+    } else render();
   }catch{say("Этот файл не похож на экспорт Linka");}finally{event.target.value="";}
 });
 $("#search-space-button").addEventListener("click",()=>showSearchSpace(search.value));
