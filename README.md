@@ -10,7 +10,11 @@
 
 ## Inbox organization
 
-Captures can carry up to 24 tags and one collection label. Use `tag:design` to find a tag, `in:research` to filter a collection, and `is:later` to find items saved for later. The Archive view hides completed items from the main inbox without deleting them. Delete moves an item to Trash; restore it from there, or choose permanent deletion explicitly. Archive, Trash, tags, collection labels, and read-later state are stored as part of each capture and travel with cloud sync.
+Captures can carry up to 24 tags and one collection label. Use `tag:design` to find a tag, `in:research` to filter a collection, `is:later` to find items saved for later, and the Today view for captures made during the local calendar day. Linka warns before saving a duplicate URL or text note; tracking parameters and fragments are ignored for URL comparisons. The Archive view hides completed items from the main inbox without deleting them. Delete moves an item to Trash; restore it from there, or choose permanent deletion explicitly. Archive, Trash, tags, collection labels, and read-later state are stored as part of each capture and travel with cloud sync.
+
+Global search includes saved captures and local text documents. Search history is stored only in local browser/app storage, is not synced, is limited to 10 recent queries, and can be cleared from the search dialog. Frequently used queries can be saved as named searches.
+
+The export format selector supports JSON (the complete restorable backup), Markdown, plain text, and self-contained HTML. JSON backups are the recommended recovery format. Text and Markdown files can be imported as a single note without splitting paragraphs or code blocks. Keyboard shortcuts: `Ctrl/⌘+K` opens global search, `Ctrl/⌘+Enter` saves the quick-capture draft, `Ctrl/⌘+Shift+E` exports the current selection (or visible results), and `Ctrl/⌘+Shift+L` toggles Read Later for selected items.
 
 ## Text documents
 
