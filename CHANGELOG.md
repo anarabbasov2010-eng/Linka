@@ -1,5 +1,16 @@
 # Changelog
 
+## Next — Interface and feature update (in progress)
+
+- Android: refined the existing ambient sphere with slow orbital motion and restrained rim lighting; quiet mode and OLED black remain unaffected.
+- Android: added directional, spring-timed page transitions and horizontally scrollable appearance controls for narrow screens.
+- Android: improved selected/pinned capture distinction, header hierarchy and settings group labels.
+- Windows/Web: refined shared Tauri/Web visual surfaces, navigation active-state rail, accessible focus rings, touch targets, and small-window spacing.
+- Windows/Web: added multi-select management for pin/unpin, copy, export and batch delete, including a confirmation before destructive bulk deletion.
+- Windows/Web: added advanced search operators for type, pinned state, domain and saved date.
+- Added a 200-item feature roadmap that separates implemented features from proposals.
+- Build and test status must be confirmed by GitHub Actions before treating this branch as release-ready.
+
 ## Next — Linka interface refinement
 
 - Android: added a slow, very subtle orbital drift and restrained rim-light detail to the existing ambient sphere; quiet mode and OLED black remain unaffected.
