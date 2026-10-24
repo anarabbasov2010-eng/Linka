@@ -1,11 +1,6 @@
 import "./visual-system.css";
 
-const ACCENTS = {
-  violet: { dark: "#C9C0FF", light: "#6554A6", glowDark: "rgba(169,154,255,.13)", glowLight: "rgba(101,84,166,.09)" },
-  blue:   { dark: "#9CC5FF", light: "#356BB4", glowDark: "rgba(111,169,255,.13)", glowLight: "rgba(53,107,180,.09)" },
-  mint:   { dark: "#8FE3CF", light: "#237A68", glowDark: "rgba(92,220,188,.11)", glowLight: "rgba(35,122,104,.08)" },
-  rose:   { dark: "#FFB6D2", light: "#B14E78", glowDark: "rgba(255,145,191,.11)", glowLight: "rgba(177,78,120,.08)" }
-};
+const ACCENTS = { forest: { dark: "#B59A69", light: "#B59A69", glowDark: "rgba(181,154,105,.11)", glowLight: "rgba(181,154,105,.11)" } };
 const DENSITIES = ["compact", "standard", "spacious"];
 const EFFECTS = ["quiet", "balanced", "atmosphere"];
 
@@ -15,16 +10,10 @@ function storageGet(key, fallback = "") {
 function storageSet(key, value) {
   try { localStorage.setItem(key, value); } catch {}
 }
-function lightTheme(root = document.documentElement) {
-  if (root.dataset.theme === "light") return true;
-  if (root.dataset.theme === "system") {
-    try { return window.matchMedia("(prefers-color-scheme: light)").matches; } catch {}
-  }
-  return false;
-}
+function lightTheme() { return false; }
 
-export function setLinkaAccent(value = "violet") {
-  const key = "violet";
+export function setLinkaAccent(value = "forest") {
+  const key = "forest";
   const root = document.documentElement;
   root.dataset.accent = key;
   storageSet("linka.accent", key);
@@ -66,10 +55,10 @@ export function initVisualSystem() {
   if (root.dataset.visualSystemReady === "true") return;
   root.dataset.visualSystemReady = "true";
 
-  setLinkaAccent("violet");
+  setLinkaAccent("forest");
   setLinkaDensity(storageGet("linka.density", "standard"));
   setLinkaEffects("atmosphere");
-  storageSet("linka.accent", "violet");
+  storageSet("linka.accent", "forest");
   storageSet("linka.effects", "atmosphere");
 
   const savedMotion = storageGet("linka.reduceMotion", "");
@@ -92,17 +81,16 @@ export function initVisualSystem() {
     });
   }
 
-  const appearanceChanged = () => setLinkaAccent(storageGet("linka.accent", "violet"));
+  const appearanceChanged = () => setLinkaAccent("forest");
   new MutationObserver(records => {
-    if (records.some(record => record.attributeName === "data-theme")) appearanceChanged();
+    if (records.some(record => record.attributeName === "data-theme")) { root.dataset.theme = "forest"; appearanceChanged(); }
   }).observe(root, { attributes: true, attributeFilter: ["data-theme"] });
 
   const colorScheme = (() => {
     try { return window.matchMedia("(prefers-color-scheme: light)"); } catch { return null; }
   })();
-  colorScheme?.addEventListener?.("change", () => {
-    if (root.dataset.theme === "system") appearanceChanged();
-  });
+  root.dataset.theme = "forest";
+  root.style.colorScheme = "dark";
 
   const toastStack = document.createElement("div");
   toastStack.className = "linka-toast-stack";
