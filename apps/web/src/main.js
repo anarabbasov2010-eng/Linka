@@ -240,7 +240,9 @@ async function syncNow({ silent = false } = {}) {
     // request was in flight. Merge against the latest in-memory library and
     // the latest tombstones instead of replacing it with a stale snapshot.
     const currentDeleted = readDeletedIds();
-    const latestDeleted = new Set([...currentDeleted, ...(result.deletedIds || [])]);
+    const removedWhileSyncing = new Set([...deletedSnapshot].filter(id => !currentDeleted.has(id)));
+    const latestDeleted = new Set([...(result.deletedIds || [])].filter(id => !removedWhileSyncing.has(id)));
+    for (const id of currentDeleted) latestDeleted.add(id);
     const latestCaptures = mergeCloudCaptures(captures, result.captures, latestDeleted);
     if (!saveCaptures(latestCaptures)) {
       throw new Error("Облако ответило, но объединённую библиотеку не удалось сохранить на устройстве. Локальные данные не перезаписаны; экспортируй резервную копию и освободи место.");
