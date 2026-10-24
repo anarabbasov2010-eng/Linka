@@ -2,13 +2,14 @@ name: Windows installer
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   workflow_dispatch: {}
 
 permissions:
   contents: write
 
 concurrency:
-  group: windows-installers
+  group: windows-installers-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -20,40 +21,21 @@ jobs:
         with:
           node-version: 22
       - uses: dtolnay/rust-toolchain@stable
-      - name: Wait for Android release built from this commit
+      - name: Read the canonical Linka version
         shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $release = $null
-          $commitSha = ""
-          for ($attempt = 1; $attempt -le 30; $attempt++) {
-            $tag = (gh api "repos/$env:GITHUB_REPOSITORY/releases/latest" --jq .tag_name 2>$null)
-            if ($LASTEXITCODE -eq 0 -and $tag) {
-              $tag = $tag.Trim()
-              $ref = gh api "repos/$env:GITHUB_REPOSITORY/git/ref/tags/$tag" | ConvertFrom-Json
-              $targetSha = $ref.object.sha
-              if ($ref.object.type -eq "tag") {
-                $tagObject = gh api "repos/$env:GITHUB_REPOSITORY/git/tags/$($ref.object.sha)" | ConvertFrom-Json
-                $targetSha = $tagObject.object.sha
-              }
-              if ($targetSha -eq $env:GITHUB_SHA) {
-                $release = gh api "repos/$env:GITHUB_REPOSITORY/releases/tags/$tag" | ConvertFrom-Json
-                break
-              }
-            }
-            Write-Host "Waiting for Android release for commit $env:GITHUB_SHA (attempt $attempt/30)..."
-            Start-Sleep -Seconds 15
+          $package = Get-Content -Raw "apps/web/package.json" | ConvertFrom-Json
+          $version = [string]$package.version
+          if ($version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') { throw "Invalid Linka version in apps/web/package.json: $version" }
+          if ($env:GITHUB_REF -like "refs/tags/v*") {
+            $tag = $env:GITHUB_REF_NAME
+            if ($tag.TrimStart("v") -ne $version) { throw "Release tag $tag does not match canonical package version $version." }
+            "LINKA_RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          } else {
+            "LINKA_RELEASE_TAG=" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           }
-          if (-not $release) { throw "Timed out waiting for the Android release matching this commit. No mismatched Windows installer was published." }
-          $version = $release.tag_name.TrimStart("v")
-          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Unexpected release tag: $($release.tag_name)" }
-          "LINKA_RELEASE_TAG=$($release.tag_name)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "VITE_LINKA_DESKTOP_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          $configPath = Join-Path $env:GITHUB_WORKSPACE "apps/desktop/src-tauri/tauri.conf.json"
-          $config = Get-Content -Raw $configPath | ConvertFrom-Json
-          $config.version = $version
-          $config | ConvertTo-Json -Depth 100 | Set-Content -Encoding utf8 $configPath
+          Write-Host "Building Linka Windows $version independently of Android."
       - name: Inject public cloud endpoint when configured
         shell: pwsh
         env:
@@ -132,10 +114,17 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          if [[ "${GITHUB_REF:-}" != refs/tags/v* ]]; then
+            echo "Windows installer built successfully. The artifact is attached to this Actions run; only version tags publish a release."
+            exit 0
+          fi
           files=(apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe)
           if [[ ! -f "${files[0]:-}" ]]; then
             echo "::error::No Windows NSIS installer was produced."
             exit 1
+          fi
+          if ! gh release view "$LINKA_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$LINKA_RELEASE_TAG" --title "Linka ${LINKA_RELEASE_TAG#v}" --notes "Windows release for Linka ${LINKA_RELEASE_TAG#v}." --repo "$GITHUB_REPOSITORY"
           fi
           cp "${files[0]}" Linka-Windows-x64-setup.exe
           gh release upload "$LINKA_RELEASE_TAG" Linka-Windows-x64-setup.exe --clobber --repo "$GITHUB_REPOSITORY"
