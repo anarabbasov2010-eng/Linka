@@ -1,5 +1,17 @@
 # Changelog
 
+## Next — Twilight atmosphere and music player
+
+- Windows/Web: added the Linka twilight background layer with a slowly drifting dusk-forest video, dark readability veil, gentle wind-like gradients and extremely subtle moving film grain.
+- Windows/Web: the supplied MP3, “как всё заебало..”, is the default soundtrack in a compact dock player; the expanded player includes seek, volume, previous/next, and a persistent playlist.
+- Windows/Web: added local photo/video backgrounds and local audio tracks stored in IndexedDB; user media is not uploaded by the atmosphere feature.
+- Windows/Web: added per-character ink/fade animation for newly typed capture text, with reduced-motion handling.
+- Android: added a looping forest-video/photo background layer, quiet grain, subtle animated newly typed glyph, a bottom mini-player and an expanded playlist dialog.
+- Android: users can choose persisted local photo/video backgrounds, import multiple audio files, choose tracks, skip, pause/resume, and set music volume.
+- The default MP3 is streamed from a hosted asset to avoid adding about 28.5 MB to each install package. Playback in browser-based clients starts from the play control because autoplay can be blocked by the platform.
+- Background-video source: [Pexels — Serene Forest Path at Dusk](https://www.pexels.com/video/serene-forest-path-at-dusk-36928855/). The clip page labels it “Free to use”; verify source availability in the installed build and fallback to user-selected media if the provider URL changes.
+- Validation and release publishing must pass GitHub Actions before this update is treated as installable.
+
 ## Next — Interface and feature update (in progress)
 
 - Android: refined the existing ambient sphere with slow orbital motion and restrained rim lighting; quiet mode and OLED black remain unaffected.
