@@ -1,8 +1,8 @@
 const CONFIG_KEY = "linka.cloud.config.v1";
 const SESSION_KEY = "linka.cloud.session.v1";
 export const DELETED_IDS_KEY = "linka.deletedIds.v1";
-const MAX_CAPTURES = 500;
-const MAX_DELETED_IDS = 5000;
+export const MAX_SYNC_PAYLOAD_BYTES = 4 * 1024 * 1024;
+export const MAX_SYNC_DELETED_IDS = 5000;
 
 function readObject(key, storage = globalThis.localStorage) {
   try {
@@ -118,21 +118,27 @@ export function readDeletedIds(storage = globalThis.localStorage) {
 export function addDeletedId(id, storage = globalThis.localStorage) {
   const deleted = readDeletedIds(storage);
   deleted.add(String(id));
-  try { storage?.setItem(DELETED_IDS_KEY, JSON.stringify(Array.from(deleted).slice(-MAX_DELETED_IDS))); } catch {}
+  try { storage?.setItem(DELETED_IDS_KEY, JSON.stringify(Array.from(deleted))); } catch {}
 }
-export function mergeCloudCaptures(localCaptures, remoteCaptures, deletedIds, maxItems = MAX_CAPTURES) {
+export function estimateCloudPayloadBytes(value) {
+  const serialized = typeof value === "string" ? value : JSON.stringify(value);
+  if (typeof TextEncoder !== "undefined") return new TextEncoder().encode(serialized).byteLength;
+  return new Blob([serialized]).size;
+}
+
+export function mergeCloudCaptures(localCaptures, remoteCaptures, deletedIds = new Set(), maxItems = Infinity) {
   const mergedById = new Map();
   for (const item of [...(remoteCaptures || []), ...(localCaptures || [])]) {
     if (!item || typeof item.id !== "string" || !item.id || typeof item.text !== "string" || !item.text.trim()) continue;
-    if (deletedIds.has(item.id)) continue;
+    if (deletedIds?.has(item.id)) continue;
     const existing = mergedById.get(item.id);
     if (!existing || Number(item.updatedAt || item.createdAt || 0) > Number(existing.updatedAt || existing.createdAt || 0)) {
       mergedById.set(item.id, item);
     }
   }
-  return [...mergedById.values()]
-    .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0))
-    .slice(0, maxItems);
+  const ordered = [...mergedById.values()]
+    .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0));
+  return Number.isFinite(maxItems) ? ordered.slice(0, Math.max(0, maxItems)) : ordered;
 }
 
 const OTP_COOLDOWN_MS = 120_000;
@@ -285,19 +291,29 @@ export async function syncCloudCaptures(localCaptures, localDeletedIds = readDel
     remoteData.deletedIds.filter(id => typeof id === "string" && id).forEach(id => deleted.add(id));
   }
   const merged = mergeCloudCaptures(localCaptures, Array.isArray(remoteData?.captures) ? remoteData.captures : [], deleted);
+  if (deleted.size > MAX_SYNC_DELETED_IDS) {
+    throw new Error(`Cloud sync paused: ${deleted.size} deletion markers exceed the safe cloud limit of ${MAX_SYNC_DELETED_IDS}. They were kept locally to prevent deleted records from reappearing.`);
+  }
   const remoteProfile = remoteData?.profile && typeof remoteData.profile === "object" ? remoteData.profile : null;
   const localProfile = profile && typeof profile === "object" ? profile : null;
   const syncedProfile = !localProfile ? remoteProfile : (!remoteProfile || Number(localProfile.updatedAt || 0) >= Number(remoteProfile.updatedAt || 0) ? localProfile : remoteProfile);
   if (syncedProfile) writeObject(PROFILE_KEY, syncedProfile);
   const body = {
     user_id: session.userId,
-    data: { captures: merged, deletedIds: Array.from(deleted).slice(-MAX_DELETED_IDS), ...(syncedProfile ? { profile: syncedProfile } : {}) },
+    data: { captures: merged, deletedIds: Array.from(deleted), ...(syncedProfile ? { profile: syncedProfile } : {}) },
     updated_at: new Date().toISOString()
   };
+  const serializedBody = JSON.stringify(body);
+  const payloadBytes = estimateCloudPayloadBytes(serializedBody);
+  if (payloadBytes > MAX_SYNC_PAYLOAD_BYTES) {
+    const payloadMiB = (payloadBytes / (1024 * 1024)).toFixed(2);
+    const limitMiB = (MAX_SYNC_PAYLOAD_BYTES / (1024 * 1024)).toFixed(0);
+    throw new Error(`Cloud sync paused: this request is ${payloadMiB} MiB, above the ${limitMiB} MiB safety limit. Your local library was not changed. Export a backup or sync a smaller set of content before retrying.`);
+  }
   const upsert = await fetch(`${config.url}/rest/v1/linka_sync?on_conflict=user_id`, {
     method: "POST",
     headers: { ...headers, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
-    body: JSON.stringify(body)
+    body: serializedBody
   });
   await readResponse(upsert);
   try { localStorage.setItem(DELETED_IDS_KEY, JSON.stringify(body.data.deletedIds)); } catch {}

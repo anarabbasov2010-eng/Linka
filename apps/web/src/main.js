@@ -1,23 +1,31 @@
-import { loadCaptures, saveCaptures, makeCapture, visibleCaptures } from "./store.js";
+import { loadCaptures, saveCaptures, makeCapture, visibleCaptures, getCaptureStorageStatus, getCaptureRecoveryData, canonicalizeCaptureUrl, splitCaptureBatch } from "./store.js";
 import { initLinkaExperience } from "./experience.js";
-import { initVisualSystem, setLinkaAccent, setLinkaDensity, setLinkaEffects } from "./visual-system.js";
+import { initVisualSystem } from "./visual-system.js";
 import { initLinkaAtmosphere, openAtmosphereSettings } from "./atmosphere.js";
 import { initLinkaDocuments } from "./documents.js";
 import { initLinkaSignature } from "./signature-theme.js";
 import {
-  addDeletedId, disconnectCloud, getCloudConfig, getCloudSession,
+  DELETED_IDS_KEY, disconnectCloud, getCloudConfig, getCloudSession,
   getOtpCooldown, readDeletedIds, requestEmailOtp, saveCloudConfig, syncCloudCaptures,
   verifyEmailOtp, readLinkaProfile, saveLinkaProfile, beginQrPairing, claimQrPairing,
   startGoogleOAuth, completeGoogleOAuthCallback
 } from "./cloud-sync.js";
 import QRCode from "qrcode";
+import { inspectTrashStorage, saveTrash, TRASH_KEY, TRASH_RECOVERY_KEY, MAX_TRASH_ITEMS } from "./trash-store.js";
 
 const $ = selector => document.querySelector(selector);
+const QUICK_DRAFT_KEY = "linka.quickDraft.v1";
+const SEARCH_HISTORY_KEY = "linka.searchHistory.v1";
+const SORT_PREFERENCE_KEY = "linka.sort.v1";
+const VIEW_PREFERENCE_KEY = "linka.viewMode.v1";
 const form = $("#capture-form");
 const draft = $("#capture-text");
 const saveButton = $("#save-button");
 const list = $("#capture-list");
 const search = $("#search");
+const sortSelect = $("#sort-select");
+const viewToggle = $("#view-toggle");
+const clearSearchHistoryButton = $("#clear-search-history");
 const count = $("#capture-count");
 const status = $("#status");
 const composeLabel = $("#compose-label");
@@ -31,6 +39,12 @@ selectionButton.className = "ghost selection-mode-button";
 selectionButton.textContent = "Select items";
 selectionButton.setAttribute("aria-pressed", "false");
 $("#export-button").insertAdjacentElement("beforebegin", selectionButton);
+const trashButton = document.createElement("button");
+trashButton.type = "button";
+trashButton.className = "ghost";
+trashButton.textContent = "Trash / Корзина";
+trashButton.addEventListener("click", () => showTrashManager());
+$("#export-button").insertAdjacentElement("beforebegin", trashButton);
 const bulkToolbar = document.createElement("div");
 bulkToolbar.className = "bulk-toolbar";
 bulkToolbar.hidden = true;
@@ -54,6 +68,15 @@ Linka is a personal inbox for saving text and links on the device or browser pro
 
 By selecting “I agree”, you confirm that you have read these terms and understand local storage, optional cloud synchronization and the need to keep backups. This notice is an in-app product agreement, not a substitute for professional legal advice.`;
 let captures = loadCaptures();
+let currentSort = "recent";
+let viewMode = "grid";
+try {
+  const savedSort = localStorage.getItem(SORT_PREFERENCE_KEY);
+  if (["recent", "oldest", "title", "domain", "longest"].includes(savedSort)) currentSort = savedSort;
+  const savedView = localStorage.getItem(VIEW_PREFERENCE_KEY);
+  if (savedView === "list" || savedView === "grid") viewMode = savedView;
+} catch {}
+sortSelect.value = currentSort;
 let activeFilter = "all";
 let editingId = null;
 let statusTimer = null;
@@ -63,7 +86,6 @@ let cloudSyncStatus = "";
 let lastCloudRefreshAt = 0;
 const expandedCards = new Set();
 const desktopBuildVersion = String(import.meta.env.VITE_LINKA_DESKTOP_VERSION || "").trim();
-let themeMode = "dark";
 let reduceMotion = localStorage.getItem("linka.reduceMotion") === "true" || (localStorage.getItem("linka.reduceMotion") === null && (() => { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } })());
 
 function say(message) {
@@ -77,9 +99,47 @@ function formatDate(value) {
   try { return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
   catch { return "Saved"; }
 }
-function persist() {
-  if (!saveCaptures(captures)) say("Storage unavailable or full. Export a backup before closing.");
+function persist(options = {}) {
+  if (!saveCaptures(captures, undefined, options)) {
+    const storage = getCaptureStorageStatus();
+    say(storage.status === "corrupt"
+      ? "Библиотека повреждена. Исходные данные сохранены для восстановления; обычная запись заблокирована."
+      : "Не удалось сохранить библиотеку: проверь свободное место и выгрузи резервную копию.");
+    return false;
+  }
   scheduleCloudSync();
+  return true;
+}
+function saveQuickDraft() {
+  try { if (draft?.value) localStorage.setItem(QUICK_DRAFT_KEY, JSON.stringify({ text: draft.value, updatedAt: Date.now() })); else localStorage.removeItem(QUICK_DRAFT_KEY); } catch {}
+}
+function clearQuickDraft() { try { localStorage.removeItem(QUICK_DRAFT_KEY); } catch {} }
+function restoreQuickDraft() {
+  try {
+    const record = JSON.parse(localStorage.getItem(QUICK_DRAFT_KEY) || "null");
+    if (record && typeof record.text === "string" && record.text && !draft.value) {
+      draft.value = record.text; saveButton.disabled = !draft.value.trim(); say("Восстановлен несохранённый черновик");
+    }
+  } catch {}
+}
+function showCaptureStorageRecoveryNotice() {
+  if (getCaptureStorageStatus().status !== "corrupt") return;
+  const banner = document.createElement("section");
+  banner.className = "linka-recovery-banner"; banner.setAttribute("role", "alert");
+  banner.style.cssText = "display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:12px 0;padding:14px 16px;border:1px solid rgba(230,171,120,.5);border-radius:15px;background:rgba(90,45,24,.3);color:var(--text,#eee);";
+  const copy = document.createElement("div"); copy.style.cssText = "flex:1;min-width:220px;line-height:1.5;font-size:13px;";
+  copy.textContent = "Не удалось прочитать библиотеку. Исходные данные сохранены для восстановления; Linka не будет перезаписывать повреждённое хранилище автоматически.";
+  const download = document.createElement("button"); download.type = "button"; download.className = "ghost"; download.textContent = "Скачать исходные данные";
+  download.addEventListener("click", () => {
+    const recovery = getCaptureRecoveryData();
+    if (!recovery) { say("Резервная копия исходных данных недоступна."); return; }
+    const url = URL.createObjectURL(new Blob([JSON.stringify(recovery, null, 2)], { type: "application/json" }));
+    const anchor = document.createElement("a"); anchor.href = url; anchor.download = "linka-damaged-library-recovery.json";
+    anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+  const importButton = document.createElement("button"); importButton.type = "button"; importButton.className = "primary"; importButton.textContent = "Импортировать резервную копию";
+  importButton.addEventListener("click", () => $("#import-button")?.click());
+  banner.append(copy, download, importButton); form?.parentElement?.insertBefore(banner, form);
 }
 function scheduleCloudSync() {
   if (!getCloudSession()) return;
@@ -91,8 +151,8 @@ async function syncNow({ silent = false } = {}) {
   cloudSyncBusy = true;
   try {
     const result = await syncCloudCaptures(captures, readDeletedIds());
+    if (!saveCaptures(result.captures)) throw new Error("Облачная копия обновлена, но локальное хранилище не изменено. Исходные локальные данные сохранены для восстановления.");
     captures = result.captures;
-    saveCaptures(captures);
     cloudSyncStatus = result.message;
     render();
     if (!silent) say(result.message);
@@ -114,17 +174,12 @@ function compareVersions(a, b) {
   }
   return 0;
 }
-function applyTheme() {
-  themeMode = "dark";
-  document.documentElement.dataset.theme = "dark";
-  try { localStorage.setItem("linka.theme", "dark"); } catch {}
-  window.dispatchEvent(new CustomEvent("linka:theme-changed", { detail: { theme: "dark" } }));
-}
-applyTheme();
-
 function render() {
   for (const id of selectedIds) if (!captures.some(item => item.id === id)) selectedIds.delete(id);
-  const shown = visibleCaptures(captures, activeFilter, search.value);
+  const shown = visibleCaptures(captures, activeFilter, search.value, currentSort);
+  list.classList.toggle("list-view", viewMode === "list");
+  viewToggle.textContent = viewMode === "grid" ? "List view" : "Grid view";
+  viewToggle.setAttribute("aria-pressed", String(viewMode === "list"));
   count.textContent = captures.length + (captures.length === 1 ? " item" : " items");
   selectionButton.textContent = selectionMode ? "Exit selection" : "Select items";
   selectionButton.setAttribute("aria-pressed", String(selectionMode));
@@ -148,6 +203,8 @@ function render() {
     bulkButton("Clear", "clear");
     bulkButton("Pin", "pin");
     bulkButton("Unpin", "unpin");
+    bulkButton("Archive", "archive");
+    bulkButton("Restore", "restore");
     bulkButton("Copy", "copy");
     bulkButton("Export", "export");
     bulkButton("Delete", "delete", true);
@@ -172,7 +229,14 @@ function render() {
     card.style.setProperty("--index", String(index));
     const head = document.createElement("div"); head.className = "item-head";
     const kind = document.createElement("span"); kind.className = "kind";
-    kind.textContent = item.pinned ? "Pinned" : (isLink(item.text) ? "Link" : "Note");
+    kind.textContent = item.archived ? "Archive" : (item.pinned ? "Pinned" : (isLink(item.text) ? "Link" : "Note"));
+    if (item.status && item.status !== "unread") {
+      const statusChip = document.createElement("span");
+      statusChip.className = "kind status-kind";
+      statusChip.textContent = ({ reading: "Reading", done: "Done", deferred: "Later", important: "Important" })[item.status] || item.status;
+      statusChip.style.marginLeft = "6px";
+      head.append(statusChip);
+    }
     if (selectionMode) {
       const selectItem = makeAction(selectedIds.has(item.id) ? "✓ Selected" : "Select", "select", item.id);
       selectItem.setAttribute("aria-pressed", String(selectedIds.has(item.id)));
@@ -192,7 +256,27 @@ function render() {
       cover.addEventListener("error", () => frame.remove(), { once: true }); frame.append(cover); previewBits.push(frame);
     }
     if (isLink(item.text) && item.previewTitle) { const title = document.createElement("p"); title.className = "item-title"; title.textContent = item.previewTitle; previewBits.push(title); }
+    else if (isLink(item.text)) {
+      try {
+        const url = new URL(item.text.trim());
+        const domainTitle = document.createElement("p"); domainTitle.className = "item-title";
+        domainTitle.textContent = url.hostname.replace(/^www\./i, "");
+        previewBits.push(domainTitle);
+      } catch {}
+    }
     if (isLink(item.text) && item.previewDescription) { const description = document.createElement("p"); description.className = "item-description"; description.textContent = item.previewDescription; previewBits.push(description); }
+    if (item.tags?.length) {
+      const tagTray = document.createElement("div");
+      tagTray.className = "item-tags";
+      tagTray.style.cssText = "display:flex;flex-wrap:wrap;gap:6px;margin:8px 0";
+      item.tags.slice(0, 12).forEach(tag => {
+        const chip = document.createElement("span");
+        chip.textContent = "#" + tag;
+        chip.style.cssText = "padding:3px 8px;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:11px";
+        tagTray.append(chip);
+      });
+      previewBits.push(tagTray);
+    }
     if (isLink(item.text)) {
       const url = document.createElement("a");
       url.href = item.text.trim(); url.target = "_blank"; url.rel = "noopener noreferrer";
@@ -202,7 +286,14 @@ function render() {
     const foot = document.createElement("div"); foot.className = "item-foot";
     const date = document.createElement("span"); date.className = "date"; date.textContent = formatDate(item.updatedAt || item.createdAt);
     const actions = document.createElement("div"); actions.className = "actions";
-    actions.append(makeAction("Copy", "copy", item.id), makeAction("Edit", "edit", item.id), makeAction("Delete", "delete", item.id));
+    actions.append(
+      makeAction("Copy", "copy", item.id),
+      makeAction("Edit", "edit", item.id),
+      makeAction(item.archived ? "Restore" : "Archive", "archive", item.id),
+      makeAction("Status", "status", item.id),
+      makeAction("Tags", "tags", item.id),
+      makeAction("Delete", "delete", item.id)
+    );
     if (item.text.length > 240) {
       const expand = makeAction(expandedCards.has(item.id) ? "Show less" : "Read more", "expand", item.id);
       expand.setAttribute("aria-expanded", String(expandedCards.has(item.id)));
@@ -280,7 +371,7 @@ function makeAction(label, action, id) {
   return button;
 }
 function resetEditor() {
-  editingId = null; draft.value = ""; composeLabel.textContent = "Quick capture";
+  editingId = null; draft.value = ""; clearQuickDraft(); composeLabel.textContent = "Quick capture";
   saveButton.innerHTML = 'Save to inbox <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg>';
   saveButton.disabled = true;
 }
@@ -297,6 +388,189 @@ function modalShell(content, { dismissable = false } = {}) {
   modalRoot.replaceChildren(layer);
   return layer;
 }
+function inspectTrash() {
+  return inspectTrashStorage();
+}
+function writeTrash(items) {
+  return saveTrash(items);
+}
+function clearDeletedId(id) {
+  const deleted = readDeletedIds();
+  deleted.delete(id);
+  try {
+    localStorage.setItem(DELETED_IDS_KEY, JSON.stringify([...deleted]));
+    return !readDeletedIds().has(id);
+  } catch { return false; }
+}
+function removeTrashEntry(id) {
+  const current = inspectTrash();
+  if (current.status === "corrupt" || current.status === "unavailable") return false;
+  return writeTrash(current.items.filter(item => item.id !== id));
+}
+function restoreTrashItem(id) {
+  const current = inspectTrash();
+  if (current.status === "corrupt" || current.status === "unavailable") return false;
+  const item = current.items.find(entry => entry.id === id);
+  if (!item) return false;
+  const oldCaptures = captures;
+  const restored = { ...item };
+  delete restored.deletedAt;
+  const nextCaptures = [...captures.filter(entry => entry.id !== id), restored]
+    .sort((a, b) => Number(b.updatedAt || b.createdAt) - Number(a.updatedAt || a.createdAt));
+  if (!saveCaptures(nextCaptures)) return false;
+  if (!clearDeletedId(id)) {
+    saveCaptures(oldCaptures);
+    return false;
+  }
+  captures = nextCaptures;
+  // If quota prevents this write, the restored library copy and Trash copy both remain safe.
+  writeTrash(current.items.filter(entry => entry.id !== id));
+  scheduleCloudSync();
+  render();
+  return true;
+}
+function showTagEditor(item) {
+  const content = document.createElement("div");
+  const head = document.createElement("div"); head.className = "modal-head";
+  const logo = document.createElement("img"); logo.className = "modal-logo"; logo.src = "/linka-mark.svg"; logo.alt = "";
+  const meta = document.createElement("div");
+  const title = document.createElement("h2"); title.textContent = "Edit tags";
+  const subtitle = document.createElement("p"); subtitle.textContent = "Separate tags with commas, for example: design, read-later, project-a.";
+  meta.append(title, subtitle); head.append(logo, meta); content.append(head);
+
+  const label = document.createElement("label"); label.className = "linka-field";
+  const labelText = document.createElement("span"); labelText.textContent = "Tags";
+  const input = document.createElement("input"); input.type = "text"; input.maxLength = 2048;
+  input.value = (item.tags || []).join(", "); input.autocomplete = "off"; input.spellcheck = false;
+  label.append(labelText, input); content.append(label);
+
+  const actions = document.createElement("div"); actions.className = "linka-actions";
+  const cancel = document.createElement("button"); cancel.type = "button"; cancel.className = "ghost"; cancel.textContent = "Cancel";
+  cancel.addEventListener("click", () => modalRoot.replaceChildren());
+  const save = document.createElement("button"); save.type = "button"; save.className = "primary"; save.textContent = "Save tags";
+  save.addEventListener("click", () => {
+    const tags = [...new Set(input.value.split(",").map(tag => tag.trim().toLocaleLowerCase().replace(/\s+/g, "-").slice(0, 40)).filter(Boolean))].slice(0, 50);
+    const next = captures.map(entry => entry.id === item.id ? { ...entry, tags, updatedAt: Date.now() } : entry);
+    if (!saveCaptures(next)) { say("Could not save tags. Your library was left unchanged."); return; }
+    captures = next;
+    scheduleCloudSync();
+    render();
+    modalRoot.replaceChildren();
+    say("Tags saved");
+  });
+  actions.append(cancel, save); content.append(actions);
+  modalShell(content, { dismissable: true });
+  input.focus(); input.select();
+}
+function showStatusEditor(item) {
+  const choices = [
+    ["unread", "Unread"],
+    ["reading", "Reading"],
+    ["done", "Done"],
+    ["deferred", "Read later"],
+    ["important", "Important"]
+  ];
+  const content = document.createElement("div");
+  const head = document.createElement("div"); head.className = "modal-head";
+  const logo = document.createElement("img"); logo.className = "modal-logo"; logo.src = "/linka-mark.svg"; logo.alt = "";
+  const meta = document.createElement("div");
+  const title = document.createElement("h2"); title.textContent = "Reading status";
+  const subtitle = document.createElement("p"); subtitle.textContent = "Track whether you have read, finished, or postponed this material.";
+  meta.append(title, subtitle); head.append(logo, meta); content.append(head);
+  const label = document.createElement("label"); label.className = "linka-field";
+  const labelText = document.createElement("span"); labelText.textContent = "Status";
+  const select = document.createElement("select"); select.className = "linka-select";
+  choices.forEach(([value, name]) => { const option = document.createElement("option"); option.value = value; option.textContent = name; select.append(option); });
+  select.value = choices.some(([value]) => value === item.status) ? item.status : "unread";
+  label.append(labelText, select); content.append(label);
+  const actions = document.createElement("div"); actions.className = "linka-actions";
+  const cancel = document.createElement("button"); cancel.type = "button"; cancel.className = "ghost"; cancel.textContent = "Cancel";
+  cancel.addEventListener("click", () => modalRoot.replaceChildren());
+  const save = document.createElement("button"); save.type = "button"; save.className = "primary"; save.textContent = "Save status";
+  save.addEventListener("click", () => {
+    const next = captures.map(entry => entry.id === item.id ? { ...entry, status: select.value, updatedAt: Date.now() } : entry);
+    if (!saveCaptures(next)) { say("Could not save the status. The previous library is unchanged."); return; }
+    captures = next; scheduleCloudSync(); render(); modalRoot.replaceChildren(); say("Status saved");
+  });
+  actions.append(cancel, save); content.append(actions);
+  modalShell(content, { dismissable: true });
+}
+function showTrashManager() {
+  const current = inspectTrash();
+  const content = document.createElement("div");
+  const head = document.createElement("div"); head.className = "modal-head";
+  const logo = document.createElement("img"); logo.className = "modal-logo"; logo.src = "/linka-mark.svg"; logo.alt = "";
+  const meta = document.createElement("div");
+  const title = document.createElement("h2"); title.textContent = "Trash";
+  const subtitle = document.createElement("p"); subtitle.textContent = "Deleted items stay here until restored or permanently removed.";
+  meta.append(title, subtitle); head.append(logo, meta); content.append(head);
+
+  if (current.status === "corrupt" || current.status === "unavailable") {
+    const warning = document.createElement("p"); warning.className = "linka-muted"; warning.setAttribute("role", "alert");
+    warning.textContent = "Trash could not be read. The original contents were preserved; new changes are disabled until recovery.";
+    content.append(warning);
+    if (current.status === "corrupt") {
+      const recover = document.createElement("button"); recover.type = "button"; recover.className = "ghost"; recover.textContent = "Download recovery data";
+      recover.addEventListener("click", () => {
+        try {
+          const raw = localStorage.getItem(TRASH_RECOVERY_KEY);
+          if (!raw) return;
+          const url = URL.createObjectURL(new Blob([raw], { type: "application/json" }));
+          const anchor = document.createElement("a"); anchor.href = url; anchor.download = "linka-trash-recovery.json"; anchor.click();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } catch {}
+      });
+      content.append(recover);
+    }
+  }
+
+  const rows = document.createElement("div"); rows.className = "trash-list";
+  if (!current.items.length) {
+    const empty = document.createElement("p"); empty.className = "linka-muted"; empty.textContent = "Trash is empty.";
+    rows.append(empty);
+  }
+  current.items.forEach(item => {
+    const row = document.createElement("article"); row.className = "trash-row";
+    row.style.cssText = "display:flex;flex-wrap:wrap;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)";
+    const copy = document.createElement("div"); copy.style.cssText = "flex:1;min-width:180px";
+    const text = document.createElement("p"); text.textContent = item.text.length > 300 ? item.text.slice(0, 300) + "…" : item.text;
+    text.style.cssText = "margin:0 0 6px;overflow-wrap:anywhere";
+    const date = document.createElement("small"); date.className = "linka-muted";
+    date.textContent = new Date(Number(item.deletedAt || Date.now())).toLocaleString();
+    copy.append(text, date);
+    const actions = document.createElement("div"); actions.className = "linka-actions";
+    const restore = document.createElement("button"); restore.type = "button"; restore.className = "ghost"; restore.textContent = "Restore";
+    restore.disabled = current.status === "corrupt" || current.status === "unavailable";
+    restore.addEventListener("click", () => {
+      if (!restoreTrashItem(item.id)) { say("Could not restore the item. Its Trash copy was kept."); return; }
+      modalRoot.replaceChildren(); say("Restored from Trash");
+    });
+    const remove = document.createElement("button"); remove.type = "button"; remove.className = "ghost"; remove.textContent = "Delete permanently";
+    remove.disabled = current.status === "corrupt" || current.status === "unavailable";
+    remove.addEventListener("click", () => {
+      if (!window.confirm("Permanently delete this item? This cannot be undone.")) return;
+      if (!removeTrashEntry(item.id)) { say("Could not update Trash; the original contents were preserved."); return; }
+      modalRoot.replaceChildren(); showTrashManager();
+    });
+    actions.append(restore, remove); row.append(copy, actions); rows.append(row);
+  });
+  content.append(rows);
+
+  const footer = document.createElement("div"); footer.className = "linka-actions";
+  if (current.items.length && current.status !== "corrupt" && current.status !== "unavailable") {
+    const empty = document.createElement("button"); empty.type = "button"; empty.className = "ghost"; empty.textContent = "Empty trash";
+    empty.addEventListener("click", () => {
+      if (!window.confirm("Permanently remove every item in Trash?")) return;
+      if (!writeTrash([])) { say("Could not empty Trash. The original data was preserved."); return; }
+      modalRoot.replaceChildren(); showTrashManager();
+    });
+    footer.append(empty);
+  }
+  const close = document.createElement("button"); close.type = "button"; close.className = "primary"; close.textContent = "Close";
+  close.addEventListener("click", () => modalRoot.replaceChildren());
+  footer.append(close); content.append(footer);
+  modalShell(content, { dismissable: true });
+}
 function addTermsBody(container) {
   const head = document.createElement("div"); head.className = "modal-head";
   const logo = document.createElement("img"); logo.className = "modal-logo"; logo.src = "/linka-mark.svg"; logo.alt = "";
@@ -307,7 +581,7 @@ function addTermsBody(container) {
   const body = document.createElement("div");
   const sections = [
     ["Your data stays local", "Captures live in this browser profile or local app storage. Browser resets, cleared data, device loss or uninstallation may erase them. Keep an export backup."],
-    ["Optional cloud sync", "Войти to the same Linka account on Android, Windows and the web to sync your library. Local storage and manual export/import remain available even when you are offline. Sync needs a configured shared Supabase project; never enter a service-role or secret key into the app."],
+    ["Optional cloud sync", "Sign in to the same Linka account on Windows and Web to sync your library. Local storage and manual export/import remain available even when you are offline. Sync needs a configured shared Supabase project; never enter a service-role or secret key into the app."],
     ["Use and responsibility", "You are responsible for what you save, protecting your device, and keeping backups. Do not use Linka as the only copy of critical information."],
     ["Links and early access", "Opened links are handled by external apps/sites. Linka is an early-stage utility; features can change and uninterrupted, error-free operation is not guaranteed."],
     ["Acceptable use", "Use Linka lawfully, respect other people’s rights, and avoid saving sensitive information on shared devices."]
@@ -562,127 +836,93 @@ function showCloudSyncНастройки() {
     finally { setBusy(false); }
   }
 }
-async function checkWindowsInstaller(statusLine, downloadLink) {
-  statusLine.textContent = "Проверитьing the latest Linka release…";
-  downloadLink.hidden = true;
-  try {
-    const response = await fetch("https://api.github.com/repos/anarabbasov2010-eng/Linka/releases/latest", {
-      headers: { Accept: "application/vnd.github+json", "User-Agent": "Linka-Web" }
-    });
-    if (!response.ok) throw new Error(`GitHub returned ${response.status}. Try again later.`);
-    const release = await response.json();
-    const tag = String(release.tag_name || "").replace(/^v/, "");
-    const asset = (release.assets || []).find(item => item.name === "Linka-Windows-x64-setup.exe");
-    if (!asset) {
-      statusLine.textContent = "The Windows installer for this release is still being built. Проверить again shortly.";
-      return;
-    }
-    downloadLink.href = asset.browser_download_url;
-    downloadLink.hidden = false;
-    downloadLink.textContent = desktopBuildVersion && compareVersions(tag, desktopBuildVersion) > 0
-      ? `Скачать update ${tag}`
-      : "Скачать Windows installer";
-    if (desktopBuildVersion && compareVersions(tag, desktopBuildVersion) <= 0) {
-      statusLine.textContent = `Приложение для Windows version ${desktopBuildVersion} is current. You can reinstall the latest installer over the existing copy.`;
-    } else {
-      statusLine.textContent = `Linka Windows ${tag} is available. Run the installer over your existing copy to update it.`;
-    }
-  } catch (error) {
-    statusLine.textContent = error?.message || "Не удалось проверить обновления Windows.";
-  }
-}
-
-function showНастройки() {
-  const content=document.createElement("div");
-  const head=document.createElement("div"); head.className="modal-head";
-  const logo=document.createElement("img"); logo.className="modal-logo"; logo.src="/linka-mark.svg"; logo.alt="";
-  const meta=document.createElement("div"); const title=document.createElement("h2"); title.textContent="Настройки";
-  const sub=document.createElement("p"); sub.textContent="Настрой Linka под себя"; meta.append(title,sub); head.append(logo,meta); content.append(head);
-  function addChoiceSetting(titleText, descriptionText, options, selectedValue, onSelect, ariaLabel) {
-    const row = document.createElement("div"); row.className = "setting-row visual-setting-row";
-    const meta = document.createElement("div");
-    const title = document.createElement("strong"); title.textContent = titleText;
-    const description = document.createElement("p"); description.textContent = descriptionText;
-    meta.append(title, description);
-    const group = document.createElement("div"); group.className = "theme-options"; group.setAttribute("aria-label", ariaLabel || titleText);
-    options.forEach(option => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "theme-option" + (selectedValue === option.value ? " active" : "");
-      button.textContent = option.label;
-      if (option.color) button.style.setProperty("--option-color", option.color);
-      button.addEventListener("click", () => {
-        onSelect(option.value);
-        group.querySelectorAll("button").forEach(node => node.classList.toggle("active", node === button));
-      });
-      group.append(button);
-    });
-    row.append(meta, group); content.append(row);
-  }
-  addChoiceSetting("Плотность интерфейса", "Больше пространства или больше содержимого", [
-    {value:"compact",label:"Компактно"},
-    {value:"standard",label:"Стандарт"},
-    {value:"spacious",label:"Свободно"}
-  ], localStorage.getItem("linka.density") || "standard", setLinkaDensity, "Interface density");
-  const motionRow=document.createElement("div"); motionRow.className="setting-row";
-  const motionMeta=document.createElement("div"); const mt=document.createElement("strong"); mt.textContent="Меньше анимации";
-  const md=document.createElement("p"); md.textContent="Уменьшает движение и переходы интерфейса"; motionMeta.append(mt,md);
-  const toggle=document.createElement("button"); toggle.type="button"; toggle.className="toggle"; toggle.setAttribute("aria-pressed",String(reduceMotion)); toggle.setAttribute("aria-label","Toggle reduced motion");
-  const knob=document.createElement("span"); toggle.append(knob);
-  toggle.addEventListener("click",()=>{reduceMotion=!reduceMotion;localStorage.setItem("linka.reduceMotion",String(reduceMotion));toggle.setAttribute("aria-pressed",String(reduceMotion));document.documentElement.classList.toggle("reduced-motion",reduceMotion);});
-  motionRow.append(motionMeta,toggle);content.append(motionRow);
-  if(reduceMotion)document.documentElement.classList.add("reduced-motion");
-  const cloudRow=document.createElement("div"); cloudRow.className="setting-row";
-  const cloudMeta=document.createElement("div");
-  const cloudTitle=document.createElement("strong"); cloudTitle.textContent="Облачная синхронизация";
-  const cloudDesc=document.createElement("p"); const cloudSession=getCloudSession();
-  cloudDesc.textContent=cloudSession ? `Connected as ${cloudSession.email || "your account"} · ${cloudSyncStatus || "sync across your devices"}` : "Синхронизируй ссылки и заметки между Android, Windows и сайтом";
-  cloudMeta.append(cloudTitle,cloudDesc);
-  const cloudButton=document.createElement("button"); cloudButton.type="button"; cloudButton.className="ghost"; cloudButton.textContent=cloudSession?"Manage":"Set up";
-  cloudButton.addEventListener("click",()=>{modalRoot.replaceChildren();showCloudSyncНастройки();});
-  cloudRow.append(cloudMeta,cloudButton);content.append(cloudRow);
-
-  const windowsRow=document.createElement("div"); windowsRow.className="setting-row";
-  const windowsMeta=document.createElement("div");
-  const windowsTitle=document.createElement("strong"); windowsTitle.textContent="Приложение для Windows";
-  const windowsDesc=document.createElement("p"); windowsDesc.textContent=desktopBuildVersion ? `Installed version ${desktopBuildVersion}. Updates install over the existing app.` : "Проверить the latest Windows installer or update your existing desktop app.";
-  windowsMeta.append(windowsTitle,windowsDesc);
-  const windowsControls=document.createElement("div"); windowsControls.className="windows-update-controls";
-  const windowsПроверить=document.createElement("button"); windowsПроверить.type="button"; windowsПроверить.className="ghost"; windowsПроверить.textContent="Проверить";
-  const windowsСкачать=document.createElement("a"); windowsСкачать.className="primary"; windowsСкачать.textContent="Скачать"; windowsСкачать.target="_blank"; windowsСкачать.rel="noopener noreferrer"; windowsСкачать.hidden=true;
-  windowsControls.append(windowsПроверить,windowsСкачать);
-  windowsRow.append(windowsMeta,windowsControls);content.append(windowsRow);
-  const windowsStatus=document.createElement("p"); windowsStatus.className="cloud-status"; windowsStatus.textContent="Проверить release status before downloading an installer.";
-  content.append(windowsStatus);
-  windowsПроверить.addEventListener("click",()=>{void checkWindowsInstaller(windowsStatus,windowsСкачать);});
-
-  const atmosphereRow=document.createElement("div"); atmosphereRow.className="setting-row";
-  const atmosphereMeta=document.createElement("div"); const atmosphereTitle=document.createElement("strong"); atmosphereTitle.textContent="Атмосфера и музыка";
-  const atmosphereDesc=document.createElement("p"); atmosphereDesc.textContent="Лесной фон, плёночное зерно, свой трек и плейлист";
-  atmosphereMeta.append(atmosphereTitle,atmosphereDesc);
-  const atmosphereOpen=document.createElement("button"); atmosphereOpen.type="button"; atmosphereOpen.className="ghost"; atmosphereOpen.textContent="Настроить";
-  atmosphereOpen.addEventListener("click",()=>{modalRoot.replaceChildren();openAtmosphereSettings();});
-  atmosphereRow.append(atmosphereMeta,atmosphereOpen); content.append(atmosphereRow);
-  const agreementRow=document.createElement("div"); agreementRow.className="setting-row";
-  const am=document.createElement("div"); const at=document.createElement("strong");at.textContent="Пользовательское соглашение";const ap=document.createElement("p");ap.textContent="Review the local-storage and privacy terms";am.append(at,ap);
-  const view=document.createElement("button");view.type="button";view.className="ghost";view.textContent="Читать условия";
-  view.addEventListener("click",()=>{modalRoot.replaceChildren();showAgreement({mustAccept:false});});
-  agreementRow.append(am,view);content.append(agreementRow);
-  const actions=document.createElement("div");actions.className="modal-actions";const close=document.createElement("button");close.type="button";close.className="primary";close.textContent="Готово";close.addEventListener("click",()=>modalRoot.replaceChildren());actions.append(close);content.append(actions);
-  const layer=modalShell(content,{dismissable:true});
-  const priorFocus=document.activeElement;
-  layer.querySelector("button")?.focus();
-}
-draft.addEventListener("input",()=>{saveButton.disabled=!draft.value.trim();});
+showCaptureStorageRecoveryNotice();
+restoreQuickDraft();
+draft.addEventListener("input",()=>{saveButton.disabled=!draft.value.trim();saveQuickDraft();});
 draft.addEventListener("keydown",event=>{if((event.ctrlKey||event.metaKey)&&event.key==="Enter"&&draft.value.trim()){event.preventDefault();form.requestSubmit();}});
 form.addEventListener("submit",event=>{
-  event.preventDefault();const text=draft.value.trim();if(!text)return;
+  event.preventDefault();
+  const text=draft.value.trim(); if(!text)return;
+  const previousCaptures=captures.slice();
   const existing=editingId?captures.find(item=>item.id===editingId):null;
-  if(existing){captures=captures.map(item=>item.id===editingId?{...item,text:text.slice(0,100000),updatedAt:Date.now()}:item);say("Запись обновлена");}
-  else{captures.unshift(makeCapture(text));say("Сохранено на этом устройстве");window.dispatchEvent(new CustomEvent("linka:capture-saved",{detail:{title:"Saved to Linka",body:text.slice(0,140)}}));}
-  persist();resetEditor();render();
+
+  if(!existing){
+    const batch=splitCaptureBatch(text);
+    if(batch && batch.length>1){
+      const known=new Set(captures.map(item=>canonicalizeCaptureUrl(item.text)).filter(Boolean));
+      const unique=new Map();
+      for(const url of batch){
+        const key=canonicalizeCaptureUrl(url);
+        if(key && !known.has(key) && !unique.has(key)) unique.set(key,url);
+      }
+      const duplicates=batch.length-unique.size;
+      if(!unique.size){say("All links in this block already appear in your library.");return;}
+      const prompt=`Save ${unique.size} new links as separate entries?${duplicates ? ` ${duplicates} duplicate or already-saved link(s) will be skipped.` : ""}`;
+      if(!window.confirm(prompt))return;
+      captures=[...Array.from(unique.values(),url=>makeCapture(url)),...captures];
+      if(!persist()){captures=previousCaptures;render();return;}
+      resetEditor();render();say(`Saved ${unique.size} links`);return;
+    }
+    const key=canonicalizeCaptureUrl(text);
+    if(key && captures.some(item=>canonicalizeCaptureUrl(item.text)===key)){
+      if(!window.confirm("This link appears to be already saved. Save another copy anyway?"))return;
+    }
+  }
+
+  if(existing){captures=captures.map(item=>item.id===editingId?{...item,text,updatedAt:Date.now()}:item);}
+  else{captures.unshift(makeCapture(text));}
+  if(!persist()){captures=previousCaptures;render();return;}
+  if(existing) say("Запись обновлена");
+  else window.dispatchEvent(new CustomEvent("linka:capture-saved",{detail:{title:"Saved to Linka",body:text.slice(0,140)}}));
+  resetEditor();render();
 });
-search.addEventListener("input",render);
+const searchHistoryList = document.createElement("datalist");
+searchHistoryList.id = "linka-search-history";
+search.setAttribute("list", searchHistoryList.id);
+search.insertAdjacentElement("afterend", searchHistoryList);
+let searchHistoryTimer = null;
+function readSearchHistory() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed.filter(value => typeof value === "string" && value.trim()).slice(0, 10) : [];
+  } catch { return []; }
+}
+function renderSearchHistory() {
+  searchHistoryList.replaceChildren();
+  readSearchHistory().forEach(value => {
+    const option = document.createElement("option");
+    option.value = value;
+    searchHistoryList.append(option);
+  });
+}
+function rememberSearch(query) {
+  const value = String(query || "").trim();
+  if (value.length < 2) return;
+  const history = [value, ...readSearchHistory().filter(entry => entry.toLocaleLowerCase() !== value.toLocaleLowerCase())].slice(0, 10);
+  try { localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(history)); } catch {}
+  renderSearchHistory();
+}
+search.addEventListener("input", () => {
+  render();
+  if (searchHistoryTimer) clearTimeout(searchHistoryTimer);
+  searchHistoryTimer = setTimeout(() => rememberSearch(search.value), 550);
+});
+renderSearchHistory();
+sortSelect.addEventListener("change", () => {
+  currentSort = ["recent", "oldest", "title", "domain", "longest"].includes(sortSelect.value) ? sortSelect.value : "recent";
+  try { localStorage.setItem(SORT_PREFERENCE_KEY, currentSort); } catch {}
+  render();
+});
+viewToggle.addEventListener("click", () => {
+  viewMode = viewMode === "grid" ? "list" : "grid";
+  try { localStorage.setItem(VIEW_PREFERENCE_KEY, viewMode); } catch {}
+  render();
+});
+clearSearchHistoryButton.addEventListener("click", () => {
+  try { localStorage.removeItem(SEARCH_HISTORY_KEY); } catch {}
+  renderSearchHistory();
+  say("Search history cleared");
+});
 filters.forEach(button=>button.addEventListener("click",()=>{
   activeFilter=button.dataset.filter;filters.forEach(item=>item.classList.toggle("active",item===button));render();
 }));
@@ -709,6 +949,12 @@ bulkToolbar.addEventListener("click", async event => {
     captures = captures.map(item => selectedIds.has(item.id) ? { ...item, pinned, updatedAt: now } : item);
     persist(); render(); say(pinned ? "Selected items pinned" : "Selected items unpinned"); return;
   }
+  if (action === "archive" || action === "restore") {
+    const archived = action === "archive", now = Date.now();
+    captures = captures.map(item => selectedIds.has(item.id) ? { ...item, archived, updatedAt: now } : item);
+    selectedIds.clear(); selectionMode = false;
+    persist(); render(); say(archived ? "Moved to Archive" : "Restored from Archive"); return;
+  }
   if (action === "copy") {
     const value = selected.map(item => item.text).join("\n\n");
     try { await navigator.clipboard.writeText(value); say("Copied " + selected.length + " selected item(s)"); }
@@ -731,12 +977,11 @@ bulkToolbar.addEventListener("click", async event => {
     say("Exported " + selected.length + " selected item(s)"); return;
   }
   if (action === "delete") {
-    if (!window.confirm("Delete " + selected.length + " selected item(s)? This cannot be undone from this dialog.")) return;
-    selected.forEach(item => addDeletedId(item.id));
-    captures = captures.filter(item => !selectedIds.has(item.id));
+    if (!window.confirm("Move " + selected.length + " selected item(s) to Trash? You can restore them later.")) return;
+    if (!moveCapturesToTrash(selected)) { say("Could not safely move items to Trash. The library is unchanged."); return; }
     selectedIds.clear(); selectionMode = false;
     if (editingId && !captures.some(item => item.id === editingId)) resetEditor();
-    persist(); render(); say("Selected items deleted");
+    render(); say("Moved selected items to Trash");
   }
 });
 list.addEventListener("click",async event=>{
@@ -750,21 +995,20 @@ list.addEventListener("click",async event=>{
   const item=captures.find(entry=>entry.id===id);if(!item)return;
   if(action==="expand"){if(expandedCards.has(id))expandedCards.delete(id);else expandedCards.add(id);render();}
   else if(action==="pin"){captures=captures.map(entry=>entry.id===id?{...entry,pinned:!entry.pinned,updatedAt:Date.now()}:entry);persist();render();say(item.pinned?"Откреплено":"Закреплено");}
+  else if(action==="archive"){
+    const archived=!item.archived;
+    captures=captures.map(entry=>entry.id===id?{...entry,archived,updatedAt:Date.now()}:entry);
+    persist();render();say(archived?"Moved to Archive":"Restored from Archive");
+  }
+  else if(action==="tags"){showTagEditor(item);}
+  else if(action==="status"){showStatusEditor(item);}
   else if(action==="delete"){
-    addDeletedId(id);
-    captures=captures.filter(entry=>entry.id!==id);
+    if(!moveCapturesToTrash([item])){say("Could not safely move this item to Trash. The library is unchanged.");return;}
     if(editingId===id)resetEditor();
-    persist();render();say("Запись удалена");
+    say("Moved to Trash");
     window.dispatchEvent(new CustomEvent("linka:toast", { detail: {
-      message: "Запись удалена",
-      actionLabel: "Отменить",
-      onAction: () => {
-        const deleted = readDeletedIds();
-        deleted.delete(id);
-        try { localStorage.setItem("linka.deletedIds.v1", JSON.stringify(Array.from(deleted))); } catch {}
-        captures = [...captures.filter(entry => entry.id !== id), item].sort((a,b) => b.updatedAt - a.updatedAt).slice(0,1000);
-        persist(); render(); say("Удаление отменено");
-      }
+      message: "Moved to Trash", actionLabel: "Restore",
+      onAction: () => { if (!restoreTrashItem(id)) { say("Could not restore this item. Its Trash copy remains safe."); return; } say("Restored from Trash"); }
     }}));
   }
   else if(action==="edit"){editingId=id;draft.value=item.text;composeLabel.textContent="Edit capture";saveButton.textContent="Save changes ↗";saveButton.disabled=false;draft.focus();window.scrollTo({top:0,behavior:"smooth"});}
@@ -779,10 +1023,14 @@ $("#import-file").addEventListener("change",async event=>{
   const file=event.target.files?.[0];if(!file)return;
   try{const parsed=JSON.parse(await file.text());const imported=Array.isArray(parsed)?parsed:parsed.captures;if(!Array.isArray(imported))throw new Error("Invalid file");
     const normalized=imported.map(item=>makeCapture(item.text,item)).filter(Boolean);const restoredIds=new Set(normalized.map(item=>item.id));const deleted=readDeletedIds();restoredIds.forEach(id=>deleted.delete(id));try{localStorage.setItem("linka.deletedIds.v1",JSON.stringify(Array.from(deleted)));}catch{}const map=new Map(captures.map(item=>[item.id,item]));normalized.forEach(item=>map.set(item.id,item));
-    captures=Array.from(map.values()).sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,1000);persist();render();say("Imported "+normalized.length+" capture(s)");
+    const previousCaptures=captures;
+    captures=Array.from(map.values()).sort((a,b)=>b.updatedAt-a.updatedAt);
+    if(!persist({allowReplaceCorrupt:true})){captures=previousCaptures;render();say("Не удалось импортировать резервную копию. Исходная библиотека сохранена.");return;}
+    render();say("Imported "+normalized.length+" capture(s)");
   }catch{say("Этот файл не похож на экспорт Linka");}finally{event.target.value="";}
 });
-$("#settings-button").addEventListener("click",showНастройки);
+window.addEventListener("linka:open-cloud-settings",()=>{modalRoot.replaceChildren();showCloudSyncНастройки();});
+window.addEventListener("linka:open-atmosphere-settings", () => openAtmosphereSettings());
 $("#search-space-button").addEventListener("click",()=>showSearchSpace(search.value));
 document.addEventListener("keydown",event=>{
   if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="k"){

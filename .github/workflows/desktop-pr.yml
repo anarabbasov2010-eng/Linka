@@ -39,6 +39,28 @@ jobs:
       - name: Build Windows installer
         working-directory: apps/desktop
         run: npm run build
+      - name: Smoke-test Windows desktop startup
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:GITHUB_WORKSPACE "apps/desktop/src-tauri/target/release/linka-desktop.exe"
+          if (-not (Test-Path $exe)) { throw "The built Linka executable was not found at $exe" }
+          $process = Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe) -PassThru
+          Start-Sleep -Seconds 8
+          $process.Refresh()
+          if ($process.HasExited) {
+            $diagnosticPaths = @(
+              (Join-Path $env:LOCALAPPDATA "Linka\logs\startup.log"),
+              (Join-Path $env:TEMP "Linka\startup.log")
+            )
+            foreach ($logPath in $diagnosticPaths) {
+              if (Test-Path $logPath) {
+                Write-Host "---- Linka startup diagnostics: $logPath ----"
+                Get-Content -Raw $logPath
+              }
+            }
+            throw "Linka exited during the startup smoke test (exit code $($process.ExitCode))."
+          }
+          Stop-Process -Id $process.Id -Force
       - name: Save preview installer
         uses: actions/upload-artifact@v4
         with:
