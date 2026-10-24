@@ -85,6 +85,53 @@ function say(message) {
 function showCaptureRecoveryNotice() {
   const recovery = getCaptureRecovery();
   if (!recovery || recovery.acknowledged || document.getElementById("linka-capture-recovery")) return;
+  const language = (() => { try { return localStorage.getItem("linka.language.v1") || "ru"; } catch { return "ru"; } })();
+  const copy = ({
+    ru: {
+      title: "Не удалось прочитать библиотеку Linka",
+      body: "Исходные данные не заменены. Запись новых изменений заблокирована, чтобы не перезаписать библиотеку. Сначала экспортируй повреждённые данные для восстановления.",
+      export: "Экспортировать исходные данные", fresh: "Начать с пустой библиотекой",
+      exportDone: "Исходные данные экспортированы. Сохрани файл до продолжения работы.",
+      confirmFresh: "Сначала экспортируй исходные данные. Linka сохранит их локально для диагностики, но создаст новую пустую библиотеку. Продолжить?",
+      freshFailed: "Не удалось безопасно сохранить исходные данные. Экспортируй их и проверь свободное место в хранилище.",
+      freshDone: "Создана новая библиотека. Повреждённые исходные данные сохранены отдельно."
+    },
+    en: {
+      title: "Linka could not read the library",
+      body: "The original data has not been replaced. Writes are paused to prevent overwriting the library. Export the damaged data before continuing.",
+      export: "Export original data", fresh: "Start with an empty library",
+      exportDone: "Original data exported. Keep the file before continuing.",
+      confirmFresh: "Export the original data first. Linka will retain it locally for recovery and create a new empty library. Continue?",
+      freshFailed: "Could not safely preserve the original data. Export it and check available storage.",
+      freshDone: "A new library was created. The original data is preserved separately."
+    },
+    az: {
+      title: "Linka kitabxananı oxuya bilmədi",
+      body: "Orijinal məlumatlar dəyişdirilməyib. Kitabxananın üzərinə yazılmaması üçün yeni yazılar dayandırılıb. Davam etməzdən əvvəl zədələnmiş məlumatları ixrac et.",
+      export: "Orijinal məlumatları ixrac et", fresh: "Boş kitabxana yarat",
+      exportDone: "Orijinal məlumatlar ixrac edildi. Davam etməzdən əvvəl faylı saxla.",
+      confirmFresh: "Əvvəlcə orijinal məlumatları ixrac et. Linka onları bərpa üçün cihazda saxlayacaq və yeni boş kitabxana yaradacaq. Davam edilsin?",
+      freshFailed: "Orijinal məlumatları təhlükəsiz saxlamaq mümkün olmadı. Onları ixrac et və yaddaş yerini yoxla.",
+      freshDone: "Yeni kitabxana yaradıldı. Orijinal məlumatlar ayrıca saxlanılır."
+    },
+    tr: {
+      title: "Linka kitaplığı okuyamadı",
+      body: "Özgün veriler değiştirilmedi. Kitaplığın üzerine yazılmasını önlemek için yeni kayıtlar duraklatıldı. Devam etmeden önce bozuk verileri dışa aktar.",
+      export: "Özgün verileri dışa aktar", fresh: "Boş kitaplık oluştur",
+      exportDone: "Özgün veriler dışa aktarıldı. Devam etmeden önce dosyayı sakla.",
+      confirmFresh: "Önce özgün verileri dışa aktar. Linka bunları kurtarma için cihazda saklayıp yeni boş bir kitaplık oluşturacak. Devam edilsin mi?",
+      freshFailed: "Özgün veriler güvenli biçimde korunamadı. Verileri dışa aktar ve kullanılabilir alanı kontrol et.",
+      freshDone: "Yeni kitaplık oluşturuldu. Özgün veriler ayrı olarak korundu."
+    }
+  })[language] || {
+    title: "Linka could not read the library",
+    body: "The original data has not been replaced. Writes are paused to prevent overwriting the library. Export the damaged data before continuing.",
+    export: "Export original data", fresh: "Start with an empty library",
+    exportDone: "Original data exported. Keep the file before continuing.",
+    confirmFresh: "Export the original data first. Linka will retain it locally for recovery and create a new empty library. Continue?",
+    freshFailed: "Could not safely preserve the original data. Export it and check available storage.",
+    freshDone: "A new library was created. The original data is preserved separately."
+  };
 
   const panel = document.createElement("section");
   panel.id = "linka-capture-recovery";
@@ -94,10 +141,10 @@ function showCaptureRecoveryNotice() {
   panel.style.cssText = "position:fixed;z-index:10000;top:14px;left:50%;transform:translateX(-50%);width:min(680px,calc(100vw - 28px));padding:18px;border:1px solid #d5a15d;border-radius:16px;background:#1b1711;color:#fff7e8;box-shadow:0 18px 70px #0009;font:13px/1.55 system-ui,sans-serif";
   const title = document.createElement("h2");
   title.id = "linka-capture-recovery-title";
-  title.textContent = "Не удалось прочитать библиотеку Linka";
+  title.textContent = copy.title;
   title.style.cssText = "margin:0 0 8px;font-size:17px;line-height:1.3";
   const description = document.createElement("p");
-  description.textContent = "Исходные данные не заменены. Запись новых изменений заблокирована, чтобы не перезаписать библиотеку. Сначала экспортируй повреждённые данные для восстановления.";
+  description.textContent = copy.body;
   description.style.cssText = "margin:0 0 14px;color:#f0dfc3";
   const actions = document.createElement("div");
   actions.style.cssText = "display:flex;flex-wrap:wrap;gap:8px";
@@ -109,7 +156,7 @@ function showCaptureRecoveryNotice() {
     actions.append(item);
     return item;
   };
-  const exportButton = button("Экспортировать исходные данные", true);
+  const exportButton = button(copy.export, true);
   exportButton.addEventListener("click", () => {
     const blob = new Blob([recovery.raw], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -118,20 +165,20 @@ function showCaptureRecoveryNotice() {
     link.download = "linka-capture-recovery.txt";
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
-    say("Исходные данные экспортированы. Сохрани файл до продолжения работы.");
+    say(copy.exportDone);
   });
-  const freshButton = button("Начать с пустой библиотекой");
+  const freshButton = button(copy.fresh);
   freshButton.addEventListener("click", () => {
-    if (!window.confirm("Сначала экспортируй исходные данные. Linka сохранит их локально для диагностики, но создаст новую пустую библиотеку. Продолжить?")) return;
+    if (!window.confirm(copy.confirmFresh)) return;
     if (!startFreshCaptureLibrary()) {
-      say("Не удалось безопасно сохранить исходные данные. Экспортируй их и проверь свободное место в хранилище.");
+      say(copy.freshFailed);
       return;
     }
     captures = [];
     persistedCaptures = [];
     panel.remove();
     render();
-    say("Создана новая библиотека. Повреждённые исходные данные сохранены отдельно.");
+    say(copy.freshDone);
   });
   panel.append(title, description, actions);
   document.body.append(panel);
