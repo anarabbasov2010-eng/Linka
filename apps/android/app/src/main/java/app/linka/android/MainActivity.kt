@@ -582,7 +582,8 @@ private fun localizeUpdateNotes(raw: String, lang: String): String {
             }
             else -> null
         }
-        if (translated != null && translated !in lines) lines += translated
+        val displayLine = translated ?: line
+        if (displayLine !in lines) lines += displayLine
     }
     if (lines.isEmpty()) {
         return when (lang) {
