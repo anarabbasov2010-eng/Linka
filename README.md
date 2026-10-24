@@ -20,7 +20,7 @@ Linka includes a separate text editor with local autosave, recoverable drafts, r
 
 ## Atmosphere and music
 
-The workspace supports three themes — Forest Studio, Carbon Glass and Paper & Ink — plus six accent palettes, configurable glass transparency, interface density and atmosphere intensity. Forest remains the signature look, with a static fallback when the background video is unavailable. Choose a personal background image/video or local audio files in Atmosphere settings; personal media stays on the current device. Large text skips per-character DOM animation. Translucency is deliberately restrained where expensive blur would hurt performance.
+The workspace supports three themes — Forest Studio, Carbon Glass and Paper & Ink — plus six accent palettes, configurable glass transparency, interface density and atmosphere intensity. Library controls also provide five sort modes, recent-search suggestions and a persistent grid/list layout preference. Forest remains the signature look, with a static fallback when the background video is unavailable. Choose a personal background image/video or local audio files in Atmosphere settings; personal media stays on the current device. Large text skips per-character DOM animation. Translucency is deliberately restrained where expensive blur would hurt performance.
 
 ## Downloads
 

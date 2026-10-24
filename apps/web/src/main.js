@@ -15,11 +15,17 @@ import { inspectTrashStorage, saveTrash, TRASH_KEY, TRASH_RECOVERY_KEY, MAX_TRAS
 
 const $ = selector => document.querySelector(selector);
 const QUICK_DRAFT_KEY = "linka.quickDraft.v1";
+const SEARCH_HISTORY_KEY = "linka.searchHistory.v1";
+const SORT_PREFERENCE_KEY = "linka.sort.v1";
+const VIEW_PREFERENCE_KEY = "linka.viewMode.v1";
 const form = $("#capture-form");
 const draft = $("#capture-text");
 const saveButton = $("#save-button");
 const list = $("#capture-list");
 const search = $("#search");
+const sortSelect = $("#sort-select");
+const viewToggle = $("#view-toggle");
+const clearSearchHistoryButton = $("#clear-search-history");
 const count = $("#capture-count");
 const status = $("#status");
 const composeLabel = $("#compose-label");
@@ -62,6 +68,15 @@ Linka is a personal inbox for saving text and links on the device or browser pro
 
 By selecting “I agree”, you confirm that you have read these terms and understand local storage, optional cloud synchronization and the need to keep backups. This notice is an in-app product agreement, not a substitute for professional legal advice.`;
 let captures = loadCaptures();
+let currentSort = "recent";
+let viewMode = "grid";
+try {
+  const savedSort = localStorage.getItem(SORT_PREFERENCE_KEY);
+  if (["recent", "oldest", "title", "domain", "longest"].includes(savedSort)) currentSort = savedSort;
+  const savedView = localStorage.getItem(VIEW_PREFERENCE_KEY);
+  if (savedView === "list" || savedView === "grid") viewMode = savedView;
+} catch {}
+sortSelect.value = currentSort;
 let activeFilter = "all";
 let editingId = null;
 let statusTimer = null;
@@ -161,7 +176,10 @@ function compareVersions(a, b) {
 }
 function render() {
   for (const id of selectedIds) if (!captures.some(item => item.id === id)) selectedIds.delete(id);
-  const shown = visibleCaptures(captures, activeFilter, search.value);
+  const shown = visibleCaptures(captures, activeFilter, search.value, currentSort);
+  list.classList.toggle("list-view", viewMode === "list");
+  viewToggle.textContent = viewMode === "grid" ? "List view" : "Grid view";
+  viewToggle.setAttribute("aria-pressed", String(viewMode === "list"));
   count.textContent = captures.length + (captures.length === 1 ? " item" : " items");
   selectionButton.textContent = selectionMode ? "Exit selection" : "Select items";
   selectionButton.setAttribute("aria-pressed", String(selectionMode));
@@ -858,7 +876,53 @@ form.addEventListener("submit",event=>{
   else window.dispatchEvent(new CustomEvent("linka:capture-saved",{detail:{title:"Saved to Linka",body:text.slice(0,140)}}));
   resetEditor();render();
 });
-search.addEventListener("input",render);
+const searchHistoryList = document.createElement("datalist");
+searchHistoryList.id = "linka-search-history";
+search.setAttribute("list", searchHistoryList.id);
+search.insertAdjacentElement("afterend", searchHistoryList);
+let searchHistoryTimer = null;
+function readSearchHistory() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed.filter(value => typeof value === "string" && value.trim()).slice(0, 10) : [];
+  } catch { return []; }
+}
+function renderSearchHistory() {
+  searchHistoryList.replaceChildren();
+  readSearchHistory().forEach(value => {
+    const option = document.createElement("option");
+    option.value = value;
+    searchHistoryList.append(option);
+  });
+}
+function rememberSearch(query) {
+  const value = String(query || "").trim();
+  if (value.length < 2) return;
+  const history = [value, ...readSearchHistory().filter(entry => entry.toLocaleLowerCase() !== value.toLocaleLowerCase())].slice(0, 10);
+  try { localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(history)); } catch {}
+  renderSearchHistory();
+}
+search.addEventListener("input", () => {
+  render();
+  if (searchHistoryTimer) clearTimeout(searchHistoryTimer);
+  searchHistoryTimer = setTimeout(() => rememberSearch(search.value), 550);
+});
+renderSearchHistory();
+sortSelect.addEventListener("change", () => {
+  currentSort = ["recent", "oldest", "title", "domain", "longest"].includes(sortSelect.value) ? sortSelect.value : "recent";
+  try { localStorage.setItem(SORT_PREFERENCE_KEY, currentSort); } catch {}
+  render();
+});
+viewToggle.addEventListener("click", () => {
+  viewMode = viewMode === "grid" ? "list" : "grid";
+  try { localStorage.setItem(VIEW_PREFERENCE_KEY, viewMode); } catch {}
+  render();
+});
+clearSearchHistoryButton.addEventListener("click", () => {
+  try { localStorage.removeItem(SEARCH_HISTORY_KEY); } catch {}
+  renderSearchHistory();
+  say("Search history cleared");
+});
 filters.forEach(button=>button.addEventListener("click",()=>{
   activeFilter=button.dataset.filter;filters.forEach(item=>item.classList.toggle("active",item===button));render();
 }));
