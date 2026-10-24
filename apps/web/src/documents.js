@@ -330,6 +330,21 @@ function buildEditorUI() {
   attachImportedFilePicker();
 }
 async function openEditor(documentValue = null) {
+  // Recent documents are opened inside the existing editor. Creating stacked
+  // modal overlays used to trap focus and duplicate the Escape/save lifecycle.
+  if (overlay && titleField && bodyField) {
+    if (!documentValue) { titleField.focus(); return; }
+    await persistCurrent(false);
+    currentDocument = normalizeLinkaDocument(documentValue);
+    titleField.value = currentDocument.title;
+    bodyField.value = currentDocument.text;
+    bodyField.dispatchEvent(new Event("input", { bubbles: true }));
+    setStatus(t("saved"));
+    await storeDocument(currentDocument).catch(() => setStatus(t("failed"), true));
+    await refreshRecentList();
+    bodyField.focus();
+    return;
+  }
   previousFocus = document.activeElement;
   clearTimeout(saveTimer);
   currentDocument = normalizeLinkaDocument(documentValue || { id: uid(), title: t("untitled"), text: "" });
