@@ -1,4 +1,4 @@
-name: Windows installer
+name: Windows desktop release
 on:
   push:
     branches: [main]
@@ -20,45 +20,25 @@ jobs:
         with:
           node-version: 22
       - uses: dtolnay/rust-toolchain@stable
-      - name: Wait for Android release built from this commit
+
+      - name: Set standalone Windows version
         shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $release = $null
-          $commitSha = ""
-          for ($attempt = 1; $attempt -le 30; $attempt++) {
-            $tag = (gh api "repos/$env:GITHUB_REPOSITORY/releases/latest" --jq .tag_name 2>$null)
-            if ($LASTEXITCODE -eq 0 -and $tag) {
-              $tag = $tag.Trim()
-              $ref = gh api "repos/$env:GITHUB_REPOSITORY/git/ref/tags/$tag" | ConvertFrom-Json
-              $targetSha = $ref.object.sha
-              if ($ref.object.type -eq "tag") {
-                $tagObject = gh api "repos/$env:GITHUB_REPOSITORY/git/tags/$($ref.object.sha)" | ConvertFrom-Json
-                $targetSha = $tagObject.object.sha
-              }
-              if ($targetSha -eq $env:GITHUB_SHA) {
-                $release = gh api "repos/$env:GITHUB_REPOSITORY/releases/tags/$tag" | ConvertFrom-Json
-                break
-              }
-            }
-            Write-Host "Waiting for Android release for commit $env:GITHUB_SHA (attempt $attempt/30)..."
-            Start-Sleep -Seconds 15
-          }
-          if (-not $release) { throw "Timed out waiting for the Android release matching this commit. No mismatched Windows installer was published." }
-          $version = $release.tag_name.TrimStart("v")
-          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Unexpected release tag: $($release.tag_name)" }
-          "LINKA_RELEASE_TAG=$($release.tag_name)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $version = "0.5.$env:GITHUB_RUN_NUMBER"
+          $tag = "v$version"
+          "LINKA_RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "VITE_LINKA_DESKTOP_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $configPath = Join-Path $env:GITHUB_WORKSPACE "apps/desktop/src-tauri/tauri.conf.json"
           $config = Get-Content -Raw $configPath | ConvertFrom-Json
           $config.version = $version
           $config | ConvertTo-Json -Depth 100 | Set-Content -Encoding utf8 $configPath
+          Write-Host "Building Linka Windows $version without a mobile release dependency."
+
       - name: Inject public cloud endpoint when configured
         shell: pwsh
         env:
-          LINKA_SUPABASE_URL: ${{ vars.LINKA_SUPABASE_URL }}
-          LINKA_SUPABASE_PUBLISHABLE_KEY: ${{ vars.LINKA_SUPABASE_PUBLISHABLE_KEY }}
+          LINKA_SUPABASE_URL: \${{ vars.LINKA_SUPABASE_URL }}
+          LINKA_SUPABASE_PUBLISHABLE_KEY: \${{ vars.LINKA_SUPABASE_PUBLISHABLE_KEY }}
         run: |
           "LINKA_SUPABASE_URL=$($env:LINKA_SUPABASE_URL)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "LINKA_SUPABASE_PUBLISHABLE_KEY=$($env:LINKA_SUPABASE_PUBLISHABLE_KEY)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
@@ -67,11 +47,12 @@ jobs:
           } else {
             Write-Warning "Linka cloud endpoint is not configured. Local-only mode remains available."
           }
-      - name: Configure signed in-app updater when signing keys are available
+
+      - name: Configure signed Windows updates when signing keys exist
         shell: pwsh
         env:
-          LINKA_UPDATER_PUBLIC_KEY: ${{ vars.LINKA_UPDATER_PUBLIC_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          LINKA_UPDATER_PUBLIC_KEY: \${{ vars.LINKA_UPDATER_PUBLIC_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: \${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: |
           $updaterEnabled = $false
           "LINKA_UPDATER_ENABLED=false" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
@@ -101,24 +82,39 @@ jobs:
           }
           "VITE_LINKA_UPDATER_ENABLED=$($updaterEnabled.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $config | ConvertTo-Json -Depth 100 | Set-Content -Encoding utf8 $configPath
+
       - name: Install web dependencies
         working-directory: apps/web
         run: npm install --no-audit --no-fund
       - name: Install desktop tooling
         working-directory: apps/desktop
         run: npm install --no-audit --no-fund
-      - name: Generate sharp Windows app icons from the Linka vector mark
+      - name: Generate Windows app icons
         working-directory: apps/desktop
         run: npx tauri icon ../web/public/linka-mark.svg --output src-tauri/icons
-      - name: Test web inbox and cloud sync merge
+      - name: Test Web and Windows-shared UI
         working-directory: apps/web
         run: npm test
       - name: Build Windows installer
         working-directory: apps/desktop
         env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          TAURI_SIGNING_PRIVATE_KEY: \${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: \${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run build
+
+      - name: Smoke-test Windows startup
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:GITHUB_WORKSPACE "apps/desktop/src-tauri/target/release/linka-desktop.exe"
+          if (-not (Test-Path $exe)) { throw "The built Linka executable was not found at $exe" }
+          $process = Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe) -PassThru
+          Start-Sleep -Seconds 8
+          $process.Refresh()
+          if ($process.HasExited) {
+            throw "Linka exited during the startup smoke test (exit code $($process.ExitCode))."
+          }
+          Stop-Process -Id $process.Id -Force
+
       - name: Upload Windows installer artifact
         uses: actions/upload-artifact@v4
         with:
@@ -126,29 +122,36 @@ jobs:
           path: apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
           if-no-files-found: error
           retention-days: 30
-      - name: Publish installer to matching Linka release
+
+      - name: Publish Windows-only release
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           files=(apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe)
-          if [[ ! -f "${files[0]:-}" ]]; then
+          if [[ ! -f "\${files[0]:-}" ]]; then
             echo "::error::No Windows NSIS installer was produced."
             exit 1
           fi
-          cp "${files[0]}" Linka-Windows-x64-setup.exe
-          gh release upload "$LINKA_RELEASE_TAG" Linka-Windows-x64-setup.exe --clobber --repo "$GITHUB_REPOSITORY"
-          if [[ "${LINKA_UPDATER_ENABLED:-false}" == "true" ]]; then
+          cp "\${files[0]}" Linka-Windows-x64-setup.exe
+          version="\${LINKA_RELEASE_TAG#v}"
+          if gh release view "$LINKA_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$LINKA_RELEASE_TAG" Linka-Windows-x64-setup.exe --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$LINKA_RELEASE_TAG" Linka-Windows-x64-setup.exe \
+              --title "Linka for Windows $version" \
+              --notes "Linka desktop release $version. Windows and Web only; standalone Windows installer includes the WebView2 bootstrapper."
+          fi
+          if [[ "\${LINKA_UPDATER_ENABLED:-false}" == "true" ]]; then
             bundles=(apps/desktop/src-tauri/target/release/bundle/nsis/*.nsis.zip)
-            if [[ ! -f "${bundles[0]:-}" || ! -f "${bundles[0]}.sig" ]]; then
+            if [[ ! -f "\${bundles[0]:-}" || ! -f "\${bundles[0]}.sig" ]]; then
               echo "::error::Signed updater archive or signature is missing."
               exit 1
             fi
-            updater_zip="${bundles[0]}"
-            signature_file="${updater_zip}.sig"
+            updater_zip="\${bundles[0]}"
+            signature_file="\${updater_zip}.sig"
             signature="$(cat "$signature_file")"
-            version="${LINKA_RELEASE_TAG#v}"
             url="https://github.com/$GITHUB_REPOSITORY/releases/download/$LINKA_RELEASE_TAG/$(basename "$updater_zip")"
             jq -n --arg version "$version" --arg notes "Linka $version" --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg url "$url" --arg signature "$signature" '{
               version: $version,
