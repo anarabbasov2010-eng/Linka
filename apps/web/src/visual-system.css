@@ -432,3 +432,18 @@ body { text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; 
   letter-spacing: .12em;
   text-transform: uppercase;
 }
+
+
+.export-format {
+  min-height: 34px;
+  max-width: 116px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel-solid);
+  color: var(--text);
+  font: inherit;
+  font-size: 10px;
+}
+.export-format:focus-visible { outline: 2px solid color-mix(in srgb,var(--accent) 35%,transparent); outline-offset: 2px; }
+@media (max-width: 680px) { .export-format { flex: 1 1 100px; max-width: none; } }
