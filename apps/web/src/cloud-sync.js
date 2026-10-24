@@ -303,6 +303,9 @@ export async function syncCloudCaptures(localCaptures, localDeletedIds = readDel
     body: JSON.stringify(body)
   });
   await readResponse(upsert);
-  try { localStorage.setItem(DELETED_IDS_KEY, JSON.stringify(body.data.deletedIds)); } catch {}
+  // A delete can happen while the request is in flight. Preserve any newer
+  // local tombstones rather than replacing them with the stale request snapshot.
+  for (const id of readDeletedIds()) deleted.add(id);
+  try { localStorage.setItem(DELETED_IDS_KEY, JSON.stringify(Array.from(deleted))); } catch {}
   return { captures: merged, deletedIds: deleted, session, message: `Synced ${merged.length} items` };
 }
