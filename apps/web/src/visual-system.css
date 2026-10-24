@@ -311,3 +311,44 @@ body { text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; 
   .web-nav-item:hover .web-nav-glyph { transform: none; }
   .item:hover,.primary:hover,.ghost:hover,.icon-btn:hover { transform: none !important; }
 }
+
+
+/* Bulk library management states shared by Web and the Windows Tauri shell. */
+.selection-mode-button.selection-mode-active {
+  color: var(--accent);
+  border-color: color-mix(in srgb,var(--accent) 38%,var(--line-strong));
+  background: color-mix(in srgb,var(--accent) 10%,var(--panel-raised));
+}
+.bulk-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 7px;
+  margin: 0 0 14px; padding: 10px 11px;
+  border: 1px solid var(--line-strong); border-radius: 15px;
+  background: color-mix(in srgb,var(--panel-solid) 88%,transparent);
+  box-shadow: 0 8px 25px rgba(0,0,0,.08);
+}
+.bulk-toolbar[hidden] { display: none !important; }
+.bulk-summary {
+  color: var(--text); font-size: 11px; font-weight: 700;
+  padding: 0 7px; margin-right: auto; font-variant-numeric: tabular-nums;
+}
+.bulk-toolbar .action {
+  border-color: var(--line); background: var(--panel);
+  min-height: 34px; font-size: 10px;
+}
+.bulk-toolbar .bulk-danger {
+  color: #e78686; border-color: color-mix(in srgb,#e78686 30%,var(--line));
+}
+.item.is-selected {
+  border-color: color-mix(in srgb,var(--accent) 62%,var(--line-strong));
+  background: linear-gradient(145deg,color-mix(in srgb,var(--accent) 8%,transparent),transparent 70%),var(--panel);
+  box-shadow: 0 0 0 1px color-mix(in srgb,var(--accent) 13%,transparent), 0 13px 36px rgba(0,0,0,.12);
+}
+.item.is-selected .kind::before {
+  box-shadow: 0 0 0 4px color-mix(in srgb,var(--accent) 10%,transparent);
+}
+@media(max-width:760px) {
+  .bulk-toolbar { padding: 9px; gap: 6px; border-radius: 13px; }
+  .bulk-summary { flex-basis: 100%; padding-bottom: 4px; }
+  .bulk-toolbar .action { flex: 1 1 26%; min-height: 38px; }
+  .selection-mode-button { min-height: 40px; }
+}
