@@ -724,7 +724,14 @@ bulkToolbar.addEventListener("click", async event => {
   if (action === "copy") {
     const value = selected.map(item => item.text).join("\n\n");
     try { await navigator.clipboard.writeText(value); say("Copied " + selected.length + " selected item(s)"); }
-    catch { draft.value = value; draft.focus(); draft.select(); say("Selected text is ready to copy"); }
+    catch {
+      const fallback = document.createElement("textarea");
+      fallback.value = value; fallback.setAttribute("readonly", ""); fallback.style.position = "fixed";
+      fallback.style.opacity = "0"; document.body.append(fallback); fallback.select();
+      const copied = (() => { try { return document.execCommand("copy"); } catch { return false; } })();
+      fallback.remove();
+      say(copied ? "Copied " + selected.length + " selected item(s)" : "Clipboard access is unavailable in this window");
+    }
     return;
   }
   if (action === "export") {
