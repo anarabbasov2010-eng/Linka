@@ -6,7 +6,7 @@ import { initLinkaDocuments } from "./documents.js";
 import { initLinkaSignature } from "./signature-theme.js";
 import {
   addDeletedId, disconnectCloud, getCloudConfig, getCloudSession,
-  getOtpCooldown, readDeletedIds, requestEmailOtp, saveCloudConfig, syncCloudCaptures,
+  getOtpCooldown, readDeletedIds, requestEmailOtp, saveCloudConfig, syncCloudCaptures, mergeCloudCaptures,
   verifyEmailOtp, readLinkaProfile, saveLinkaProfile, beginQrPairing, claimQrPairing,
   startGoogleOAuth, completeGoogleOAuthCallback
 } from "./cloud-sync.js";
@@ -68,11 +68,12 @@ let editingId = null;
 let statusTimer = null;
 let cloudSyncTimer = null;
 let cloudSyncBusy = false;
+let cloudSyncQueued = false;
+let localDataRevision = 0;
 let cloudSyncStatus = "";
 let lastCloudRefreshAt = 0;
 const expandedCards = new Set();
 const desktopBuildVersion = String(import.meta.env.VITE_LINKA_DESKTOP_VERSION || "").trim();
-let themeMode = "dark";
 let reduceMotion = localStorage.getItem("linka.reduceMotion") === "true" || (localStorage.getItem("linka.reduceMotion") === null && (() => { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } })());
 
 function say(message) {
@@ -150,34 +151,54 @@ function persist() {
     return false;
   }
   persistedCaptures = captures.map(item => ({ ...item }));
+  localDataRevision += 1;
   scheduleCloudSync();
   return true;
 }
 function scheduleCloudSync() {
   if (!getCloudSession()) return;
   clearTimeout(cloudSyncTimer);
-  cloudSyncTimer = setTimeout(() => { void syncNow({ silent: true }).catch(() => {}); }, 1400);
+  cloudSyncTimer = setTimeout(() => {
+    if (cloudSyncBusy) { cloudSyncQueued = true; return; }
+    void syncNow({ silent: true }).catch(() => {});
+  }, 1400);
 }
 async function syncNow({ silent = false } = {}) {
-  if (cloudSyncBusy) return null;
+  if (cloudSyncBusy) { cloudSyncQueued = true; return null; }
   cloudSyncBusy = true;
+  const startRevision = localDataRevision;
   try {
-    const result = await syncCloudCaptures(captures, readDeletedIds());
-    if (!saveCaptures(result.captures)) {
+    const localSnapshot = captures.map(item => ({ ...item }));
+    const deletedSnapshot = readDeletedIds();
+    const result = await syncCloudCaptures(localSnapshot, deletedSnapshot);
+
+    // The user may have edited, added, or deleted items while the network
+    // request was in flight. Merge against the latest in-memory library and
+    // the latest tombstones instead of replacing it with a stale snapshot.
+    const currentDeleted = readDeletedIds();
+    const latestDeleted = new Set([...currentDeleted, ...(result.deletedIds || [])]);
+    const latestCaptures = mergeCloudCaptures(captures, result.captures, latestDeleted);
+    if (!saveCaptures(latestCaptures)) {
       throw new Error("Облако ответило, но объединённую библиотеку не удалось сохранить на устройстве. Локальные данные не перезаписаны; экспортируй резервную копию и освободи место.");
     }
-    captures = result.captures;
+    captures = latestCaptures;
     persistedCaptures = captures.map(item => ({ ...item }));
     cloudSyncStatus = result.message;
+    if (localDataRevision !== startRevision) cloudSyncQueued = true;
     render();
     if (!silent) say(result.message);
-    return result;
+    return { ...result, captures: latestCaptures, deletedIds: latestDeleted };
   } catch (error) {
-    cloudSyncStatus = error?.message || "Облачная синхронизация failed";
+    cloudSyncStatus = error?.message || "Cloud sync failed";
     if (!silent) say("Sync failed: " + cloudSyncStatus);
     throw error;
   } finally {
     cloudSyncBusy = false;
+    if (cloudSyncQueued && getCloudSession()) {
+      cloudSyncQueued = false;
+      clearTimeout(cloudSyncTimer);
+      cloudSyncTimer = setTimeout(() => { void syncNow({ silent: true }).catch(() => {}); }, 600);
+    }
   }
 }
 function compareVersions(a, b) {
@@ -189,14 +210,6 @@ function compareVersions(a, b) {
   }
   return 0;
 }
-function applyTheme() {
-  themeMode = "dark";
-  document.documentElement.dataset.theme = "dark";
-  try { localStorage.setItem("linka.theme", "dark"); } catch {}
-  window.dispatchEvent(new CustomEvent("linka:theme-changed", { detail: { theme: "dark" } }));
-}
-applyTheme();
-
 function render() {
   for (const id of selectedIds) if (!captures.some(item => item.id === id)) selectedIds.delete(id);
   const shown = visibleCaptures(captures, activeFilter, search.value);
