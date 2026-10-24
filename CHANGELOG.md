@@ -1,5 +1,15 @@
 # Changelog
 
+## Next — Unified twilight theme correction
+
+- Removed the pulsing sphere and old generated ambient audio; the twilight forest is now Linka's single built-in appearance across Android, Web, and Windows.
+- Migrated older installations to make the forest backdrop and the user's supplied “как всё заебало..” MP3 the defaults, while retaining user-added tracks and backgrounds.
+- Added verified Pexels dusk-path fallback clips and a matching poster so a failed video source does not leave the background black.
+- Removed alternate theme and accent choices from settings and the command palette.
+- Moved the Android mini-player into a compact floating dock above navigation; the expanded player still contains the playlist and controls.
+- Kept custom photo/video backgrounds, local playlists, animated text entry, wind-like movement, and subtle film grain.
+
+
 ## Next — Twilight atmosphere and music player
 
 - Windows/Web: added the Linka twilight background layer with a slowly drifting dusk-forest video, dark readability veil, gentle wind-like gradients and extremely subtle moving film grain.
