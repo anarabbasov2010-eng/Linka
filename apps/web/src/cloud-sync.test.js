@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { completeGoogleOAuthCallback, getOtpCooldown, mergeCloudCaptures, readLinkaProfile, saveLinkaProfile } from "./cloud-sync.js";
+import { addDeletedIds, completeGoogleOAuthCallback, getOtpCooldown, mergeCloudCaptures, readDeletedIds, removeDeletedIds, readLinkaProfile, saveLinkaProfile, DELETED_IDS_KEY } from "./cloud-sync.js";
 
 test("cloud merge picks the newest copy, keeps pins, and orders newest first", () => {
   const remote = [
@@ -24,13 +24,22 @@ test("cloud merge respects deletion tombstones so removed data cannot reappear",
   assert.deepEqual(merged.map(item => item.id), ["kept"]);
 });
 
-test("cloud merge ignores malformed records and enforces the shared item limit", () => {
-  const items = Array.from({ length: 510 }, (_, index) => ({
-    id: String(index), text: "note", createdAt: index + 1, updatedAt: index + 1
-  }));
-  const merged = mergeCloudCaptures(items.concat([null, { id: "bad", text: "" }]), [], new Set());
-  assert.equal(merged.length, 500);
-  assert.equal(merged[0].id, "509");
+test("cloud merge prefers the local copy when update timestamps are equal", () => {
+  const local = [{ id: "same", text: "latest local edit", createdAt: 1, updatedAt: 100 }];
+  const remote = [{ id: "same", text: "older remote edit", createdAt: 1, updatedAt: 100 }];
+  assert.equal(mergeCloudCaptures(local, remote, new Set())[0].text, "latest local edit");
+});
+
+test("cloud merge ignores malformed records and never silently truncates the library", () => {
+  for (const count of [500, 1000, 5000, 10000]) {
+    const items = Array.from({ length: count }, (_, index) => ({
+      id: String(index), text: "note", createdAt: index + 1, updatedAt: index + 1
+    }));
+    const merged = mergeCloudCaptures(items.concat([null, { id: "bad", text: "" }]), [], new Set());
+    assert.equal(merged.length, count);
+    assert.equal(merged[0].id, String(count - 1));
+    assert.equal(mergeCloudCaptures(items, [], new Set(), 500).length, Math.min(count, 500));
+  }
 });
 
 function memoryStorage() {
@@ -41,6 +50,21 @@ function memoryStorage() {
     removeItem(key) { values.delete(key); }
   };
 }
+
+test("bulk deletion markers are written atomically and can be removed for undo/import", () => {
+  const storage = memoryStorage();
+  assert.equal(addDeletedIds(["a", "b"], storage), true);
+  assert.deepEqual([...readDeletedIds(storage)].sort(), ["a", "b"]);
+  assert.equal(removeDeletedIds(["a"], storage), true);
+  assert.deepEqual([...readDeletedIds(storage)], ["b"]);
+  const failing = {
+    getItem(key) { return key === DELETED_IDS_KEY ? JSON.stringify(["kept"]) : null; },
+    setItem() { throw new Error("quota exceeded"); }
+  };
+  assert.equal(addDeletedIds(["c"], failing), false);
+  assert.equal(removeDeletedIds(["kept"], failing), false);
+  assert.deepEqual([...readDeletedIds(failing)], ["kept"]);
+});
 
 test("profile onboarding saves a cleaned display name and optional age", () => {
   const storage = memoryStorage();

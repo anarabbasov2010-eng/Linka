@@ -29,7 +29,18 @@ function addStyles(){if($("#linka-atmosphere-styles"))return;const s=document.cr
 '#linka-atmosphere .grain{position:absolute;inset:-40%;opacity:.026;background-image:url("data:image/svg+xml,%3Csvg viewBox=%270 0 180 180%27 xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cfilter id=%27n%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.8%27 numOctaves=%273%27 stitchTiles=%27stitch%27/%3E%3C/filter%3E%3Crect width=%27100%25%27 height=%27100%25%27 filter=%27url(%23n)%27 opacity=%27.8%27/%3E%3C/svg%3E");animation:linka-grain .24s steps(2) infinite}',
 '#linka-atmosphere .wind{position:absolute;inset:-15%;opacity:.23;background:radial-gradient(ellipse at 20% 45%,rgba(153,157,186,.09),transparent 50%),radial-gradient(ellipse at 85% 60%,rgba(135,112,169,.08),transparent 45%);animation:linka-wind 52s ease-in-out infinite alternate}',
 '#linka-atmosphere .ready{opacity:.78!important}#linka-atmosphere.disabled video,#linka-atmosphere.disabled img{opacity:0!important}#linka-atmosphere.no-grain .grain{display:none}',
-'.shell{position:relative;z-index:1;background:transparent}html,body{background:#09090b!important;color-scheme:dark!important}body{isolation:isolate!important}body::before,body::after,.ambient,.orb{display:none!important;content:none!important}',
+    ':root[data-color-scheme="light"] #linka-atmosphere video{opacity:.18!important;filter:saturate(.45) brightness(1.1)!important}:root[data-color-scheme="light"] #linka-atmosphere .veil{background:linear-gradient(180deg,rgba(244,242,237,.30),rgba(244,242,237,.48) 48%,rgba(244,242,237,.72))!important}',
+    ':root[data-color-scheme="light"] .linka-player-dock{background:rgba(255,255,255,.92)!important;color:var(--text)!important;border-color:var(--line-strong)!important;box-shadow:0 14px 44px rgba(35,31,24,.14)!important}',
+    ':root[data-color-scheme="light"] .linka-player-track span,:root[data-color-scheme="light"] .linka-player-muted,:root[data-color-scheme="light"] .linka-player-current span,:root[data-color-scheme="light"] .linka-player-time,:root[data-color-scheme="light"] .linka-player-volume{color:var(--muted)!important}',
+    ':root[data-color-scheme="light"] .linka-player-button,:root[data-color-scheme="light"] .linka-player-playlist-item{background:var(--panel-raised)!important;color:var(--text)!important;border-color:var(--line)!important}',
+    ':root[data-color-scheme="light"] .linka-player-window,:root[data-color-scheme="light"] .linka-atmosphere-settings{background:var(--panel-solid)!important;color:var(--text)!important;border-color:var(--line-strong)!important;box-shadow:0 28px 90px rgba(35,31,24,.18)!important}',
+    ':root[data-color-scheme="light"] .linka-player-hero,:root[data-color-scheme="light"] .linka-player-disc{background:color-mix(in srgb,var(--panel-raised) 86%,var(--accent) 4%)!important;border-color:var(--line-strong)!important;box-shadow:0 0 30px var(--glow)!important}',
+    ':root[data-color-scheme="light"] .linka-player-current strong,:root[data-color-scheme="light"] .linka-player-head-copy strong,:root[data-color-scheme="light"] .linka-player-list-label strong{color:var(--text)!important}',
+    ':root[data-color-scheme="light"] .linka-atmosphere-title-row small,:root[data-color-scheme="light"] .linka-atmosphere-setting-copy span{color:var(--muted)!important}',
+    ':root[data-color-scheme="light"] .linka-atmosphere-setting{border-color:var(--line)!important}',
+    ':root[data-color-scheme="light"] .linka-atmosphere-actions button{background:var(--panel-raised)!important;color:var(--text)!important;border-color:var(--line-strong)!important}',
+    ':root[data-color-scheme="light"] .linka-player-panel.open{background:rgba(30,29,35,.30)!important}',
+'.shell{position:relative;z-index:1;background:transparent}html,body{background:var(--bg,#09090b)!important;color-scheme:inherit!important}body{isolation:isolate!important}',
 '.linka-player-dock{position:fixed;z-index:42;right:20px;bottom:20px;display:flex;align-items:center;gap:9px;width:min(294px,calc(100vw - 26px));padding:9px 10px;border:1px solid rgba(240,235,255,.15);border-radius:18px;background:rgba(17,16,23,.8);box-shadow:0 16px 48px #0004,inset 0 1px #fff0a;backdrop-filter:blur(24px);color:#f5f3fa;transition:transform .45s cubic-bezier(.2,.8,.2,1),background .35s;cursor:pointer}',
 '.linka-player-dock:hover{transform:translateY(-3px);background:rgba(23,21,31,.92)}.linka-player-art{width:38px;height:38px;flex:0 0 38px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(145deg,#bca8ff3b,#40364d70);color:#d9d0ff}.linka-player-art svg{width:20px;height:20px}',
 '.linka-player-track{min-width:0;flex:1;display:grid;gap:3px;text-align:left}.linka-player-track strong{font-size:11px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.linka-player-track span{font-size:9px;color:#a8a3b2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
@@ -42,7 +53,7 @@ function addStyles(){if($("#linka-atmosphere-styles"))return;const s=document.cr
 '.linka-atmosphere-settings{width:min(490px,100%);background:var(--panel-solid,#111216);color:var(--text,#f5f5f7);border-color:var(--line-strong, #ffffff26);filter:none;opacity:1}.linka-atmosphere-title-row{display:flex;align-items:center;gap:11px;margin-bottom:7px}.linka-atmosphere-title-row>div{flex:1}.linka-atmosphere-title-row h2{margin:0;font-size:19px;letter-spacing:-.05em}.linka-atmosphere-title-row small{display:block;margin-top:4px;color:var(--muted,#96969f);font-size:10px}.linka-atmosphere-settings>p{font-size:11px;line-height:1.7;color:var(--muted,#96969f)}',
 '.linka-atmosphere-setting{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 0;border-top:1px solid var(--line,#ffffff14)}.linka-atmosphere-setting-copy{min-width:0;flex:1}.linka-atmosphere-setting-copy strong{display:block;font-size:12px}.linka-atmosphere-setting-copy span{display:block;margin-top:5px;font-size:10px;line-height:1.6;color:var(--muted,#96969f)}.linka-atmosphere-toggle{width:40px;height:23px;padding:2px;border:1px solid var(--line-strong,#ffffff26);border-radius:30px;background:var(--panel-raised,#17191d);display:flex;align-items:center}.linka-atmosphere-toggle i{display:block;width:17px;height:17px;border-radius:50%;background:var(--muted,#96969f);transition:transform .25s,background .25s}.linka-atmosphere-toggle[aria-pressed=true] i{transform:translateX(16px);background:var(--accent,#c9c0ff)}',
 '.linka-atmosphere-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.linka-atmosphere-actions button{font:inherit;font-size:10px;border:1px solid var(--line,#ffffff17);border-radius:11px;background:var(--panel,#17171b);color:var(--soft,#d0d0d8);padding:9px 11px}.linka-atmosphere-state{margin-top:11px;min-height:16px;color:var(--muted,#96969f);font-size:10px;line-height:1.6}',
-'.linka-type-stage{position:relative;width:100%}.linka-type-mirror{position:absolute;inset:0;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;pointer-events:none;z-index:2;color:var(--text);font:inherit;line-height:inherit;letter-spacing:inherit;padding:inherit;border:1px solid transparent;word-break:break-word;opacity:0}.linka-type-stage.is-typing .linka-type-mirror{opacity:1}.linka-type-stage.is-typing textarea{color:transparent!important;-webkit-text-fill-color:transparent!important;caret-color:var(--text)!important;position:relative;z-index:3;background:transparent!important}.linka-type-stage.is-typing textarea::placeholder{color:transparent!important}.linka-type-letter{display:inline;animation:linka-ink .23s cubic-bezier(.16,1,.3,1) both}.linka-type-erasing{display:inline;animation:linka-ink-out .19s ease both}',
+'.linka-type-stage{position:relative;width:100%}.linka-type-mirror{position:absolute;inset:0;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;pointer-events:none;z-index:2;color:var(--text);font:inherit;line-height:inherit;letter-spacing:inherit;padding:inherit;border:1px solid transparent;word-break:break-word;opacity:0}.linka-type-stage.is-typing .linka-type-mirror{opacity:1}.linka-type-stage.is-typing textarea{color:transparent!important;-webkit-text-fill-color:transparent!important;caret-color:var(--text)!important;position:relative;z-index:3;background:transparent!important}.linka-type-stage.is-typing textarea::placeholder{color:transparent!important}.linka-type-stage.plain-text-mode .linka-type-mirror{display:none!important;opacity:0!important}.linka-type-stage.plain-text-mode textarea{color:var(--text)!important;-webkit-text-fill-color:var(--text)!important;caret-color:var(--text)!important}.linka-type-letter{display:inline;animation:linka-ink .23s cubic-bezier(.16,1,.3,1) both}.linka-type-erasing{display:inline;animation:linka-ink-out .19s ease both}',
 '@keyframes linka-forest{from{transform:scale(1.04) translate3d(-.5%,0,0)}to{transform:scale(1.1) translate3d(.7%,-.45%,0)}}@keyframes linka-wind{from{transform:translate3d(-1.2%,.3%,0)}to{transform:translate3d(1.2%,-.4%,0)}}@keyframes linka-grain{0%{transform:translate(0,0)}25%{transform:translate(1%,-.5%)}50%{transform:translate(-.6%,.6%)}75%{transform:translate(.5%,1%)}}@keyframes linka-ink{from{opacity:0;filter:blur(3px);transform:translateY(2px)}to{opacity:1;filter:blur(0);transform:translateY(0)}}@keyframes linka-ink-out{from{opacity:.9;filter:blur(0)}to{opacity:0;filter:blur(2px)}}@keyframes linka-disc{to{transform:rotate(360deg)}}',
 ':root.reduced-motion #linka-atmosphere *, :root.reduced-motion .linka-player-dock, :root.reduced-motion .linka-player-panel, :root.reduced-motion .linka-player-window, :root.reduced-motion .linka-player-disc, :root.reduced-motion .linka-type-letter,.linka-type-erasing{animation:none!important;transition:none!important;filter:none!important}:root[data-effects="quiet"] #linka-atmosphere .wind{opacity:.05}',
 '@media(max-width:700px){.linka-player-dock{right:12px;bottom:82px;width:min(270px,calc(100vw - 24px));padding:8px}.linka-player-art{width:34px;height:34px;flex-basis:34px}.linka-player-window,.linka-atmosphere-settings{padding:15px}.linka-player-panel{padding:8px}}@media(prefers-reduced-motion:reduce){#linka-atmosphere *, .linka-player-dock,.linka-player-panel,.linka-player-window,.linka-player-disc,.linka-type-letter{animation:none!important;transition:none!important;filter:none!important}.linka-player-dock,.linka-player-panel,.linka-player-window{transform:none!important}}'
@@ -130,33 +141,39 @@ function typingAnimation(){
    const wrap=document.createElement("div");wrap.className="linka-type-stage";ta.parentNode.insertBefore(wrap,ta);wrap.append(ta);
    const mirror=document.createElement("div");mirror.className="linka-type-mirror";mirror.setAttribute("aria-hidden","true");
    const computed=getComputedStyle(ta);["fontFamily","fontSize","fontWeight","fontStyle","lineHeight","letterSpacing","textAlign","textIndent","paddingTop","paddingRight","paddingBottom","paddingLeft","boxSizing"].forEach(key=>mirror.style[key]=computed[key]);wrap.prepend(mirror);
+   const MAX_ANIMATED_CHARS=3000, MAX_ANIMATED_FRAGMENT=180;
+   const reducedMotion=()=>window.matchMedia("(prefers-reduced-motion: reduce)").matches||document.documentElement.classList.contains("reduced-motion");
    let previous=ta.value, eraseTimer=0, emptyTimer=0;
    const draw=(next,old=next,animate=false)=>{
+     const plainTextMode=next.length>MAX_ANIMATED_CHARS||old.length>MAX_ANIMATED_CHARS;
+     wrap.classList.toggle("plain-text-mode",plainTextMode);
      mirror.replaceChildren();mirror.style.opacity=next||old?"":"0";
+     if(plainTextMode){wrap.classList.remove("is-typing");clearTimeout(eraseTimer);return}
      if(!next&&!old)return;
      let prefix=0;while(prefix<Math.min(next.length,old.length)&&next[prefix]===old[prefix])prefix++;
      let suffix=0;while(suffix<next.length-prefix&&suffix<old.length-prefix&&next[next.length-1-suffix]===old[old.length-1-suffix])suffix++;
      const removed=old.slice(prefix,old.length-suffix),added=next.slice(prefix,next.length-suffix);
      const makeSpan=(ch,cls,index)=>{const span=document.createElement("span");span.textContent=ch;if(cls){span.className=cls;span.style.animationDelay=Math.min(index*7,70)+"ms"}return span};
      const fragment=document.createDocumentFragment();
-     for(let i=0;i<prefix;i++)fragment.append(makeSpan(next[i],"",i));
-     if(removed&&!window.matchMedia("(prefers-reduced-motion: reduce)").matches&&!document.documentElement.classList.contains("reduced-motion")){
+     if(prefix)fragment.append(document.createTextNode(next.slice(0,prefix)));
+     if(removed&&removed.length<=MAX_ANIMATED_FRAGMENT&&!reducedMotion()){
        for(const ch of removed)fragment.append(makeSpan(ch,"linka-type-erasing",0));
        clearTimeout(eraseTimer);eraseTimer=setTimeout(()=>draw(ta.value),230);
      }
-     [...added].forEach((ch,i)=>fragment.append(makeSpan(ch,animate?"linka-type-letter":"",i)));
-     for(let i=next.length-suffix;i<next.length;i++)if(i>=prefix)fragment.append(makeSpan(next[i],"",i));
+     if(added){if(animate&&added.length<=MAX_ANIMATED_FRAGMENT&&!reducedMotion())[...added].forEach((ch,i)=>fragment.append(makeSpan(ch,"linka-type-letter",i)));else fragment.append(document.createTextNode(added))}
+     if(suffix)fragment.append(document.createTextNode(next.slice(next.length-suffix)));
      mirror.append(fragment);mirror.scrollTop=ta.scrollTop;mirror.scrollLeft=ta.scrollLeft;
    };
    draw(ta.value);
    ta.addEventListener("input",()=>{
       const next=ta.value, old=previous;
-      if(next){clearTimeout(emptyTimer);wrap.classList.add("is-typing")}
+      if(next.length>MAX_ANIMATED_CHARS){clearTimeout(eraseTimer);wrap.classList.remove("is-typing")}
+      else if(next){clearTimeout(emptyTimer);wrap.classList.add("is-typing")}
       else if(old){clearTimeout(emptyTimer);wrap.classList.add("is-typing");emptyTimer=setTimeout(()=>{if(!ta.value)wrap.classList.remove("is-typing")},235)}
       else wrap.classList.remove("is-typing");
       draw(next,old,true);previous=next;
     });
-   ta.addEventListener("focus",()=>{if(ta.value){wrap.classList.add("is-typing");draw(ta.value)}});
+   ta.addEventListener("focus",()=>{if(ta.value&&ta.value.length<=MAX_ANIMATED_CHARS){wrap.classList.add("is-typing");draw(ta.value)}});
    ta.addEventListener("blur",()=>wrap.classList.remove("is-typing"));
    ta.addEventListener("scroll",()=>{mirror.scrollTop=ta.scrollTop;mirror.scrollLeft=ta.scrollLeft});
  }

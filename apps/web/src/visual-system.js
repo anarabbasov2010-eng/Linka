@@ -1,8 +1,37 @@
 import "./visual-system.css";
 
-const ACCENTS = { forest: { dark: "#B59A69", light: "#B59A69", glowDark: "rgba(181,154,105,.11)", glowLight: "rgba(181,154,105,.11)" } };
+const ACCENTS = {
+  forest: { dark: "#B59A69", light: "#80652F", darkText: "#12170F", lightText: "#FFFFFF", glowDark: "rgba(181,154,105,.11)", glowLight: "rgba(128,101,47,.09)" },
+  violet: { dark: "#C9C0FF", light: "#6554A6", darkText: "#171323", lightText: "#FFFFFF", glowDark: "rgba(169,154,255,.13)", glowLight: "rgba(101,84,166,.09)" },
+  blue: { dark: "#9CC5FF", light: "#356BB4", darkText: "#101A2A", lightText: "#FFFFFF", glowDark: "rgba(111,169,255,.13)", glowLight: "rgba(53,107,180,.09)" },
+  mint: { dark: "#8FE3CF", light: "#237A68", darkText: "#0C2420", lightText: "#FFFFFF", glowDark: "rgba(92,220,188,.11)", glowLight: "rgba(35,122,104,.08)" },
+  rose: { dark: "#FFB6D2", light: "#B14E78", darkText: "#29121E", lightText: "#FFFFFF", glowDark: "rgba(255,145,191,.11)", glowLight: "rgba(177,78,120,.08)" }
+};
 const DENSITIES = ["compact", "standard", "spacious"];
 const EFFECTS = ["quiet", "balanced", "atmosphere"];
+const THEMES = ["forest", "dark", "light", "system", "oled"];
+const THEME_PRESETS = {
+  forest: {
+    "--bg": "#0B120D", "--panel": "rgba(18,28,20,.88)", "--panel-solid": "#121C14", "--panel-raised": "#1B291D",
+    "--line": "rgba(232,223,200,.105)", "--line-strong": "rgba(181,154,105,.30)", "--text": "#E8DFC8",
+    "--muted": "#B3BDA9", "--soft": "#D1C3A2", "--shadow": "0 28px 88px rgba(0,0,0,.33)", "--surface-top": "rgba(255,255,255,.035)"
+  },
+  dark: {
+    "--bg": "#09090B", "--panel": "rgba(17,17,20,.90)", "--panel-solid": "#111114", "--panel-raised": "#1B1B21",
+    "--line": "rgba(255,255,255,.09)", "--line-strong": "rgba(255,255,255,.16)", "--text": "#EDEDF2",
+    "--muted": "#9696A3", "--soft": "#CFCFD8", "--shadow": "0 22px 80px rgba(0,0,0,.34)", "--surface-top": "rgba(255,255,255,.035)"
+  },
+  light: {
+    "--bg": "#F4F2ED", "--panel": "rgba(255,255,255,.88)", "--panel-solid": "#FFFFFF", "--panel-raised": "#EBE8E1",
+    "--line": "rgba(37,34,28,.10)", "--line-strong": "rgba(37,34,28,.18)", "--text": "#24232A",
+    "--muted": "#74717A", "--soft": "#53515A", "--shadow": "0 22px 70px rgba(42,35,24,.12)", "--surface-top": "rgba(25,20,10,.025)"
+  },
+  oled: {
+    "--bg": "#000000", "--panel": "rgba(6,6,8,.92)", "--panel-solid": "#050506", "--panel-raised": "#101014",
+    "--line": "rgba(255,255,255,.10)", "--line-strong": "rgba(255,255,255,.18)", "--text": "#F5F5F7",
+    "--muted": "#92929D", "--soft": "#D0D0D8", "--shadow": "0 22px 80px rgba(0,0,0,.55)", "--surface-top": "rgba(255,255,255,.025)"
+  }
+};
 
 function storageGet(key, fallback = "") {
   try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; }
@@ -10,23 +39,44 @@ function storageGet(key, fallback = "") {
 function storageSet(key, value) {
   try { localStorage.setItem(key, value); } catch {}
 }
-function lightTheme() { return false; }
+function systemPrefersLight() {
+  try { return window.matchMedia("(prefers-color-scheme: light)").matches; } catch { return false; }
+}
+function resolvedTheme(theme) {
+  return theme === "system" ? (systemPrefersLight() ? "light" : "dark") : theme;
+}
 
-export function setLinkaAccent(value = "forest") {
-  const key = "forest";
+export function setLinkaTheme(value = storageGet("linka.theme", "forest")) {
+  const key = THEMES.includes(value) ? value : "forest";
+  const resolved = resolvedTheme(key);
+  const root = document.documentElement;
+  root.dataset.theme = key;
+  root.dataset.colorScheme = resolved === "light" ? "light" : "dark";
+  root.style.colorScheme = root.dataset.colorScheme;
+  Object.entries(THEME_PRESETS[resolved] || THEME_PRESETS.forest).forEach(([property, color]) => {
+    root.style.setProperty(property, color);
+  });
+  storageSet("linka.theme", key);
+  setLinkaAccent(storageGet("linka.accent", "forest"));
+  window.dispatchEvent(new CustomEvent("linka:appearance-theme", { detail: { theme: key, resolvedTheme: resolved } }));
+  return key;
+}
+
+export function setLinkaAccent(value = storageGet("linka.accent", "forest")) {
+  const key = Object.hasOwn(ACCENTS, value) ? value : "forest";
   const root = document.documentElement;
   root.dataset.accent = key;
   storageSet("linka.accent", key);
   const palette = ACCENTS[key];
-  const light = lightTheme(root);
+  const light = root.dataset.colorScheme === "light";
   root.style.setProperty("--accent", light ? palette.light : palette.dark);
-  root.style.setProperty("--accent-text", light ? "#FFFFFF" : "#171323");
+  root.style.setProperty("--accent-text", light ? palette.lightText : palette.darkText);
   root.style.setProperty("--glow", light ? palette.glowLight : palette.glowDark);
   window.dispatchEvent(new CustomEvent("linka:accent-changed", { detail: { accent: key } }));
   return key;
 }
 
-export function setLinkaDensity(value = "standard") {
+export function setLinkaDensity(value = storageGet("linka.density", "standard")) {
   const key = DENSITIES.includes(value) ? value : "standard";
   document.documentElement.dataset.density = key;
   storageSet("linka.density", key);
@@ -34,8 +84,8 @@ export function setLinkaDensity(value = "standard") {
   return key;
 }
 
-export function setLinkaEffects(value = "balanced") {
-  const key = "atmosphere";
+export function setLinkaEffects(value = storageGet("linka.effects", "balanced")) {
+  const key = EFFECTS.includes(value) ? value : "balanced";
   document.documentElement.dataset.effects = key;
   storageSet("linka.effects", key);
   window.dispatchEvent(new CustomEvent("linka:effects-changed", { detail: { effects: key } }));
@@ -55,11 +105,10 @@ export function initVisualSystem() {
   if (root.dataset.visualSystemReady === "true") return;
   root.dataset.visualSystemReady = "true";
 
-  setLinkaAccent("forest");
+  setLinkaTheme(storageGet("linka.theme", "forest"));
+  setLinkaAccent(storageGet("linka.accent", "forest"));
   setLinkaDensity(storageGet("linka.density", "standard"));
-  setLinkaEffects("atmosphere");
-  storageSet("linka.accent", "forest");
-  storageSet("linka.effects", "atmosphere");
+  setLinkaEffects(storageGet("linka.effects", "atmosphere"));
 
   const savedMotion = storageGet("linka.reduceMotion", "");
   let reducedMotion = savedMotion === "true";
@@ -81,16 +130,14 @@ export function initVisualSystem() {
     });
   }
 
-  const appearanceChanged = () => setLinkaAccent("forest");
-  new MutationObserver(records => {
-    if (records.some(record => record.attributeName === "data-theme")) { root.dataset.theme = "forest"; appearanceChanged(); }
-  }).observe(root, { attributes: true, attributeFilter: ["data-theme"] });
-
   const colorScheme = (() => {
     try { return window.matchMedia("(prefers-color-scheme: light)"); } catch { return null; }
   })();
-  root.dataset.theme = "forest";
-  root.style.colorScheme = "dark";
+  if (colorScheme?.addEventListener) {
+    colorScheme.addEventListener("change", () => {
+      if (storageGet("linka.theme", "forest") === "system") setLinkaTheme("system");
+    });
+  }
 
   const toastStack = document.createElement("div");
   toastStack.className = "linka-toast-stack";
@@ -143,7 +190,7 @@ export function initVisualSystem() {
       '<label class="linka-command-search"><span aria-hidden="true">⌕</span><input type="search" autocomplete="off" spellcheck="false" placeholder="Type a command…" aria-label="Search commands"></label>' +
       '<div class="linka-command-meta"><span>COMMANDS</span><span>↑ ↓ select · ↵ run</span></div>' +
       '<div class="linka-command-results" role="listbox" aria-label="Commands"></div>' +
-      '<div class="linka-command-footer"><span><kbd>Ctrl K</kbd> to open</span><span>Linka · Obsidian</span></div>' +
+      '<div class="linka-command-footer"><span><kbd>Ctrl K</kbd> to open</span><span>Linka · Workspace</span></div>' +
     '</section>';
   document.body.append(palette);
   const commandInput = palette.querySelector("input");

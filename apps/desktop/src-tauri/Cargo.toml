@@ -1,6 +1,6 @@
 [package]
 name = "linka-desktop"
-version = "0.3.0"
+version = "0.3.2"
 description = "Linka local-first inbox"
 authors = ["Linka"]
 edition = "2021"

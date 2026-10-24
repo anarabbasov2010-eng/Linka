@@ -61,6 +61,9 @@ function addStyles() {
     .linka-doc-type-mirror,.linka-doc-body { box-sizing:border-box; width:100%; min-height:220px; max-height:45vh; margin:0; padding:17px 17px 20px; border:0; border-radius:15px; font:400 15px/1.86 "Palatino Linotype","Book Antiqua",Georgia,serif; letter-spacing:.008em; white-space:pre-wrap; overflow-wrap:anywhere; tab-size:4; }
     .linka-doc-type-mirror { position:absolute; inset:0; overflow:auto; pointer-events:none; color:#e8dfc8; z-index:0; }
     .linka-doc-body { position:relative; z-index:1; display:block; resize:vertical; outline:none; color:transparent; -webkit-text-fill-color:transparent; caret-color:#d3bd8c; background:transparent; }
+    .linka-doc-body-wrap.plain-text-mode .linka-doc-type-mirror { display:none; }
+    .linka-doc-body-wrap.plain-text-mode .linka-doc-body { color:#e8dfc8; -webkit-text-fill-color:#e8dfc8; }
+    .linka-doc-body-wrap.plain-text-mode .linka-doc-body::selection { color:#111; -webkit-text-fill-color:#111; }
     .linka-doc-body::selection { background:rgba(181,154,105,.32); color:transparent; }
     .linka-doc-letter { display:inline; animation:linka-doc-letter-in .2s cubic-bezier(.2,.8,.2,1) both; }
     .linka-doc-gone { display:inline; animation:linka-doc-letter-out .19s ease both; }
@@ -79,6 +82,32 @@ function addStyles() {
     html.reduced-motion .linka-doc-overlay,html.reduced-motion .linka-doc-window,html.reduced-motion .linka-doc-btn { transition:none!important; }
     html.reduced-motion .linka-doc-letter,html.reduced-motion .linka-doc-gone { animation:none!important; }
     .top-actions #linka-document-button { border-color:rgba(181,154,105,.28); }
+    :root[data-color-scheme="light"] .linka-doc-window {
+      color:var(--text)!important;background:var(--panel-solid)!important;border-color:var(--line-strong)!important;
+      box-shadow:0 28px 90px rgba(35,31,24,.16),inset 0 1px rgba(255,255,255,.85)!important;
+    }
+    :root[data-color-scheme="light"] .linka-doc-headcopy p,
+    :root[data-color-scheme="light"] .linka-doc-label,
+    :root[data-color-scheme="light"] .linka-doc-footer,
+    :root[data-color-scheme="light"] .linka-doc-recent h3 { color:var(--muted)!important; }
+    :root[data-color-scheme="light"] .linka-doc-title,
+    :root[data-color-scheme="light"] .linka-doc-body-wrap,
+    :root[data-color-scheme="light"] .linka-doc-recent-item {
+      color:var(--text)!important;background:color-mix(in srgb,var(--bg) 62%,var(--panel-solid))!important;
+      border-color:var(--line)!important;
+    }
+    :root[data-color-scheme="light"] .linka-doc-title { -webkit-text-fill-color:var(--text)!important; }
+    :root[data-color-scheme="light"] .linka-doc-body { caret-color:var(--accent)!important; }
+    :root[data-color-scheme="light"] .linka-doc-type-mirror { color:var(--text)!important; }
+    :root[data-color-scheme="light"] .linka-doc-body-wrap.plain-text-mode .linka-doc-body {
+      color:var(--text)!important;-webkit-text-fill-color:var(--text)!important;
+    }
+    :root[data-color-scheme="light"] .linka-doc-btn {
+      color:var(--text)!important;background:var(--panel-raised)!important;border-color:var(--line-strong)!important;
+    }
+    :root[data-color-scheme="light"] .linka-doc-btn.primary {
+      color:var(--accent-text)!important;background:var(--accent)!important;border-color:transparent!important;
+    }
   `;
   document.head.append(style);
 }
@@ -122,6 +151,43 @@ async function storeDocument(document) {
     throw new Error("storage-unavailable");
   }
 }
+export async function searchLinkaDocuments(query = "", limit = 20) {
+  const needle = String(query || "").trim().replace(/^"|"$/g, "").toLocaleLowerCase();
+  if (needle.length < 2 || needle.includes(":")) return [];
+  const documents = await listDocuments();
+  const matches = [];
+  for (let index = 0; index < documents.length; index++) {
+    const item = documents[index];
+    const title = String(item.title || "");
+    const text = String(item.text || "");
+    const titleMatch = title.toLocaleLowerCase().includes(needle);
+    const textPosition = titleMatch ? -1 : text.toLocaleLowerCase().indexOf(needle);
+    if (titleMatch || textPosition >= 0) {
+      const excerptStart = textPosition >= 0 ? Math.max(0, textPosition - 72) : 0;
+      const excerptEnd = textPosition >= 0 ? Math.min(text.length, textPosition + needle.length + 110) : Math.min(text.length, 160);
+      matches.push({
+        id: String(item.id),
+        title: title || t("untitled"),
+        updatedAt: Number(item.updatedAt || item.createdAt || 0),
+        excerpt: text.slice(excerptStart, excerptEnd).replace(/\s+/g, " ").trim(),
+        matchedTitle: titleMatch
+      });
+      if (matches.length >= Math.max(1, Math.min(50, Number(limit) || 20))) break;
+    }
+    // Searching large local documents remains cooperative and does not keep
+    // the main thread busy for a long uninterrupted scan.
+    if (index % 2 === 1) await new Promise(resolve => setTimeout(resolve, 0));
+  }
+  return matches;
+}
+
+export async function openLinkaDocumentById(id) {
+  const documentValue = (await listDocuments()).find(item => String(item.id) === String(id));
+  if (!documentValue) return false;
+  await openEditor(documentValue);
+  return true;
+}
+
 async function listDocuments() {
   const db = await database();
   if (db) {
@@ -142,11 +208,19 @@ function setStatus(message, isError = false) {
 function createMirrorAnimation(textarea, mirror) {
   const computed = getComputedStyle(textarea);
   ["fontFamily","fontSize","fontWeight","fontStyle","lineHeight","letterSpacing","textAlign","textIndent","paddingTop","paddingRight","paddingBottom","paddingLeft","boxSizing","tabSize"].forEach(key => { mirror.style[key] = computed[key]; });
+  const wrapper = textarea.closest(".linka-doc-body-wrap");
+  const MAX_ANIMATED_CHARS = 3000;
   let previous = textarea.value;
   let clearGhostTimer = 0;
   const draw = (value, before = value, animate = false) => {
+    const plainTextMode = value.length > MAX_ANIMATED_CHARS || before.length > MAX_ANIMATED_CHARS;
+    wrapper?.classList.toggle("plain-text-mode", plainTextMode);
     mirror.replaceChildren();
+    if (plainTextMode) return;
     if (!value && !before) return;
+
+    // Keep unchanged content in text nodes. Only the inserted/deleted fragment
+    // receives spans, instead of creating one element per character per input.
     const prefix = reducedMotion() ? value.length : (() => { let i = 0; while (i < value.length && i < before.length && value[i] === before[i]) i++; return i; })();
     let suffix = 0;
     while (suffix < value.length - prefix && suffix < before.length - prefix && value[value.length - 1 - suffix] === before[before.length - 1 - suffix]) suffix++;
@@ -159,14 +233,15 @@ function createMirrorAnimation(textarea, mirror) {
       if (className === "linka-doc-letter") span.style.animationDelay = Math.min(Math.max(index, 0) * 9, 90) + "ms";
       return span;
     };
-    for (let i = 0; i < prefix; i++) mirror.append(makeSpan(value[i], "", i));
+
+    if (prefix) mirror.append(document.createTextNode(value.slice(0, prefix)));
     if (animate && removed && !reducedMotion()) {
       [...removed].forEach((character, index) => mirror.append(makeSpan(character, "linka-doc-gone", index)));
       clearTimeout(clearGhostTimer);
       clearGhostTimer = setTimeout(() => draw(textarea.value), 210);
     }
     [...added].forEach((character, index) => mirror.append(makeSpan(character, animate && !reducedMotion() ? "linka-doc-letter" : "", index)));
-    for (let i = value.length - suffix; i < value.length; i++) if (i >= prefix) mirror.append(makeSpan(value[i], "", i));
+    if (suffix) mirror.append(document.createTextNode(value.slice(value.length - suffix)));
   };
   draw(textarea.value);
   textarea.addEventListener("input", () => {
@@ -267,7 +342,7 @@ function attachImportedFilePicker() {
     const file = event.target.files?.[0];
     if (!file) return;
     try {
-      if (file.size > 20 * 1024 * 1024) throw new Error("too-large");
+      if (file.size > 32 * 1024 * 1024) throw new Error("Файл больше 32 МиБ. Раздели документ на несколько файлов.");
       const parsed = parseLinkaDocument(await file.text(), file.name.replace(/\.[^.]+$/, "") || t("untitled"));
       currentDocument = await storeDocument(parsed);
       titleField.value = currentDocument.title;

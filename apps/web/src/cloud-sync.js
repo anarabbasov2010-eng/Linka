@@ -1,8 +1,6 @@
 const CONFIG_KEY = "linka.cloud.config.v1";
 const SESSION_KEY = "linka.cloud.session.v1";
 export const DELETED_IDS_KEY = "linka.deletedIds.v1";
-const MAX_CAPTURES = 500;
-const MAX_DELETED_IDS = 5000;
 
 function readObject(key, storage = globalThis.localStorage) {
   try {
@@ -115,24 +113,52 @@ export function readDeletedIds(storage = globalThis.localStorage) {
     return new Set(Array.isArray(parsed) ? parsed.filter(x => typeof x === "string" && x) : []);
   } catch { return new Set(); }
 }
-export function addDeletedId(id, storage = globalThis.localStorage) {
+export function addDeletedIds(ids, storage = globalThis.localStorage) {
   const deleted = readDeletedIds(storage);
-  deleted.add(String(id));
-  try { storage?.setItem(DELETED_IDS_KEY, JSON.stringify(Array.from(deleted).slice(-MAX_DELETED_IDS))); } catch {}
+  for (const id of ids || []) {
+    if (id == null || !String(id)) continue;
+    deleted.add(String(id));
+  }
+  try {
+    if (!storage || typeof storage.setItem !== "function") return false;
+    storage.setItem(DELETED_IDS_KEY, JSON.stringify(Array.from(deleted)));
+    return true;
+  } catch {
+    return false;
+  }
 }
-export function mergeCloudCaptures(localCaptures, remoteCaptures, deletedIds, maxItems = MAX_CAPTURES) {
+export function addDeletedId(id, storage = globalThis.localStorage) {
+  return addDeletedIds([id], storage);
+}
+export function removeDeletedIds(ids, storage = globalThis.localStorage) {
+  const deleted = readDeletedIds(storage);
+  for (const id of ids || []) deleted.delete(String(id));
+  try {
+    if (!storage || typeof storage.setItem !== "function") return false;
+    storage.setItem(DELETED_IDS_KEY, JSON.stringify(Array.from(deleted)));
+    return true;
+  } catch {
+    return false;
+  }
+}
+export function mergeCloudCaptures(localCaptures, remoteCaptures, deletedIds, maxItems = Number.POSITIVE_INFINITY) {
+  const tombstones = deletedIds instanceof Set ? deletedIds : new Set(deletedIds || []);
   const mergedById = new Map();
   for (const item of [...(remoteCaptures || []), ...(localCaptures || [])]) {
     if (!item || typeof item.id !== "string" || !item.id || typeof item.text !== "string" || !item.text.trim()) continue;
-    if (deletedIds.has(item.id)) continue;
+    if (tombstones.has(item.id)) continue;
     const existing = mergedById.get(item.id);
-    if (!existing || Number(item.updatedAt || item.createdAt || 0) > Number(existing.updatedAt || existing.createdAt || 0)) {
+    if (!existing || Number(item.updatedAt || item.createdAt || 0) >= Number(existing.updatedAt || existing.createdAt || 0)) {
       mergedById.set(item.id, item);
     }
   }
-  return [...mergedById.values()]
-    .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0))
-    .slice(0, maxItems);
+  const ordered = [...mergedById.values()].sort(
+    (a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) ||
+      Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0)
+  );
+  // The default is deliberately unlimited: a display or transport limit must
+  // never be treated as permission to delete valid local records.
+  return Number.isFinite(maxItems) ? ordered.slice(0, Math.max(0, Math.floor(maxItems))) : ordered;
 }
 
 const OTP_COOLDOWN_MS = 120_000;
@@ -291,7 +317,7 @@ export async function syncCloudCaptures(localCaptures, localDeletedIds = readDel
   if (syncedProfile) writeObject(PROFILE_KEY, syncedProfile);
   const body = {
     user_id: session.userId,
-    data: { captures: merged, deletedIds: Array.from(deleted).slice(-MAX_DELETED_IDS), ...(syncedProfile ? { profile: syncedProfile } : {}) },
+    data: { captures: merged, deletedIds: Array.from(deleted), ...(syncedProfile ? { profile: syncedProfile } : {}) },
     updated_at: new Date().toISOString()
   };
   const upsert = await fetch(`${config.url}/rest/v1/linka_sync?on_conflict=user_id`, {
@@ -300,6 +326,9 @@ export async function syncCloudCaptures(localCaptures, localDeletedIds = readDel
     body: JSON.stringify(body)
   });
   await readResponse(upsert);
-  try { localStorage.setItem(DELETED_IDS_KEY, JSON.stringify(body.data.deletedIds)); } catch {}
+  // A delete can happen while the request is in flight. Preserve any newer
+  // local tombstones rather than replacing them with the stale request snapshot.
+  for (const id of readDeletedIds()) deleted.add(id);
+  try { localStorage.setItem(DELETED_IDS_KEY, JSON.stringify(Array.from(deleted))); } catch {}
   return { captures: merged, deletedIds: deleted, session, message: `Synced ${merged.length} items` };
 }

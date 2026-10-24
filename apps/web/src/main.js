@@ -1,12 +1,12 @@
-import { loadCaptures, saveCaptures, makeCapture, visibleCaptures } from "./store.js";
+import { loadCaptures, saveCaptures, makeCapture, visibleCaptures, getCaptureRecovery, startFreshCaptureLibrary } from "./store.js";
 import { initLinkaExperience } from "./experience.js";
-import { initVisualSystem, setLinkaAccent, setLinkaDensity, setLinkaEffects } from "./visual-system.js";
+import { initVisualSystem } from "./visual-system.js";
 import { initLinkaAtmosphere, openAtmosphereSettings } from "./atmosphere.js";
-import { initLinkaDocuments } from "./documents.js";
+import { initLinkaDocuments, searchLinkaDocuments, openLinkaDocumentById } from "./documents.js";
 import { initLinkaSignature } from "./signature-theme.js";
 import {
-  addDeletedId, disconnectCloud, getCloudConfig, getCloudSession,
-  getOtpCooldown, readDeletedIds, requestEmailOtp, saveCloudConfig, syncCloudCaptures,
+  addDeletedId, addDeletedIds, removeDeletedIds, disconnectCloud, getCloudConfig, getCloudSession,
+  getOtpCooldown, readDeletedIds, requestEmailOtp, saveCloudConfig, syncCloudCaptures, mergeCloudCaptures,
   verifyEmailOtp, readLinkaProfile, saveLinkaProfile, beginQrPairing, claimQrPairing,
   startGoogleOAuth, completeGoogleOAuthCallback
 } from "./cloud-sync.js";
@@ -15,6 +15,8 @@ import QRCode from "qrcode";
 const $ = selector => document.querySelector(selector);
 const form = $("#capture-form");
 const draft = $("#capture-text");
+const tagsDraft = $("#capture-tags");
+const collectionDraft = $("#capture-collection");
 const saveButton = $("#save-button");
 const list = $("#capture-list");
 const search = $("#search");
@@ -35,7 +37,17 @@ const bulkToolbar = document.createElement("div");
 bulkToolbar.className = "bulk-toolbar";
 bulkToolbar.hidden = true;
 list.parentElement.insertBefore(bulkToolbar, list);
-search.title = "Search operators: type:link, type:note, is:pinned, site:example.com, before:YYYY-MM-DD, after:YYYY-MM-DD";
+search.title = "Search operators: type:link, type:note, is:pinned, is:later, tag:design, in:research, site:example.com, before:YYYY-MM-DD, after:YYYY-MM-DD";
+function captureUiText(key) {
+  const language = (() => { try { return localStorage.getItem("linka.language.v1") || "en"; } catch { return "en"; } })();
+  const copy = {
+    en: { later: "Read later", removeLater: "Remove later", tagSearch: "Search this tag", collectionSearch: "Show this collection", savedLater: "Saved for later", removedLater: "Removed from read later", readLater: "Read later", archive: "Archive", unarchive: "Unarchive", trash: "Move to trash", restore: "Restore", deletePermanent: "Delete permanently", archived: "Archived", unarchived: "Moved out of archive", movedTrash: "Moved to trash", restored: "Restored from trash", deletedPermanent: "Permanently deleted", confirmPermanent: "Permanently delete the selected items? This cannot be undone.", tags: "Edit tags", collection: "Set collection", markLater: "Mark for later", removeLaterBulk: "Remove from read later", tagPrompt: "Comma-separated tags (leave empty to clear)", collectionPrompt: "Collection name (leave empty to clear)", savedViews: "Saved searches", saveView: "Save view", removeView: "Remove view", nameView: "Name this search", viewSaved: "Search saved", viewRemoved: "Saved search removed", enterSearch: "Type a search before saving it." },
+    ru: { later: "Сохранить на потом", removeLater: "Убрать из отложенного", tagSearch: "Найти этот тег", collectionSearch: "Открыть коллекцию", savedLater: "Добавлено в «Сохранить на потом»", removedLater: "Убрано из отложенного", readLater: "Отложено", archive: "В архив", unarchive: "Вернуть из архива", trash: "В корзину", restore: "Восстановить", deletePermanent: "Удалить навсегда", archived: "Перемещено в архив", unarchived: "Возвращено из архива", movedTrash: "Перемещено в корзину", restored: "Восстановлено из корзины", deletedPermanent: "Удалено навсегда", confirmPermanent: "Удалить выбранные записи навсегда? Это действие нельзя отменить.", tags: "Изменить теги", collection: "Задать коллекцию", markLater: "Отложить", removeLaterBulk: "Убрать из отложенного", tagPrompt: "Теги через запятую (пустое поле очистит теги)", collectionPrompt: "Название коллекции (пустое поле очистит её)", savedViews: "Сохранённые поиски", saveView: "Сохранить поиск", removeView: "Удалить поиск", nameView: "Название поиска", viewSaved: "Поиск сохранён", viewRemoved: "Поиск удалён", enterSearch: "Сначала введи поисковый запрос." },
+    az: { later: "Sonra oxu", removeLater: "Sonra oxumaqdan çıxar", tagSearch: "Bu teqi axtar", collectionSearch: "Kolleksiyanı göstər", savedLater: "Sonra oxumaq üçün saxlanıldı", removedLater: "Sonra oxumaq siyahısından çıxarıldı", readLater: "Sonra oxu", archive: "Arxivə köçür", unarchive: "Arxivdən çıxar", trash: "Zibil qutusuna köçür", restore: "Bərpa et", deletePermanent: "Həmişəlik sil", archived: "Arxivə köçürüldü", unarchived: "Arxivdən çıxarıldı", movedTrash: "Zibil qutusuna köçürüldü", restored: "Zibil qutusundan bərpa edildi", deletedPermanent: "Həmişəlik silindi", confirmPermanent: "Seçilmiş qeydlər həmişəlik silinsin? Bu əməl geri qaytarıla bilməz.", tags: "Teqləri dəyiş", collection: "Kolleksiya təyin et", markLater: "Sonra oxu üçün saxla", removeLaterBulk: "Sonra oxu siyahısından çıxar", tagPrompt: "Vergüllə ayrılmış teqlər (boş buraxmaq təmizləyir)", collectionPrompt: "Kolleksiyanın adı (boş buraxmaq təmizləyir)", savedViews: "Saxlanmış axtarışlar", saveView: "Axtarışı saxla", removeView: "Axtarışı sil", nameView: "Axtarışın adı", viewSaved: "Axtarış saxlanıldı", viewRemoved: "Saxlanmış axtarış silindi", enterSearch: "Əvvəlcə axtarış sorğusu yaz." },
+    tr: { later: "Daha sonra oku", removeLater: "Sonradan oku listesinden çıkar", tagSearch: "Bu etiketi ara", collectionSearch: "Bu koleksiyonu göster", savedLater: "Daha sonra okumak için kaydedildi", removedLater: "Sonradan oku listesinden kaldırıldı", readLater: "Daha sonra oku", archive: "Arşivle", unarchive: "Arşivden çıkar", trash: "Çöp kutusuna taşı", restore: "Geri yükle", deletePermanent: "Kalıcı olarak sil", archived: "Arşive taşındı", unarchived: "Arşivden çıkarıldı", movedTrash: "Çöp kutusuna taşındı", restored: "Çöp kutusundan geri yüklendi", deletedPermanent: "Kalıcı olarak silindi", confirmPermanent: "Seçili kayıtlar kalıcı olarak silinsin mi? Bu işlem geri alınamaz.", tags: "Etiketleri düzenle", collection: "Koleksiyon ata", markLater: "Daha sonra oku", removeLaterBulk: "Sonradan oku listesinden çıkar", tagPrompt: "Virgülle ayrılmış etiketler (boş bırakmak temizler)", collectionPrompt: "Koleksiyon adı (boş bırakmak temizler)", savedViews: "Kayıtlı aramalar", saveView: "Aramayı kaydet", removeView: "Aramayı kaldır", nameView: "Arama adı", viewSaved: "Arama kaydedildi", viewRemoved: "Kayıtlı arama silindi", enterSearch: "Önce bir arama yaz." }
+  };
+  return (copy[language] || copy.en)[key] || copy.en[key] || key;
+}
 const TERMS_VERSION = "2026-10-23-v2";
 const TERMS_TEXT = `
 Linka is a personal inbox for saving text and links on the device or browser profile where you use it.
@@ -54,16 +66,41 @@ Linka is a personal inbox for saving text and links on the device or browser pro
 
 By selecting “I agree”, you confirm that you have read these terms and understand local storage, optional cloud synchronization and the need to keep backups. This notice is an in-app product agreement, not a substitute for professional legal advice.`;
 let captures = loadCaptures();
+let persistedCaptures = captures.map(item => ({ ...item }));
+const QUICK_DRAFT_KEY = "linka.captureDraft.v1";
+const QUICK_DRAFT_TAGS_KEY = "linka.captureDraft.tags.v1";
+const QUICK_DRAFT_COLLECTION_KEY = "linka.captureDraft.collection.v1";
+function parseTagInput(value) {
+  return String(value || "").split(/[,;\n]+/).map(tag => tag.trim().replace(/^#+/, "").replace(/\s+/g, " ").slice(0, 40)).filter(Boolean).slice(0, 24);
+}
+function saveCaptureMetadataDraft() {
+  try {
+    if (tagsDraft.value) localStorage.setItem(QUICK_DRAFT_TAGS_KEY, tagsDraft.value);
+    else localStorage.removeItem(QUICK_DRAFT_TAGS_KEY);
+    if (collectionDraft.value) localStorage.setItem(QUICK_DRAFT_COLLECTION_KEY, collectionDraft.value);
+    else localStorage.removeItem(QUICK_DRAFT_COLLECTION_KEY);
+  } catch {}
+}
+try {
+  const savedDraft = localStorage.getItem(QUICK_DRAFT_KEY);
+  const savedTags = localStorage.getItem(QUICK_DRAFT_TAGS_KEY);
+  const savedCollection = localStorage.getItem(QUICK_DRAFT_COLLECTION_KEY);
+  if (savedDraft && !draft.value) draft.value = savedDraft;
+  if (savedTags && !tagsDraft.value) tagsDraft.value = savedTags;
+  if (savedCollection && !collectionDraft.value) collectionDraft.value = savedCollection;
+  saveButton.disabled = !draft.value.trim();
+} catch {}
 let activeFilter = "all";
 let editingId = null;
 let statusTimer = null;
 let cloudSyncTimer = null;
 let cloudSyncBusy = false;
+let cloudSyncQueued = false;
+let localDataRevision = 0;
 let cloudSyncStatus = "";
 let lastCloudRefreshAt = 0;
 const expandedCards = new Set();
 const desktopBuildVersion = String(import.meta.env.VITE_LINKA_DESKTOP_VERSION || "").trim();
-let themeMode = "dark";
 let reduceMotion = localStorage.getItem("linka.reduceMotion") === "true" || (localStorage.getItem("linka.reduceMotion") === null && (() => { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } })());
 
 function say(message) {
@@ -72,37 +109,172 @@ function say(message) {
   clearTimeout(statusTimer);
   statusTimer = setTimeout(() => { status.style.opacity = "0"; }, 2800);
 }
+function showCaptureRecoveryNotice() {
+  const recovery = getCaptureRecovery();
+  if (!recovery || recovery.acknowledged || document.getElementById("linka-capture-recovery")) return;
+  const language = (() => { try { return localStorage.getItem("linka.language.v1") || "ru"; } catch { return "ru"; } })();
+  const copy = ({
+    ru: {
+      title: "Не удалось прочитать библиотеку Linka",
+      body: "Исходные данные не заменены. Запись новых изменений заблокирована, чтобы не перезаписать библиотеку. Сначала экспортируй повреждённые данные для восстановления.",
+      export: "Экспортировать исходные данные", fresh: "Начать с пустой библиотекой",
+      exportDone: "Исходные данные экспортированы. Сохрани файл до продолжения работы.",
+      confirmFresh: "Сначала экспортируй исходные данные. Linka сохранит их локально для диагностики, но создаст новую пустую библиотеку. Продолжить?",
+      freshFailed: "Не удалось безопасно сохранить исходные данные. Экспортируй их и проверь свободное место в хранилище.",
+      freshDone: "Создана новая библиотека. Повреждённые исходные данные сохранены отдельно."
+    },
+    en: {
+      title: "Linka could not read the library",
+      body: "The original data has not been replaced. Writes are paused to prevent overwriting the library. Export the damaged data before continuing.",
+      export: "Export original data", fresh: "Start with an empty library",
+      exportDone: "Original data exported. Keep the file before continuing.",
+      confirmFresh: "Export the original data first. Linka will retain it locally for recovery and create a new empty library. Continue?",
+      freshFailed: "Could not safely preserve the original data. Export it and check available storage.",
+      freshDone: "A new library was created. The original data is preserved separately."
+    },
+    az: {
+      title: "Linka kitabxananı oxuya bilmədi",
+      body: "Orijinal məlumatlar dəyişdirilməyib. Kitabxananın üzərinə yazılmaması üçün yeni yazılar dayandırılıb. Davam etməzdən əvvəl zədələnmiş məlumatları ixrac et.",
+      export: "Orijinal məlumatları ixrac et", fresh: "Boş kitabxana yarat",
+      exportDone: "Orijinal məlumatlar ixrac edildi. Davam etməzdən əvvəl faylı saxla.",
+      confirmFresh: "Əvvəlcə orijinal məlumatları ixrac et. Linka onları bərpa üçün cihazda saxlayacaq və yeni boş kitabxana yaradacaq. Davam edilsin?",
+      freshFailed: "Orijinal məlumatları təhlükəsiz saxlamaq mümkün olmadı. Onları ixrac et və yaddaş yerini yoxla.",
+      freshDone: "Yeni kitabxana yaradıldı. Orijinal məlumatlar ayrıca saxlanılır."
+    },
+    tr: {
+      title: "Linka kitaplığı okuyamadı",
+      body: "Özgün veriler değiştirilmedi. Kitaplığın üzerine yazılmasını önlemek için yeni kayıtlar duraklatıldı. Devam etmeden önce bozuk verileri dışa aktar.",
+      export: "Özgün verileri dışa aktar", fresh: "Boş kitaplık oluştur",
+      exportDone: "Özgün veriler dışa aktarıldı. Devam etmeden önce dosyayı sakla.",
+      confirmFresh: "Önce özgün verileri dışa aktar. Linka bunları kurtarma için cihazda saklayıp yeni boş bir kitaplık oluşturacak. Devam edilsin mi?",
+      freshFailed: "Özgün veriler güvenli biçimde korunamadı. Verileri dışa aktar ve kullanılabilir alanı kontrol et.",
+      freshDone: "Yeni kitaplık oluşturuldu. Özgün veriler ayrı olarak korundu."
+    }
+  })[language] || {
+    title: "Linka could not read the library",
+    body: "The original data has not been replaced. Writes are paused to prevent overwriting the library. Export the damaged data before continuing.",
+    export: "Export original data", fresh: "Start with an empty library",
+    exportDone: "Original data exported. Keep the file before continuing.",
+    confirmFresh: "Export the original data first. Linka will retain it locally for recovery and create a new empty library. Continue?",
+    freshFailed: "Could not safely preserve the original data. Export it and check available storage.",
+    freshDone: "A new library was created. The original data is preserved separately."
+  };
+
+  const panel = document.createElement("section");
+  panel.id = "linka-capture-recovery";
+  panel.setAttribute("role", "alertdialog");
+  panel.setAttribute("aria-modal", "false");
+  panel.setAttribute("aria-labelledby", "linka-capture-recovery-title");
+  panel.style.cssText = "position:fixed;z-index:10000;top:14px;left:50%;transform:translateX(-50%);width:min(680px,calc(100vw - 28px));padding:18px;border:1px solid #d5a15d;border-radius:16px;background:#1b1711;color:#fff7e8;box-shadow:0 18px 70px #0009;font:13px/1.55 system-ui,sans-serif";
+  const title = document.createElement("h2");
+  title.id = "linka-capture-recovery-title";
+  title.textContent = copy.title;
+  title.style.cssText = "margin:0 0 8px;font-size:17px;line-height:1.3";
+  const description = document.createElement("p");
+  description.textContent = copy.body;
+  description.style.cssText = "margin:0 0 14px;color:#f0dfc3";
+  const actions = document.createElement("div");
+  actions.style.cssText = "display:flex;flex-wrap:wrap;gap:8px";
+  const button = (label, primary = false) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.textContent = label;
+    item.style.cssText = "border:1px solid " + (primary ? "#d5a15d" : "#76664f") + ";border-radius:10px;padding:9px 12px;background:" + (primary ? "#d5a15d" : "#29231b") + ";color:" + (primary ? "#21180b" : "#fff7e8") + ";font:600 12px system-ui;cursor:pointer";
+    actions.append(item);
+    return item;
+  };
+  const exportButton = button(copy.export, true);
+  exportButton.addEventListener("click", () => {
+    const blob = new Blob([recovery.raw], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "linka-capture-recovery.txt";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    say(copy.exportDone);
+  });
+  const freshButton = button(copy.fresh);
+  freshButton.addEventListener("click", () => {
+    if (!window.confirm(copy.confirmFresh)) return;
+    if (!startFreshCaptureLibrary()) {
+      say(copy.freshFailed);
+      return;
+    }
+    captures = [];
+    persistedCaptures = [];
+    panel.remove();
+    render();
+    say(copy.freshDone);
+  });
+  panel.append(title, description, actions);
+  document.body.append(panel);
+}
+
 function isLink(text) { return /^https?:\/\//i.test(text.trim()); }
 function formatDate(value) {
   try { return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
   catch { return "Saved"; }
 }
 function persist() {
-  if (!saveCaptures(captures)) say("Storage unavailable or full. Export a backup before closing.");
+  if (!saveCaptures(captures)) {
+    // Roll back the in-memory mutation to the last state known to be on disk.
+    // This prevents the UI from presenting an unsaved edit/delete as durable.
+    captures = persistedCaptures.map(item => ({ ...item }));
+    say("Не удалось сохранить данные. Предыдущее состояние восстановлено; освободи место или экспортируй резервную копию.");
+    return false;
+  }
+  persistedCaptures = captures.map(item => ({ ...item }));
+  localDataRevision += 1;
   scheduleCloudSync();
+  return true;
 }
 function scheduleCloudSync() {
   if (!getCloudSession()) return;
   clearTimeout(cloudSyncTimer);
-  cloudSyncTimer = setTimeout(() => { void syncNow({ silent: true }).catch(() => {}); }, 1400);
+  cloudSyncTimer = setTimeout(() => {
+    if (cloudSyncBusy) { cloudSyncQueued = true; return; }
+    void syncNow({ silent: true }).catch(() => {});
+  }, 1400);
 }
 async function syncNow({ silent = false } = {}) {
-  if (cloudSyncBusy) return null;
+  if (cloudSyncBusy) { cloudSyncQueued = true; return null; }
   cloudSyncBusy = true;
+  const startRevision = localDataRevision;
   try {
-    const result = await syncCloudCaptures(captures, readDeletedIds());
-    captures = result.captures;
-    saveCaptures(captures);
+    const localSnapshot = captures.map(item => ({ ...item }));
+    const deletedSnapshot = readDeletedIds();
+    const result = await syncCloudCaptures(localSnapshot, deletedSnapshot);
+
+    // The user may have edited, added, or deleted items while the network
+    // request was in flight. Merge against the latest in-memory library and
+    // the latest tombstones instead of replacing it with a stale snapshot.
+    const currentDeleted = readDeletedIds();
+    const removedWhileSyncing = new Set([...deletedSnapshot].filter(id => !currentDeleted.has(id)));
+    const latestDeleted = new Set([...(result.deletedIds || [])].filter(id => !removedWhileSyncing.has(id)));
+    for (const id of currentDeleted) latestDeleted.add(id);
+    const latestCaptures = mergeCloudCaptures(captures, result.captures, latestDeleted);
+    if (!saveCaptures(latestCaptures)) {
+      throw new Error("Облако ответило, но объединённую библиотеку не удалось сохранить на устройстве. Локальные данные не перезаписаны; экспортируй резервную копию и освободи место.");
+    }
+    captures = latestCaptures;
+    persistedCaptures = captures.map(item => ({ ...item }));
     cloudSyncStatus = result.message;
+    if (localDataRevision !== startRevision) cloudSyncQueued = true;
     render();
     if (!silent) say(result.message);
-    return result;
+    return { ...result, captures: latestCaptures, deletedIds: latestDeleted };
   } catch (error) {
-    cloudSyncStatus = error?.message || "Облачная синхронизация failed";
+    cloudSyncStatus = error?.message || "Cloud sync failed";
     if (!silent) say("Sync failed: " + cloudSyncStatus);
     throw error;
   } finally {
     cloudSyncBusy = false;
+    if (cloudSyncQueued && getCloudSession()) {
+      cloudSyncQueued = false;
+      clearTimeout(cloudSyncTimer);
+      cloudSyncTimer = setTimeout(() => { void syncNow({ silent: true }).catch(() => {}); }, 600);
+    }
   }
 }
 function compareVersions(a, b) {
@@ -114,17 +286,19 @@ function compareVersions(a, b) {
   }
   return 0;
 }
-function applyTheme() {
-  themeMode = "dark";
-  document.documentElement.dataset.theme = "dark";
-  try { localStorage.setItem("linka.theme", "dark"); } catch {}
-  window.dispatchEvent(new CustomEvent("linka:theme-changed", { detail: { theme: "dark" } }));
-}
-applyTheme();
-
 function render() {
   for (const id of selectedIds) if (!captures.some(item => item.id === id)) selectedIds.delete(id);
   const shown = visibleCaptures(captures, activeFilter, search.value);
+  const tagOptions = $("#linka-tag-options");
+  if (tagOptions) {
+    const tags = [...new Map(captures.flatMap(item => item.tags || []).map(tag => [tag.toLocaleLowerCase(), tag])).values()].sort((a, b) => a.localeCompare(b));
+    tagOptions.replaceChildren(...tags.map(tag => { const option = document.createElement("option"); option.value = tag; return option; }));
+  }
+  const collectionOptions = $("#linka-collection-options");
+  if (collectionOptions) {
+    const collections = [...new Set(captures.map(item => item.collection).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    collectionOptions.replaceChildren(...collections.map(value => { const option = document.createElement("option"); option.value = value; return option; }));
+  }
   count.textContent = captures.length + (captures.length === 1 ? " item" : " items");
   selectionButton.textContent = selectionMode ? "Exit selection" : "Select items";
   selectionButton.setAttribute("aria-pressed", String(selectionMode));
@@ -150,7 +324,16 @@ function render() {
     bulkButton("Unpin", "unpin");
     bulkButton("Copy", "copy");
     bulkButton("Export", "export");
-    bulkButton("Delete", "delete", true);
+    bulkButton(captureUiText("tags"), "tags");
+    bulkButton(captureUiText("collection"), "collection");
+    bulkButton(captureUiText(selected.every(item => item.readLater) ? "removeLaterBulk" : "markLater"), "later");
+    if (activeFilter === "trash") {
+      bulkButton(captureUiText("restore") + " selected", "restore-trash");
+      bulkButton(captureUiText("deletePermanent"), "delete", true);
+    } else {
+      bulkButton((activeFilter === "archive" ? captureUiText("unarchive") : captureUiText("archive")) + " selected", "archive");
+      bulkButton(captureUiText("trash"), "delete", true);
+    }
   }
   list.replaceChildren();
   if (!shown.length) {
@@ -172,7 +355,7 @@ function render() {
     card.style.setProperty("--index", String(index));
     const head = document.createElement("div"); head.className = "item-head";
     const kind = document.createElement("span"); kind.className = "kind";
-    kind.textContent = item.pinned ? "Pinned" : (isLink(item.text) ? "Link" : "Note");
+    kind.textContent = item.trashedAt ? captureUiText("trash") : (item.archivedAt ? captureUiText("archive") : (item.pinned ? "Pinned" : (item.readLater ? captureUiText("readLater") : (isLink(item.text) ? "Link" : "Note"))));
     if (selectionMode) {
       const selectItem = makeAction(selectedIds.has(item.id) ? "✓ Selected" : "Select", "select", item.id);
       selectItem.setAttribute("aria-pressed", String(selectedIds.has(item.id)));
@@ -199,16 +382,54 @@ function render() {
       url.className = "open-link"; url.textContent = "Open link ↗";
       body.append(document.createElement("br"), url);
     }
+    let meta = null;
+    if ((item.tags && item.tags.length) || item.collection) {
+      meta = document.createElement("div");
+      meta.className = "item-meta";
+      for (const tag of item.tags || []) {
+        const tagButton = document.createElement("button");
+        tagButton.type = "button"; tagButton.className = "item-tag"; tagButton.textContent = "#" + tag;
+        tagButton.title = captureUiText("tagSearch");
+        tagButton.addEventListener("click", () => {
+          search.value = "tag:" + tag; activeFilter = "all";
+          filters.forEach(filter => filter.classList.toggle("active", filter.dataset.filter === activeFilter));
+          render(); search.focus();
+        });
+        meta.append(tagButton);
+      }
+      if (item.collection) {
+        const collectionButton = document.createElement("button");
+        collectionButton.type = "button"; collectionButton.className = "item-collection"; collectionButton.textContent = item.collection;
+        collectionButton.title = captureUiText("collectionSearch");
+        collectionButton.addEventListener("click", () => {
+          search.value = "in:" + item.collection; activeFilter = "all";
+          filters.forEach(filter => filter.classList.toggle("active", filter.dataset.filter === activeFilter));
+          render(); search.focus();
+        });
+        meta.append(collectionButton);
+      }
+    }
     const foot = document.createElement("div"); foot.className = "item-foot";
     const date = document.createElement("span"); date.className = "date"; date.textContent = formatDate(item.updatedAt || item.createdAt);
     const actions = document.createElement("div"); actions.className = "actions";
-    actions.append(makeAction("Copy", "copy", item.id), makeAction("Edit", "edit", item.id), makeAction("Delete", "delete", item.id));
+    actions.append(makeAction("Copy", "copy", item.id));
+    if (item.trashedAt) {
+      actions.append(makeAction(captureUiText("restore"), "restore-trash", item.id), makeAction(captureUiText("deletePermanent"), "delete-permanent", item.id));
+    } else {
+      actions.append(makeAction(item.readLater ? captureUiText("removeLater") : captureUiText("later"), "later", item.id));
+      actions.append(makeAction(item.archivedAt ? captureUiText("unarchive") : captureUiText("archive"), "archive", item.id));
+      actions.append(makeAction("Edit", "edit", item.id), makeAction(captureUiText("trash"), "delete", item.id));
+    }
     if (item.text.length > 240) {
       const expand = makeAction(expandedCards.has(item.id) ? "Show less" : "Read more", "expand", item.id);
       expand.setAttribute("aria-expanded", String(expandedCards.has(item.id)));
       actions.prepend(expand);
     }
-    foot.append(date, actions); card.append(head, ...previewBits, body, foot); list.append(card);
+    foot.append(date, actions);
+    card.append(head, ...previewBits, body);
+    if (meta) card.append(meta);
+    card.append(foot);
+    list.append(card);
   });
 }
 function showSearchSpace(initial = "") {
@@ -226,17 +447,83 @@ function showSearchSpace(initial = "") {
   const hint = document.createElement("span"); hint.className = "search-hint"; hint.textContent = "Esc to close";
   searchWrap.append(input, hint);
   const info = document.createElement("div"); info.className = "search-space-meta";
-  const count = document.createElement("span"); const scope = document.createElement("span"); scope.textContent = "Across links and notes";
+  const count = document.createElement("span"); const scope = document.createElement("span"); scope.textContent = "Across links, notes and documents";
   info.append(count, scope);
+  const savedSearchToolbar = document.createElement("div"); savedSearchToolbar.className = "saved-search-toolbar";
+  const savedSearchSelect = document.createElement("select"); savedSearchSelect.className = "saved-search-select"; savedSearchSelect.setAttribute("aria-label", captureUiText("savedViews"));
+  const savedSearchSave = document.createElement("button"); savedSearchSave.type = "button"; savedSearchSave.className = "search-save-button"; savedSearchSave.textContent = captureUiText("saveView");
+  const savedSearchRemove = document.createElement("button"); savedSearchRemove.type = "button"; savedSearchRemove.className = "search-save-button secondary"; savedSearchRemove.textContent = captureUiText("removeView");
+  savedSearchToolbar.append(savedSearchSelect, savedSearchSave, savedSearchRemove);
   const results = document.createElement("div"); results.className = "search-space-results"; results.setAttribute("role", "listbox"); results.setAttribute("aria-label", "Search results");
-  content.append(head, searchWrap, info, results);
+  content.append(head, searchWrap, info, savedSearchToolbar, results);
+  const SAVED_SEARCHES_KEY = "linka.savedSearches.v1";
+  let savedSearches = [];
+  const readSavedSearches = () => {
+    try {
+      const value = JSON.parse(localStorage.getItem(SAVED_SEARCHES_KEY) || "[]");
+      return Array.isArray(value) ? value.filter(item => item && typeof item.name === "string" && typeof item.query === "string").slice(0, 15) : [];
+    } catch { return []; }
+  };
+  const renderSavedSearches = selectedQuery => {
+    savedSearches = readSavedSearches();
+    const placeholder = document.createElement("option"); placeholder.value = ""; placeholder.textContent = captureUiText("savedViews");
+    savedSearchSelect.replaceChildren(placeholder);
+    for (const item of savedSearches) {
+      const option = document.createElement("option"); option.value = item.query; option.textContent = item.name;
+      savedSearchSelect.append(option);
+    }
+    savedSearchSelect.value = selectedQuery && savedSearches.some(item => item.query === selectedQuery) ? selectedQuery : "";
+    savedSearchRemove.disabled = !savedSearchSelect.value;
+  };
+  renderSavedSearches(input.value.trim());
+  savedSearchSave.addEventListener("click", () => {
+    const query = input.value.trim();
+    if (!query) { say(captureUiText("enterSearch")); return; }
+    const existing = savedSearches.find(item => item.query === query);
+    const name = window.prompt(captureUiText("nameView"), existing?.name || query.slice(0, 48));
+    if (!name || !name.trim()) return;
+    const next = [{ name: name.trim().slice(0, 48), query, updatedAt: Date.now() }, ...savedSearches.filter(item => item.query !== query)].slice(0, 15);
+    try {
+      localStorage.setItem(SAVED_SEARCHES_KEY, JSON.stringify(next));
+      renderSavedSearches(query);
+      say(captureUiText("viewSaved"));
+    } catch { say("Could not save this search. Check available local storage."); }
+  });
+  savedSearchSelect.addEventListener("change", () => {
+    if (!savedSearchSelect.value) return;
+    input.value = savedSearchSelect.value;
+    savedSearchRemove.disabled = false;
+    void refresh();
+    input.focus();
+  });
+  savedSearchRemove.addEventListener("click", () => {
+    const query = savedSearchSelect.value;
+    if (!query) return;
+    const next = savedSearches.filter(item => item.query !== query);
+    try {
+      localStorage.setItem(SAVED_SEARCHES_KEY, JSON.stringify(next));
+      renderSavedSearches(input.value.trim());
+      say(captureUiText("viewRemoved"));
+    } catch { say("Could not update saved searches."); }
+  });
   const layer = modalShell(content, { dismissable: true }); layer.classList.add("search-space-layer");
-  function refresh() {
+  let searchSequence = 0;
+  let searchTimer = null;
+  async function refresh() {
+    const sequence = ++searchSequence;
     const q = input.value.trim().toLocaleLowerCase();
     const found = visibleCaptures(captures, "all", input.value).slice(0, 80);
-    count.textContent = q ? (found.length + " matching " + (found.length === 1 ? "item" : "items")) : ("Recently saved · " + found.length);
+    const freeTextQuery = q.includes(":") ? "" : input.value.trim().replace(/^"|"$/g, "");
+    let documentFound = [];
+    if (freeTextQuery.length >= 2) {
+      documentFound = await searchLinkaDocuments(freeTextQuery, 20).catch(() => []);
+    }
+    if (sequence !== searchSequence) return;
+    renderSavedSearches(input.value.trim());
+    const totalFound = found.length + documentFound.length;
+    count.textContent = q ? (totalFound + " matching " + (totalFound === 1 ? "item" : "items")) : ("Recently saved · " + totalFound);
     results.replaceChildren();
-    if (!found.length) {
+    if (!found.length && !documentFound.length) {
       const empty = document.createElement("div"); empty.className = "search-empty";
       empty.innerHTML = '<div style="font-size:22px;margin-bottom:9px">⌕</div><strong>No matches yet</strong><br>Try a different word, domain, or page title.';
       results.append(empty); return;
@@ -269,9 +556,34 @@ function showSearchSpace(initial = "") {
       });
       results.append(row);
     });
+    if (documentFound.length) {
+      const heading = document.createElement("div");
+      heading.className = "search-section-heading";
+      heading.textContent = "Text documents";
+      results.append(heading);
+      documentFound.forEach(item => {
+        const row = document.createElement("button");
+        row.type = "button"; row.className = "search-result"; row.setAttribute("role", "option");
+        const thumb = document.createElement("span"); thumb.className = "search-thumb"; thumb.textContent = "Aa";
+        const copy = document.createElement("span"); copy.className = "search-result-copy";
+        const rowTitle = document.createElement("span"); rowTitle.className = "search-result-title"; rowTitle.textContent = item.title || "Untitled document";
+        const detail = document.createElement("span"); detail.className = "search-result-detail"; detail.textContent = item.excerpt || "Open local document";
+        const type = document.createElement("span"); type.className = "search-result-type"; type.textContent = "Document";
+        copy.append(rowTitle, detail); row.append(thumb, copy, type);
+        row.addEventListener("click", async () => {
+          modalRoot.replaceChildren();
+          const opened = await openLinkaDocumentById(item.id).catch(() => false);
+          if (!opened) say("Could not open this document. It may have been deleted.");
+        });
+        results.append(row);
+      });
+    }
   }
-  input.addEventListener("input", refresh);
-  refresh(); input.focus(); input.select();
+  input.addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { void refresh(); }, 160);
+  });
+  void refresh(); input.focus(); input.select();
 }
 function makeAction(label, action, id) {
   const button = document.createElement("button");
@@ -280,7 +592,12 @@ function makeAction(label, action, id) {
   return button;
 }
 function resetEditor() {
-  editingId = null; draft.value = ""; composeLabel.textContent = "Quick capture";
+  editingId = null; draft.value = ""; tagsDraft.value = ""; collectionDraft.value = ""; composeLabel.textContent = "Quick capture";
+  try {
+    localStorage.removeItem(QUICK_DRAFT_KEY);
+    localStorage.removeItem(QUICK_DRAFT_TAGS_KEY);
+    localStorage.removeItem(QUICK_DRAFT_COLLECTION_KEY);
+  } catch {}
   saveButton.innerHTML = 'Save to inbox <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg>';
   saveButton.disabled = true;
 }
@@ -592,95 +909,33 @@ async function checkWindowsInstaller(statusLine, downloadLink) {
   }
 }
 
-function showНастройки() {
-  const content=document.createElement("div");
-  const head=document.createElement("div"); head.className="modal-head";
-  const logo=document.createElement("img"); logo.className="modal-logo"; logo.src="/linka-mark.svg"; logo.alt="";
-  const meta=document.createElement("div"); const title=document.createElement("h2"); title.textContent="Настройки";
-  const sub=document.createElement("p"); sub.textContent="Настрой Linka под себя"; meta.append(title,sub); head.append(logo,meta); content.append(head);
-  function addChoiceSetting(titleText, descriptionText, options, selectedValue, onSelect, ariaLabel) {
-    const row = document.createElement("div"); row.className = "setting-row visual-setting-row";
-    const meta = document.createElement("div");
-    const title = document.createElement("strong"); title.textContent = titleText;
-    const description = document.createElement("p"); description.textContent = descriptionText;
-    meta.append(title, description);
-    const group = document.createElement("div"); group.className = "theme-options"; group.setAttribute("aria-label", ariaLabel || titleText);
-    options.forEach(option => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "theme-option" + (selectedValue === option.value ? " active" : "");
-      button.textContent = option.label;
-      if (option.color) button.style.setProperty("--option-color", option.color);
-      button.addEventListener("click", () => {
-        onSelect(option.value);
-        group.querySelectorAll("button").forEach(node => node.classList.toggle("active", node === button));
-      });
-      group.append(button);
-    });
-    row.append(meta, group); content.append(row);
-  }
-  addChoiceSetting("Плотность интерфейса", "Больше пространства или больше содержимого", [
-    {value:"compact",label:"Компактно"},
-    {value:"standard",label:"Стандарт"},
-    {value:"spacious",label:"Свободно"}
-  ], localStorage.getItem("linka.density") || "standard", setLinkaDensity, "Interface density");
-  const motionRow=document.createElement("div"); motionRow.className="setting-row";
-  const motionMeta=document.createElement("div"); const mt=document.createElement("strong"); mt.textContent="Меньше анимации";
-  const md=document.createElement("p"); md.textContent="Уменьшает движение и переходы интерфейса"; motionMeta.append(mt,md);
-  const toggle=document.createElement("button"); toggle.type="button"; toggle.className="toggle"; toggle.setAttribute("aria-pressed",String(reduceMotion)); toggle.setAttribute("aria-label","Toggle reduced motion");
-  const knob=document.createElement("span"); toggle.append(knob);
-  toggle.addEventListener("click",()=>{reduceMotion=!reduceMotion;localStorage.setItem("linka.reduceMotion",String(reduceMotion));toggle.setAttribute("aria-pressed",String(reduceMotion));document.documentElement.classList.toggle("reduced-motion",reduceMotion);});
-  motionRow.append(motionMeta,toggle);content.append(motionRow);
-  if(reduceMotion)document.documentElement.classList.add("reduced-motion");
-  const cloudRow=document.createElement("div"); cloudRow.className="setting-row";
-  const cloudMeta=document.createElement("div");
-  const cloudTitle=document.createElement("strong"); cloudTitle.textContent="Облачная синхронизация";
-  const cloudDesc=document.createElement("p"); const cloudSession=getCloudSession();
-  cloudDesc.textContent=cloudSession ? `Connected as ${cloudSession.email || "your account"} · ${cloudSyncStatus || "sync across your devices"}` : "Синхронизируй ссылки и заметки между Android, Windows и сайтом";
-  cloudMeta.append(cloudTitle,cloudDesc);
-  const cloudButton=document.createElement("button"); cloudButton.type="button"; cloudButton.className="ghost"; cloudButton.textContent=cloudSession?"Manage":"Set up";
-  cloudButton.addEventListener("click",()=>{modalRoot.replaceChildren();showCloudSyncНастройки();});
-  cloudRow.append(cloudMeta,cloudButton);content.append(cloudRow);
-
-  const windowsRow=document.createElement("div"); windowsRow.className="setting-row";
-  const windowsMeta=document.createElement("div");
-  const windowsTitle=document.createElement("strong"); windowsTitle.textContent="Приложение для Windows";
-  const windowsDesc=document.createElement("p"); windowsDesc.textContent=desktopBuildVersion ? `Installed version ${desktopBuildVersion}. Updates install over the existing app.` : "Проверить the latest Windows installer or update your existing desktop app.";
-  windowsMeta.append(windowsTitle,windowsDesc);
-  const windowsControls=document.createElement("div"); windowsControls.className="windows-update-controls";
-  const windowsПроверить=document.createElement("button"); windowsПроверить.type="button"; windowsПроверить.className="ghost"; windowsПроверить.textContent="Проверить";
-  const windowsСкачать=document.createElement("a"); windowsСкачать.className="primary"; windowsСкачать.textContent="Скачать"; windowsСкачать.target="_blank"; windowsСкачать.rel="noopener noreferrer"; windowsСкачать.hidden=true;
-  windowsControls.append(windowsПроверить,windowsСкачать);
-  windowsRow.append(windowsMeta,windowsControls);content.append(windowsRow);
-  const windowsStatus=document.createElement("p"); windowsStatus.className="cloud-status"; windowsStatus.textContent="Проверить release status before downloading an installer.";
-  content.append(windowsStatus);
-  windowsПроверить.addEventListener("click",()=>{void checkWindowsInstaller(windowsStatus,windowsСкачать);});
-
-  const atmosphereRow=document.createElement("div"); atmosphereRow.className="setting-row";
-  const atmosphereMeta=document.createElement("div"); const atmosphereTitle=document.createElement("strong"); atmosphereTitle.textContent="Атмосфера и музыка";
-  const atmosphereDesc=document.createElement("p"); atmosphereDesc.textContent="Лесной фон, плёночное зерно, свой трек и плейлист";
-  atmosphereMeta.append(atmosphereTitle,atmosphereDesc);
-  const atmosphereOpen=document.createElement("button"); atmosphereOpen.type="button"; atmosphereOpen.className="ghost"; atmosphereOpen.textContent="Настроить";
-  atmosphereOpen.addEventListener("click",()=>{modalRoot.replaceChildren();openAtmosphereSettings();});
-  atmosphereRow.append(atmosphereMeta,atmosphereOpen); content.append(atmosphereRow);
-  const agreementRow=document.createElement("div"); agreementRow.className="setting-row";
-  const am=document.createElement("div"); const at=document.createElement("strong");at.textContent="Пользовательское соглашение";const ap=document.createElement("p");ap.textContent="Review the local-storage and privacy terms";am.append(at,ap);
-  const view=document.createElement("button");view.type="button";view.className="ghost";view.textContent="Читать условия";
-  view.addEventListener("click",()=>{modalRoot.replaceChildren();showAgreement({mustAccept:false});});
-  agreementRow.append(am,view);content.append(agreementRow);
-  const actions=document.createElement("div");actions.className="modal-actions";const close=document.createElement("button");close.type="button";close.className="primary";close.textContent="Готово";close.addEventListener("click",()=>modalRoot.replaceChildren());actions.append(close);content.append(actions);
-  const layer=modalShell(content,{dismissable:true});
-  const priorFocus=document.activeElement;
-  layer.querySelector("button")?.focus();
-}
-draft.addEventListener("input",()=>{saveButton.disabled=!draft.value.trim();});
+draft.addEventListener("input",()=>{
+  saveButton.disabled=!draft.value.trim();
+  try {
+    if (draft.value) localStorage.setItem(QUICK_DRAFT_KEY, draft.value);
+    else localStorage.removeItem(QUICK_DRAFT_KEY);
+  } catch {}
+});
+tagsDraft.addEventListener("input", saveCaptureMetadataDraft);
+collectionDraft.addEventListener("input", saveCaptureMetadataDraft);
 draft.addEventListener("keydown",event=>{if((event.ctrlKey||event.metaKey)&&event.key==="Enter"&&draft.value.trim()){event.preventDefault();form.requestSubmit();}});
 form.addEventListener("submit",event=>{
-  event.preventDefault();const text=draft.value.trim();if(!text)return;
+  event.preventDefault();
+  const text=draft.value.trim();
+  if(!text)return;
+  const metadata = { tags: parseTagInput(tagsDraft.value), collection: collectionDraft.value.trim().slice(0,80) };
   const existing=editingId?captures.find(item=>item.id===editingId):null;
-  if(existing){captures=captures.map(item=>item.id===editingId?{...item,text:text.slice(0,100000),updatedAt:Date.now()}:item);say("Запись обновлена");}
-  else{captures.unshift(makeCapture(text));say("Сохранено на этом устройстве");window.dispatchEvent(new CustomEvent("linka:capture-saved",{detail:{title:"Saved to Linka",body:text.slice(0,140)}}));}
-  persist();resetEditor();render();
+  if(existing){
+    captures=captures.map(item=>item.id===editingId?{...item,...metadata,text:text.slice(0,100000),updatedAt:Date.now()}:item);
+    say("Запись обновлена");
+  } else {
+    captures.unshift(makeCapture(text, metadata));
+    say("Сохранено на этом устройстве");
+    window.dispatchEvent(new CustomEvent("linka:capture-saved",{detail:{title:"Saved to Linka",body:text.slice(0,140)}}));
+  }
+  if (!persist()) { render(); return; }
+  resetEditor();
+  render();
 });
 search.addEventListener("input",render);
 filters.forEach(button=>button.addEventListener("click",()=>{
@@ -707,7 +962,8 @@ bulkToolbar.addEventListener("click", async event => {
     const pinned = action === "pin";
     const now = Date.now();
     captures = captures.map(item => selectedIds.has(item.id) ? { ...item, pinned, updatedAt: now } : item);
-    persist(); render(); say(pinned ? "Selected items pinned" : "Selected items unpinned"); return;
+    if (!persist()) { render(); return; }
+    render(); say(pinned ? "Selected items pinned" : "Selected items unpinned"); return;
   }
   if (action === "copy") {
     const value = selected.map(item => item.text).join("\n\n");
@@ -730,13 +986,76 @@ bulkToolbar.addEventListener("click", async event => {
     setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
     say("Exported " + selected.length + " selected item(s)"); return;
   }
+  if (action === "tags") {
+    const current = [...new Set(selected.flatMap(item => item.tags || []))].join(", ");
+    const value = window.prompt(captureUiText("tagPrompt"), current);
+    if (value === null) return;
+    const tags = parseTagInput(value);
+    const now = Date.now();
+    captures = captures.map(item => selectedIds.has(item.id) ? { ...item, tags, updatedAt: now } : item);
+    if (!persist()) { render(); return; }
+    selectedIds.clear(); selectionMode = false;
+    render(); say(captureUiText("tags") + ": " + tags.length); return;
+  }
+  if (action === "collection") {
+    const collections = [...new Set(selected.map(item => item.collection || ""))];
+    const current = collections.length === 1 ? collections[0] : "";
+    const value = window.prompt(captureUiText("collectionPrompt"), current);
+    if (value === null) return;
+    const collection = value.trim().slice(0, 80);
+    const now = Date.now();
+    captures = captures.map(item => selectedIds.has(item.id) ? { ...item, collection, updatedAt: now } : item);
+    if (!persist()) { render(); return; }
+    selectedIds.clear(); selectionMode = false;
+    render(); say(captureUiText("collection") + ": " + (collection || "—")); return;
+  }
+  if (action === "later") {
+    const mark = !selected.every(item => item.readLater);
+    const now = Date.now();
+    captures = captures.map(item => selectedIds.has(item.id) ? { ...item, readLater: mark, updatedAt: now } : item);
+    if (!persist()) { render(); return; }
+    selectedIds.clear(); selectionMode = false;
+    render(); say(mark ? captureUiText("savedLater") : captureUiText("removedLater")); return;
+  }
+  if (action === "archive") {
+    const archive = activeFilter !== "archive";
+    const now = Date.now();
+    captures = captures.map(item => selectedIds.has(item.id) ? { ...item, archivedAt: archive ? now : 0, trashedAt: 0, updatedAt: now } : item);
+    if (!persist()) { render(); return; }
+    selectedIds.clear(); selectionMode = false;
+    render(); say(archive ? captureUiText("archived") : captureUiText("unarchived")); return;
+  }
+  if (action === "restore-trash") {
+    const now = Date.now();
+    captures = captures.map(item => selectedIds.has(item.id) ? { ...item, archivedAt: 0, trashedAt: 0, updatedAt: now } : item);
+    if (!persist()) { render(); return; }
+    selectedIds.clear(); selectionMode = false;
+    render(); say(captureUiText("restored")); return;
+  }
   if (action === "delete") {
-    if (!window.confirm("Delete " + selected.length + " selected item(s)? This cannot be undone from this dialog.")) return;
-    selected.forEach(item => addDeletedId(item.id));
+    if (activeFilter !== "trash") {
+      if (!window.confirm("Move " + selected.length + " selected item(s) to Trash? You can restore them later.")) return;
+      const now = Date.now();
+      captures = captures.map(item => selectedIds.has(item.id) ? { ...item, archivedAt: 0, trashedAt: now, updatedAt: now } : item);
+      if (!persist()) { render(); return; }
+      selectedIds.clear(); selectionMode = false;
+      render(); say(captureUiText("movedTrash")); return;
+    }
+    if (!window.confirm(captureUiText("confirmPermanent"))) return;
+    const removed = selected;
     captures = captures.filter(item => !selectedIds.has(item.id));
+    if (!persist()) { render(); return; }
+    if (!addDeletedIds(removed.map(item => item.id))) {
+      captures = [...captures, ...removed].sort((a, b) => Number(b.pinned) - Number(a.pinned) || Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0));
+      if (!persist()) say("Could not safely record cloud deletion markers. Export a backup and pause cloud sync before continuing.");
+      else say("Permanent deletion cancelled because the cloud deletion markers could not be saved.");
+      render();
+      return;
+    }
+    scheduleCloudSync();
     selectedIds.clear(); selectionMode = false;
     if (editingId && !captures.some(item => item.id === editingId)) resetEditor();
-    persist(); render(); say("Selected items deleted");
+    render(); say(captureUiText("deletedPermanent"));
   }
 });
 list.addEventListener("click",async event=>{
@@ -749,25 +1068,51 @@ list.addEventListener("click",async event=>{
   }
   const item=captures.find(entry=>entry.id===id);if(!item)return;
   if(action==="expand"){if(expandedCards.has(id))expandedCards.delete(id);else expandedCards.add(id);render();}
-  else if(action==="pin"){captures=captures.map(entry=>entry.id===id?{...entry,pinned:!entry.pinned,updatedAt:Date.now()}:entry);persist();render();say(item.pinned?"Откреплено":"Закреплено");}
+  else if(action==="pin"){captures=captures.map(entry=>entry.id===id?{...entry,pinned:!entry.pinned,updatedAt:Date.now()}:entry);if(!persist()){render();return;}render();say(item.pinned?"Откреплено":"Закреплено");}
+  else if(action==="later"){captures=captures.map(entry=>entry.id===id?{...entry,readLater:!entry.readLater,updatedAt:Date.now()}:entry);if(!persist()){render();return;}render();say(item.readLater?captureUiText("removedLater"):captureUiText("savedLater"));}
+  else if(action==="archive"){
+    const archive = !item.archivedAt;
+    captures = captures.map(entry => entry.id === id ? { ...entry, archivedAt: archive ? Date.now() : 0, trashedAt: 0, updatedAt: Date.now() } : entry);
+    if (!persist()) { render(); return; }
+    render(); say(archive ? captureUiText("archived") : captureUiText("unarchived"));
+  }
+  else if(action==="restore-trash"){
+    captures = captures.map(entry => entry.id === id ? { ...entry, archivedAt: 0, trashedAt: 0, updatedAt: Date.now() } : entry);
+    if (!persist()) { render(); return; }
+    render(); say(captureUiText("restored"));
+  }
+  else if(action==="delete-permanent"){
+    if (!window.confirm(captureUiText("confirmPermanent"))) return;
+    const removed = item;
+    captures = captures.filter(entry => entry.id !== id);
+    if (!persist()) { render(); return; }
+    if (!addDeletedId(id)) {
+      captures = [...captures, removed].sort((a,b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt);
+      if (!persist()) say("Could not safely record the cloud deletion marker. Export a backup and pause cloud sync before continuing.");
+      else say("Permanent deletion cancelled because the cloud deletion marker could not be saved.");
+      render(); return;
+    }
+    scheduleCloudSync();
+    if (editingId === id) resetEditor();
+    render(); say(captureUiText("deletedPermanent"));
+  }
   else if(action==="delete"){
-    addDeletedId(id);
-    captures=captures.filter(entry=>entry.id!==id);
+    const now = Date.now();
+    captures = captures.map(entry => entry.id === id ? { ...entry, archivedAt: 0, trashedAt: now, updatedAt: now } : entry);
+    if (!persist()) { render(); return; }
     if(editingId===id)resetEditor();
-    persist();render();say("Запись удалена");
+    render();say(captureUiText("movedTrash"));
     window.dispatchEvent(new CustomEvent("linka:toast", { detail: {
-      message: "Запись удалена",
-      actionLabel: "Отменить",
+      message: captureUiText("movedTrash"),
+      actionLabel: "Undo",
       onAction: () => {
-        const deleted = readDeletedIds();
-        deleted.delete(id);
-        try { localStorage.setItem("linka.deletedIds.v1", JSON.stringify(Array.from(deleted))); } catch {}
-        captures = [...captures.filter(entry => entry.id !== id), item].sort((a,b) => b.updatedAt - a.updatedAt).slice(0,1000);
-        persist(); render(); say("Удаление отменено");
+        captures = captures.map(entry => entry.id === id ? { ...entry, trashedAt: 0, archivedAt: 0, updatedAt: Date.now() } : entry);
+        if (!persist()) { render(); return; }
+        render(); say(captureUiText("restored"));
       }
     }}));
   }
-  else if(action==="edit"){editingId=id;draft.value=item.text;composeLabel.textContent="Edit capture";saveButton.textContent="Save changes ↗";saveButton.disabled=false;draft.focus();window.scrollTo({top:0,behavior:"smooth"});}
+  else if(action==="edit"){editingId=id;draft.value=item.text;tagsDraft.value=(item.tags||[]).join(", ");collectionDraft.value=item.collection||"";composeLabel.textContent="Edit capture";saveButton.textContent="Save changes ↗";saveButton.disabled=false;saveCaptureMetadataDraft();draft.focus();window.scrollTo({top:0,behavior:"smooth"});}
   else if(action==="copy"){try{await navigator.clipboard.writeText(item.text);say("Скопировано");}catch{draft.value=item.text;draft.focus();draft.select();say("Text selected for manual copying");}}
 });
 $("#export-button").addEventListener("click",()=>{
@@ -778,11 +1123,21 @@ $("#import-button").addEventListener("click",()=>$("#import-file").click());
 $("#import-file").addEventListener("change",async event=>{
   const file=event.target.files?.[0];if(!file)return;
   try{const parsed=JSON.parse(await file.text());const imported=Array.isArray(parsed)?parsed:parsed.captures;if(!Array.isArray(imported))throw new Error("Invalid file");
-    const normalized=imported.map(item=>makeCapture(item.text,item)).filter(Boolean);const restoredIds=new Set(normalized.map(item=>item.id));const deleted=readDeletedIds();restoredIds.forEach(id=>deleted.delete(id));try{localStorage.setItem("linka.deletedIds.v1",JSON.stringify(Array.from(deleted)));}catch{}const map=new Map(captures.map(item=>[item.id,item]));normalized.forEach(item=>map.set(item.id,item));
-    captures=Array.from(map.values()).sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,1000);persist();render();say("Imported "+normalized.length+" capture(s)");
+    const normalized=imported.map(item=>makeCapture(item.text,item)).filter(Boolean);const restoredIds=new Set(normalized.map(item=>item.id));const beforeImport=captures.map(item=>({...item}));const map=new Map(captures.map(item=>[item.id,item]));normalized.forEach(item=>map.set(item.id,item));
+    captures=Array.from(map.values()).sort((a,b)=>b.updatedAt-a.updatedAt);
+    if (persist()) {
+      if (!removeDeletedIds(restoredIds)) {
+        captures=beforeImport;
+        if (!persist()) say("Could not safely restore the previous library. Export a backup before continuing.");
+        else say("Import rolled back because old cloud deletion markers could not be removed.");
+        render();
+        return;
+      }
+      scheduleCloudSync();
+      render(); say("Imported "+normalized.length+" capture(s)");
+    } else render();
   }catch{say("Этот файл не похож на экспорт Linka");}finally{event.target.value="";}
 });
-$("#settings-button").addEventListener("click",showНастройки);
 $("#search-space-button").addEventListener("click",()=>showSearchSpace(search.value));
 document.addEventListener("keydown",event=>{
   if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="k"){
@@ -816,8 +1171,12 @@ void completeGoogleOAuthCallback().then(session => {
 }).catch(error => {
   say(error?.message || "Google sign-in could not be completed.");
 });
+window.addEventListener("linka:open-cloud-settings", () => showCloudSyncНастройки());
+window.addEventListener("linka:open-atmosphere-settings", () => openAtmosphereSettings());
+window.addEventListener("linka:open-agreement", () => showAgreement({ mustAccept: false }));
 initLinkaExperience();
 initLinkaSignature();
 initVisualSystem();
+setTimeout(showCaptureRecoveryNotice, 700);
 void initLinkaAtmosphere().catch(error => console.warn("Linka atmosphere could not start", error));
 void initLinkaDocuments().catch(error => console.warn("Linka documents could not start", error));
