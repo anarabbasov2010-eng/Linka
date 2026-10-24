@@ -45,3 +45,18 @@ test("search finds cached page titles, descriptions and host names", () => {
   assert.deepEqual(visibleCaptures(items, "all", "example.com").map(item => item.id), ["site"]);
   assert.deepEqual(visibleCaptures(items, "all", "safe routes").map(item => item.id), ["site"]);
 });
+
+
+test("search supports type, pinned, site and date operators", () => {
+  const items = [
+    { id: "a", text: "https://docs.example.com/guide", createdAt: Date.parse("2026-01-02T10:00:00"), updatedAt: 3, pinned: true, previewTitle: "Guide" },
+    { id: "b", text: "https://other.test/page", createdAt: Date.parse("2026-02-15T10:00:00"), updatedAt: 2, pinned: false },
+    { id: "c", text: "Read the guide", createdAt: Date.parse("2026-03-20T10:00:00"), updatedAt: 1, pinned: true },
+  ];
+  assert.deepEqual(visibleCaptures(items, "all", "type:link").map(item => item.id), ["a", "b"]);
+  assert.deepEqual(visibleCaptures(items, "all", "type:note is:pinned").map(item => item.id), ["c"]);
+  assert.deepEqual(visibleCaptures(items, "all", "site:example.com").map(item => item.id), ["a"]);
+  assert.deepEqual(visibleCaptures(items, "all", "before:2026-02-01").map(item => item.id), ["a"]);
+  assert.deepEqual(visibleCaptures(items, "all", "after:2026-02-01").map(item => item.id), ["c", "b"]);
+  assert.deepEqual(visibleCaptures(items, "all", 'type:link "Guide"').map(item => item.id), ["a"]);
+});
