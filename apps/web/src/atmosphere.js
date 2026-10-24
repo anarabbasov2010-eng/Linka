@@ -142,7 +142,7 @@ function typingAnimation(){
   state.audio.addEventListener("timeupdate",renderPlayer);
   state.audio.addEventListener("loadedmetadata",renderPlayer);
   state.audio.addEventListener("error",()=>{playing(false);toast("Не удалось загрузить музыку. Добавь MP3 с устройства или проверь соединение.")});
-  state.volume=Number(read("volume",.14));if(!Number.isFinite(state.volume))state.volume=.14;
+  state.volume=Number(read("volume",.14));if(!Number.isFinite(state.volume))state.volume=.14;state.volume=Math.min(1,Math.max(0,state.volume));
   const savedPlaylist=read("playlist",[]);
   const userTracks=Array.isArray(savedPlaylist)?savedPlaylist.filter(t=>t&&t.id!==DEFAULT_TRACK.id&&t.id!=="linka-provided-track"):[];
   state.playlist=[DEFAULT_TRACK,...userTracks];
@@ -155,14 +155,21 @@ function typingAnimation(){
   input.addEventListener("change",async e=>{
     const files=Array.from(e.target.files||[]);
     try{
-      let added=0;
+      let added=0,firstAddedId="";
       for(const file of files){
         if(!file.type.startsWith("audio/"))continue;
         const id=uid(),localId="track:"+id;
         await putMedia(localId,file,"audio");state.urls.set(localId,URL.createObjectURL(file));
-        state.playlist.push({id,localId,name:file.name.replace(/\.[a-z0-9]{1,5}$/i,""),artist:"Локальный файл"});added++;
+        state.playlist.push({id,localId,name:file.name.replace(/\.[a-z0-9]{1,5}$/i,""),artist:"Локальный файл"});
+        if(!firstAddedId)firstAddedId=id;
+        added++;
       }
-      write("playlist",state.playlist);renderPlayer();toast("Добавлено треков: "+added);
+      if(added){
+        state.index=Math.max(0,state.playlist.findIndex(item=>item.id===firstAddedId));
+        write("playlist",state.playlist);write("index",state.index);renderPlayer();
+        await loadTrack(state.index,true);
+      }
+      toast("Добавлено треков: "+added);
     }catch(err){toast(err.message||"Не удалось добавить треки")}
     finally{e.target.value=""}
   });
