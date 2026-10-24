@@ -1251,6 +1251,48 @@ private fun LinkaApp(
     var profileDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    var atmosphereBackgroundUri by remember { mutableStateOf(prefs.getString(ATMOSPHERE_BACKGROUND_URI_KEY, "") ?: "") }
+    var atmosphereBackgroundType by remember { mutableStateOf(prefs.getString(ATMOSPHERE_BACKGROUND_TYPE_KEY, "") ?: "") }
+    var atmosphereBackgroundEnabled by remember { mutableStateOf(prefs.getBoolean(ATMOSPHERE_BACKGROUND_ENABLED_KEY, true)) }
+    var atmosphereGrainEnabled by remember { mutableStateOf(prefs.getBoolean(ATMOSPHERE_GRAIN_ENABLED_KEY, true)) }
+    var musicEnabled by remember { mutableStateOf(prefs.getBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true)) }
+    var playerExpanded by remember { mutableStateOf(false) }
+    var musicVolume by remember { mutableFloatStateOf(prefs.getFloat(ATMOSPHERE_MUSIC_VOLUME_KEY, .14f).coerceIn(0f, 1f)) }
+    val defaultAtmosphereTrack = remember { AtmosphereTrack("linka-default", "как всё заебало..", DEFAULT_MUSIC_URL, true) }
+    val restoredMusicTracks = remember {
+        runCatching {
+            val array = JSONArray(prefs.getString(ATMOSPHERE_MUSIC_PLAYLIST_KEY, "[]") ?: "[]")
+            (0 until array.length()).mapNotNull { index ->
+                val obj = array.optJSONObject(index) ?: return@mapNotNull null
+                val id = obj.optString("id", "")
+                val name = obj.optString("name", "")
+                val uri = obj.optString("uri", "")
+                if (id.isBlank() || name.isBlank() || uri.isBlank()) null
+                else AtmosphereTrack(id, name, uri, obj.optBoolean("builtin", false))
+            }
+        }.getOrDefault(emptyList())
+    }
+    var musicTracks by remember {
+        mutableStateOf(if (restoredMusicTracks.any { it.id == defaultAtmosphereTrack.id }) restoredMusicTracks
+            else listOf(defaultAtmosphereTrack) + restoredMusicTracks.filterNot { it.builtin })
+    }
+    var musicIndex by remember { mutableIntStateOf(prefs.getInt(ATMOSPHERE_MUSIC_INDEX_KEY, 0).coerceAtLeast(0)) }
+    var musicPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+    var musicPlaying by remember { mutableStateOf(false) }
+    val activeMusicTrack = musicTracks.getOrElse(musicIndex.coerceIn(0, musicTracks.lastIndex)) { musicTracks.first() }
+    fun persistMusicTracks(tracks: List<AtmosphereTrack>) {
+        val array = JSONArray()
+        tracks.forEach { array.put(JSONObject().put("id", it.id).put("name", it.name).put("uri", it.uri).put("builtin", it.builtin)) }
+        prefs.edit().putString(ATMOSPHERE_MUSIC_PLAYLIST_KEY, array.toString()).apply()
+    }
+    fun changeMusicTrack(step: Int) {
+        if (musicTracks.size <= 1) {
+            runCatching { musicPlayer?.seekTo(0); musicPlayer?.start(); musicPlaying = true }
+            return
+        }
+        musicIndex = (musicIndex + step + musicTracks.size) % musicTracks.size
+        prefs.edit().putInt(ATMOSPHERE_MUSIC_INDEX_KEY, musicIndex).apply()
+    }
     val storedProfile = remember { runCatching { JSONObject(prefs.getString(PROFILE_JSON_KEY, "{}") ?: "{}") }.getOrDefault(JSONObject()) }
     var profileName by remember { mutableStateOf(storedProfile.optString("displayName", "")) }
     var profileAge by remember { mutableStateOf(if (storedProfile.isNull("age")) "" else storedProfile.optString("age", "")) }
@@ -1351,6 +1393,37 @@ private fun LinkaApp(
         }
     }
 
+    val backgroundPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            atmosphereBackgroundUri = uri.toString()
+            atmosphereBackgroundType = context.contentResolver.getType(uri).orEmpty()
+            prefs.edit().putString(ATMOSPHERE_BACKGROUND_URI_KEY, atmosphereBackgroundUri)
+                .putString(ATMOSPHERE_BACKGROUND_TYPE_KEY, atmosphereBackgroundType).apply()
+            message = if (lang == "ru") "Фон сохранён на этом устройстве" else "Background saved on this device"
+        }
+    }
+    val musicPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNotEmpty()) {
+            val added = uris.mapNotNull { uri ->
+                runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+                val title = runCatching {
+                    context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                        if (cursor.moveToFirst()) cursor.getString(0) else null
+                    }
+                }.getOrNull()?.takeIf { it.isNotBlank() } ?: uri.lastPathSegment?.substringAfterLast('/') ?: "Audio track"
+                AtmosphereTrack(UUID.randomUUID().toString(), title.substringBeforeLast('.', title), uri.toString())
+            }
+            if (added.isNotEmpty()) {
+                musicTracks = (musicTracks + added).distinctBy { it.id }
+                musicIndex = musicTracks.indexOfFirst { it.id == added.first().id }.coerceAtLeast(0)
+                persistMusicTracks(musicTracks)
+                prefs.edit().putInt(ATMOSPHERE_MUSIC_INDEX_KEY, musicIndex).putBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true).apply()
+                musicEnabled = true
+                message = if (lang == "ru") "Добавлено треков: " + added.size else "Tracks added: " + added.size
+            }
+        }
+    }
     fun commit(list: List<Capture>) {
         val normalized = list.sortedWith(compareByDescending<Capture> { it.pinned }.thenByDescending { it.updatedAt }).take(MAX_CAPTURES)
         val nextIds = normalized.map { it.id }.toSet()
@@ -1388,6 +1461,49 @@ private fun LinkaApp(
                 }
             }
         }
+    }
+    LaunchedEffect(activeMusicTrack.uri, musicEnabled, appInForeground, musicTracks.size, musicIndex) {
+        runCatching { musicPlayer?.release() }
+        musicPlayer = null
+        musicPlaying = false
+        if (!musicEnabled || !appInForeground) return@LaunchedEffect
+        try {
+            val player = MediaPlayer()
+            musicPlayer = player
+            player.setAudioAttributes(AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
+            if (activeMusicTrack.uri.startsWith("content://")) player.setDataSource(context, Uri.parse(activeMusicTrack.uri))
+            else player.setDataSource(activeMusicTrack.uri)
+            player.setVolume(musicVolume, musicVolume)
+            player.isLooping = musicTracks.size <= 1
+            player.setOnPreparedListener { prepared ->
+                if (musicEnabled && appInForeground) {
+                    runCatching { prepared.start(); musicPlaying = true }
+                }
+            }
+            player.setOnCompletionListener {
+                if (musicTracks.size > 1) changeMusicTrack(1)
+            }
+            player.setOnErrorListener { _, _, _ ->
+                musicPlaying = false
+                message = if (lang == "ru") "Не удалось воспроизвести трек" else "Could not play this track"
+                true
+            }
+            player.prepareAsync()
+        } catch (error: Exception) {
+            musicPlaying = false
+            message = error.message ?: "Music playback is unavailable"
+            runCatching { musicPlayer?.release() }
+            musicPlayer = null
+        }
+    }
+    DisposableEffect(musicPlayer) {
+        onDispose { runCatching { musicPlayer?.release() } }
+    }
+    LaunchedEffect(musicVolume) {
+        runCatching { musicPlayer?.setVolume(musicVolume, musicVolume) }
+        prefs.edit().putFloat(ATMOSPHERE_MUSIC_VOLUME_KEY, musicVolume).apply()
     }
     LaunchedEffect(accepted, language) {
         if (!accepted || language.isBlank()) return@LaunchedEffect
