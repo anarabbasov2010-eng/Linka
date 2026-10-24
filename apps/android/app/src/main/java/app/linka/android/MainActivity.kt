@@ -1553,11 +1553,11 @@ private fun LinkaApp(
             }
         }
     }
-    LaunchedEffect(activeMusicTrack.uri, musicEnabled, appInForeground, musicTracks.size, musicIndex) {
+    LaunchedEffect(activeMusicTrack.uri, musicEnabled, appInForeground, musicTracks.size, musicIndex, accepted, language) {
         runCatching { musicPlayer?.release() }
         musicPlayer = null
         musicPlaying = false
-        if (!musicEnabled || !appInForeground) return@LaunchedEffect
+        if (!accepted || language.isBlank() || !musicEnabled || !appInForeground) return@LaunchedEffect
         try {
             val player = MediaPlayer()
             musicPlayer = player
