@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { loadCaptures, saveCaptures, makeCapture, visibleCaptures, STORAGE_KEY, RECOVERY_KEY, getCaptureRecovery, startFreshCaptureLibrary } from "./store.js";
+import { loadCaptures, saveCaptures, makeCapture, visibleCaptures, normalizeDuplicateKey, findDuplicateCapture, STORAGE_KEY, RECOVERY_KEY, getCaptureRecovery, startFreshCaptureLibrary } from "./store.js";
 
 function memoryStorage() {
   const data = new Map();
@@ -139,4 +139,27 @@ test("archive and trash filters keep records recoverable and separate", () => {
   assert.deepEqual(loadCaptures(saved).map(item => [item.id, item.archivedAt, item.trashedAt]), [
     ["active", 0, 0], ["archived", 10, 0], ["trashed", 0, 20]
   ]);
+});
+
+
+test("duplicate detection normalizes tracking parameters and whitespace without treating trashed records as duplicates", () => {
+  const items = [
+    makeCapture("https://example.com/article?utm_source=newsletter&id=7#section", { id: "url" }),
+    makeCapture("  A note   with    repeated whitespace ", { id: "note" }),
+    makeCapture("https://example.com/article?utm_source=old&id=8", { id: "different" }),
+    makeCapture("https://example.com/article?id=7", { id: "trashed", trashedAt: Date.now() })
+  ];
+  assert.equal(normalizeDuplicateKey("https://EXAMPLE.com/article/?id=7&utm_medium=email"), normalizeDuplicateKey("https://example.com/article?id=7"));
+  assert.equal(findDuplicateCapture(items, "https://example.com/article?id=7")?.id, "url");
+  assert.equal(findDuplicateCapture(items, "a note with repeated whitespace")?.id, "note");
+  assert.equal(findDuplicateCapture(items, "https://example.com/article?id=8")?.id, "different");
+  assert.equal(findDuplicateCapture(items, "https://new.example.com") , null);
+});
+
+test("Today filter includes only captures created during the current local day", () => {
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  const today = makeCapture("today", { id: "today", createdAt: start.getTime() + 1000 });
+  const yesterday = makeCapture("yesterday", { id: "yesterday", createdAt: start.getTime() - 1000 });
+  const archived = makeCapture("archived today", { id: "archived", createdAt: start.getTime() + 2000, archivedAt: Date.now() });
+  assert.deepEqual(visibleCaptures([today, yesterday, archived], "today").map(item => item.id), ["today"]);
 });
