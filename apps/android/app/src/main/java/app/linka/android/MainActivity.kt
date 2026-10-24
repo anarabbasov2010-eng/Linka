@@ -1226,6 +1226,10 @@ private fun LinkaApp(
     var visibleLimit by remember { mutableIntStateOf(30) }
     var deleting by remember { mutableStateOf<Capture?>(null) }
     var clearDialog by remember { mutableStateOf(false) }
+    var selectionMode by remember { mutableStateOf(false) }
+    var selectedCaptureIds by remember { mutableStateOf(setOf<String>()) }
+    var bulkDeleteDialog by remember { mutableStateOf(false) }
+    var pendingExportJson by remember { mutableStateOf("[]") }
     var cloudDialog by remember { mutableStateOf(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(SYNC_REFRESH_KEY, "").isNullOrBlank()) }
     var cloudConfigExpanded by remember { mutableStateOf(false) }
     var emailSignInExpanded by remember { mutableStateOf(false) }
@@ -1316,6 +1320,22 @@ private fun LinkaApp(
             message = tr(lang, "importSuccess")
         }.onFailure { message = tr(lang, "importFailed") }
     }
+    val selectedExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) {
+            runCatching {
+                val output = context.contentResolver.openOutputStream(uri) ?: error("Could not open destination")
+                output.bufferedWriter(Charsets.UTF_8).use { it.write(pendingExportJson) }
+                message = if (lang == "ru") "Выбранные записи экспортированы"
+                    else if (lang == "az") "Seçilmiş qeydlər ixrac edildi"
+                    else if (lang == "tr") "Seçilen kayıtlar dışa aktarıldı" else "Selected items exported"
+            }.onFailure {
+                message = if (lang == "ru") "Не удалось экспортировать записи"
+                    else if (lang == "az") "Qeydləri ixrac etmək olmadı"
+                    else if (lang == "tr") "Kayıtlar dışa aktarılamadı" else "Could not export selected items"
+            }
+        }
+    }
+
     fun commit(list: List<Capture>) {
         val normalized = list.sortedWith(compareByDescending<Capture> { it.pinned }.thenByDescending { it.updatedAt }).take(MAX_CAPTURES)
         val nextIds = normalized.map { it.id }.toSet()
@@ -1668,6 +1688,59 @@ private fun LinkaApp(
                             textStyle = TextStyle(color = main, fontSize = 13.sp * fontScale), shape = RoundedCornerShape(18.dp),
                             colors = fieldColors(panel, border, main, muted))
                         FilterRow(lang, filter, { filter = it })
+                        if (page == 1) {
+                            val selectedItems = captures.filter { it.id in selectedCaptureIds }
+                            val bulkLabels = when (lang) {
+                                "ru" -> listOf("Выбрать", "Видимые", "Копировать", "Закрепить", "Открепить", "Экспорт", "Удалить", "Снять выбор")
+                                "az" -> listOf("Seç", "Görünənlər", "Kopyala", "Bərkid", "Aç", "İxrac et", "Sil", "Seçimi sil")
+                                "tr" -> listOf("Seç", "Görünenler", "Kopyala", "Sabitle", "Sabitlemeyi kaldır", "Dışa aktar", "Sil", "Seçimi temizle")
+                                else -> listOf("Select", "Visible", "Copy", "Pin", "Unpin", "Export", "Delete", "Clear")
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                TextButton(onClick = {
+                                    selectionMode = !selectionMode
+                                    if (!selectionMode) selectedCaptureIds = emptySet()
+                                }) {
+                                    Text(if (selectionMode) bulkLabels[7] else bulkLabels[0], color = if (selectionMode) MaterialTheme.colorScheme.primary else muted, fontSize = 11.sp)
+                                }
+                                if (selectionMode) {
+                                    Text("${selectedCaptureIds.size}", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                    TextButton(onClick = { selectedCaptureIds = selectedCaptureIds + visible.map { it.id } }) { Text(bulkLabels[1], color = muted, fontSize = 11.sp) }
+                                    TextButton(onClick = {
+                                        if (selectedItems.isNotEmpty()) {
+                                            copy(selectedItems.joinToString("\n\n") { it.text })
+                                            message = tr(lang, "copied")
+                                        }
+                                    }) { Text(bulkLabels[2], color = muted, fontSize = 11.sp) }
+                                    TextButton(onClick = {
+                                        if (selectedItems.isNotEmpty()) commit(captures.map { if (it.id in selectedCaptureIds) it.copy(pinned = true, updatedAt = System.currentTimeMillis()) else it })
+                                    }) { Text(bulkLabels[3], color = muted, fontSize = 11.sp) }
+                                    TextButton(onClick = {
+                                        if (selectedItems.isNotEmpty()) commit(captures.map { if (it.id in selectedCaptureIds) it.copy(pinned = false, updatedAt = System.currentTimeMillis()) else it })
+                                    }) { Text(bulkLabels[4], color = muted, fontSize = 11.sp) }
+                                    TextButton(onClick = {
+                                        if (selectedItems.isNotEmpty()) {
+                                            pendingExportJson = JSONArray().apply {
+                                                selectedItems.forEach { item ->
+                                                    put(JSONObject().put("id", item.id).put("text", item.text)
+                                                        .put("createdAt", item.createdAt).put("updatedAt", item.updatedAt)
+                                                        .put("pinned", item.pinned).put("previewTitle", item.previewTitle)
+                                                        .put("previewDescription", item.previewDescription).put("previewImageUrl", item.previewImageUrl))
+                                                }
+                                            }.toString(2)
+                                            selectedExportLauncher.launch("linka-selection.json")
+                                        }
+                                    }) { Text(bulkLabels[5], color = muted, fontSize = 11.sp) }
+                                    TextButton(onClick = { if (selectedCaptureIds.isNotEmpty()) bulkDeleteDialog = true }) {
+                                        Text(bulkLabels[6], color = Color(0xFFDA6969), fontSize = 11.sp)
+                                    }
+                                }
+                            }
+                        }
                         Text("${visible.size} ${tr(lang, "items")}", color = muted, fontSize = 11.sp)
                         if (visible.isEmpty()) EmptyState(lang, panel, border, main, muted, if (page == 2 && query.isNotBlank()) "noResults" else "empty")
                         else visible.take(visibleLimit).forEach { c -> CaptureCard(c, lang, panel, raised, border, main, muted, fontScale, density, animations,
@@ -1675,7 +1748,12 @@ private fun LinkaApp(
                             onCopy = { copy(it.text); message = tr(lang, "copied") }, onOpen = { open(it.text) },
                             onEdit = { draft = it.text; editingId = it.id; tab = 0; message = tr(lang, "edit") },
                             onDelete = { deleting = it },
-                            onPreviewLoaded = { item, preview -> commit(captures.map { c -> if (c.id == item.id) c.copy(previewTitle = preview.title, previewDescription = preview.description, previewImageUrl = preview.imageUrl) else c }) })
+                            onPreviewLoaded = { item, preview -> commit(captures.map { c -> if (c.id == item.id) c.copy(previewTitle = preview.title, previewDescription = preview.description, previewImageUrl = preview.imageUrl) else c }) },
+                             selectable = page == 1 && selectionMode,
+                             selected = c.id in selectedCaptureIds,
+                             onSelect = { item ->
+                                 selectedCaptureIds = if (item.id in selectedCaptureIds) selectedCaptureIds - item.id else selectedCaptureIds + item.id
+                             })
                         }
                         if (visible.size > visibleLimit) {
                             TextButton(onClick = { visibleLimit = (visibleLimit + 30).coerceAtMost(visible.size) }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
@@ -2064,6 +2142,23 @@ private fun LinkaApp(
         title = { Text(tr(lang, "delete"), color = main) }, text = { Text(deleting!!.text.take(180), color = muted) },
         confirmButton = { TextButton(onClick = { commit(captures.filterNot { it.id == deleting!!.id }); deleting = null; message = tr(lang, "deleted") }) { Text(tr(lang, "delete"), color = Color(0xFFDA6969)) } },
         dismissButton = { TextButton(onClick = { deleting = null }) { Text(tr(lang, "cancel"), color = muted) } })
+    if (bulkDeleteDialog) AlertDialog(
+        onDismissRequest = { bulkDeleteDialog = false },
+        containerColor = panel,
+        title = { Text(if (lang == "ru") "Удалить выбранные записи?" else if (lang == "az") "Seçilmiş qeydlər silinsin?" else if (lang == "tr") "Seçilen kayıtlar silinsin mi?" else "Delete selected items?", color = main) },
+        text = { Text(if (lang == "ru") "Будет удалено записей: ${selectedCaptureIds.size}. Это действие синхронизируется с аккаунтом." else if (lang == "az") "Silinəcək qeydlər: ${selectedCaptureIds.size}. Bu dəyişiklik hesabla sinxronlaşdırılacaq." else if (lang == "tr") "Silinecek kayıt sayısı: ${selectedCaptureIds.size}. Bu işlem hesapla eşitlenecek." else "Items to delete: ${selectedCaptureIds.size}. This change will sync with your account.", color = muted, fontSize = 12.sp, lineHeight = 18.sp) },
+        confirmButton = {
+            TextButton(onClick = {
+                val ids = selectedCaptureIds
+                commit(captures.filterNot { it.id in ids })
+                selectedCaptureIds = emptySet()
+                selectionMode = false
+                bulkDeleteDialog = false
+                message = if (lang == "ru") "Выбранные записи удалены" else if (lang == "az") "Seçilmiş qeydlər silindi" else if (lang == "tr") "Seçilen kayıtlar silindi" else "Selected items deleted"
+            }) { Text(tr(lang, "delete"), color = Color(0xFFDA6969)) }
+        },
+        dismissButton = { TextButton(onClick = { bulkDeleteDialog = false }) { Text(tr(lang, "cancel"), color = muted) } }
+    )
     if (clearDialog) AlertDialog(onDismissRequest = { clearDialog = false }, containerColor = panel,
         title = { Text(tr(lang, "clearData"), color = main) }, text = { Text(tr(lang, "clearConfirm"), color = muted, fontSize = 13.sp, lineHeight = 19.sp) },
         confirmButton = { TextButton(onClick = { commit(emptyList()); clearDialog = false; message = ""; query = "" }) { Text(tr(lang, "deleteAll"), color = Color(0xFFDA6969)) } },
@@ -2164,7 +2259,10 @@ private fun FilterRow(lang: String, selected: String, onSelected: (String) -> Un
 private fun CaptureCard(
     capture: Capture, lang: String, panel: Color, raised: Color, border: Color, main: Color, muted: Color, scale: Float, density: String, animations: Boolean,
     onPin: (Capture) -> Unit, onCopy: (Capture) -> Unit, onOpen: (Capture) -> Unit, onEdit: (Capture) -> Unit, onDelete: (Capture) -> Unit,
-    onPreviewLoaded: (Capture, LinkPreview) -> Unit
+    onPreviewLoaded: (Capture, LinkPreview) -> Unit,
+    selectable: Boolean = false,
+    selected: Boolean = false,
+    onSelect: (Capture) -> Unit = {}
 ) {
     val link = capture.text.startsWith("http://", true) || capture.text.startsWith("https://", true)
     var expanded by remember(capture.id) { mutableStateOf(false) }
@@ -2177,7 +2275,7 @@ private fun CaptureCard(
     val accentColor = MaterialTheme.colorScheme.primary
     Card(
         colors = CardDefaults.cardColors(containerColor = if (capture.pinned) raised.copy(alpha = .98f) else panel.copy(alpha = .93f)),
-        border = BorderStroke(1.dp, if (capture.pinned) accentColor.copy(alpha = .38f) else border.copy(alpha = .76f)),
+        border = BorderStroke(1.dp, if (selected) accentColor.copy(alpha = .88f) else if (capture.pinned) accentColor.copy(alpha = .38f) else border.copy(alpha = .76f)),
         elevation = CardDefaults.cardElevation(defaultElevation = if (capture.pinned) 2.dp else 0.dp),
         shape = RoundedCornerShape(23.dp),
         modifier = Modifier.fillMaxWidth().then(if (animations) Modifier.animateContentSize(spring(dampingRatio = .86f, stiffness = 340f)) else Modifier)
@@ -2198,6 +2296,11 @@ private fun CaptureCard(
                     fontSize = 9.sp, letterSpacing = 1.sp, fontWeight = FontWeight.SemiBold
                 )
                 Spacer(Modifier.weight(1f))
+                if (selectable) IconButton(onClick = { onSelect(capture) }, modifier = Modifier.size(30.dp)) {
+                    Icon(if (selected) Icons.Outlined.Check else Icons.Outlined.Add,
+                        contentDescription = if (selected) "Selected" else "Select item",
+                        tint = if (selected) accentColor else muted, modifier = Modifier.size(18.dp))
+                }
                 IconButton(onClick = { onPin(capture) }, modifier = Modifier.size(30.dp)) {
                     Icon(Icons.Outlined.PushPin, tr(lang, if (capture.pinned) "unpin" else "pin"), tint = if (capture.pinned) main else muted, modifier = Modifier.size(17.dp))
                 }
