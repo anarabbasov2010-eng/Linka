@@ -1800,43 +1800,6 @@ private fun LinkaApp(
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets.statusBars,
         bottomBar = {
-            Column(Modifier.fillMaxWidth()) {
-                if (musicTracks.isNotEmpty()) {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-                        color = panel.copy(alpha = .88f),
-                        shape = RoundedCornerShape(18.dp),
-                        border = BorderStroke(1.dp, border.copy(alpha = .75f)),
-                        tonalElevation = 1.dp
-                    ) {
-                        Row(Modifier.fillMaxWidth().clickable { playerExpanded = true }.padding(start = 12.dp, end = 5.dp, top = 7.dp, bottom = 7.dp),
-                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                            Surface(color = linkaAccent.copy(alpha = .14f), shape = RoundedCornerShape(11.dp)) {
-                                Icon(Icons.Outlined.Tune, null, tint = linkaAccent, modifier = Modifier.padding(9.dp).size(18.dp))
-                            }
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                Text(activeMusicTrack.name, color = main, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
-                                Text(if (musicPlaying) "Linka · играет" else if (musicEnabled) "Linka · готово к воспроизведению" else "Linka · музыка выключена",
-                                    color = muted, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                            TextButton(onClick = { changeMusicTrack(-1) }, contentPadding = PaddingValues(horizontal = 5.dp, vertical = 0.dp)) { Text("‹", color = muted, fontSize = 20.sp) }
-                            TextButton(onClick = {
-                                if (!musicEnabled) {
-                                    musicEnabled = true
-                                    prefs.edit().putBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true).apply()
-                                } else if (musicPlaying) {
-                                    runCatching { musicPlayer?.pause() }
-                                    musicPlaying = false
-                                } else {
-                                    runCatching { musicPlayer?.start(); musicPlaying = true }
-                                }
-                            }, contentPadding = PaddingValues(horizontal = 5.dp, vertical = 0.dp)) {
-                                Text(if (musicPlaying) "Ⅱ" else "▶", color = main, fontSize = 14.sp)
-                            }
-                            TextButton(onClick = { changeMusicTrack(1) }, contentPadding = PaddingValues(horizontal = 5.dp, vertical = 0.dp)) { Text("›", color = muted, fontSize = 20.sp) }
-                        }
-                    }
-                }
                 NavigationBar(modifier = Modifier.background(Brush.verticalGradient(listOf(Color.Transparent, panel.copy(alpha = .76f)))), containerColor = Color.Transparent, tonalElevation = 0.dp, windowInsets = WindowInsets.navigationBars) {
                 val items = listOf(
                     Triple(0, Icons.Outlined.Home, tr(lang, "home")),
@@ -1856,7 +1819,6 @@ private fun LinkaApp(
                         label = { Text(label, fontSize = 10.sp * fontScale, maxLines = 1) }, alwaysShowLabel = true,
                         colors = androidx.compose.material3.NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent, selectedIconColor = linkaAccent, unselectedIconColor = muted, selectedTextColor = main, unselectedTextColor = muted))
                 }
-            }
             }
         }
     ) { padding ->
@@ -1879,7 +1841,7 @@ private fun LinkaApp(
             }, label = "linka-page"
         ) { page ->
             Column(Modifier.fillMaxSize().background(Color.Transparent).verticalScroll(rememberScrollState()).imePadding()
-                .padding(horizontal = 18.dp).padding(top = 14.dp, bottom = 28.dp),
+                .padding(horizontal = 18.dp).padding(top = 14.dp, bottom = 100.dp),
                 verticalArrangement = Arrangement.spacedBy(when (density) { "compact" -> 10.dp; "spacious" -> 19.dp; else -> 14.dp })) {
                 Header(lang, main, muted, panel, border) { tab = 3 }
                 when (page) {
@@ -2188,6 +2150,48 @@ private fun LinkaApp(
             }
         }
     }
+    if (musicTracks.isNotEmpty()) {
+        Surface(
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 10.dp, bottom = 82.dp).widthIn(max = 240.dp),
+            color = panel.copy(alpha = .94f),
+            shape = RoundedCornerShape(17.dp),
+            border = BorderStroke(1.dp, border.copy(alpha = .88f)),
+            shadowElevation = 8.dp
+        ) {
+            Row(
+                Modifier.fillMaxWidth().clickable { playerExpanded = true }.padding(start = 8.dp, end = 4.dp, top = 5.dp, bottom = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Surface(color = linkaAccent.copy(alpha = .15f), shape = RoundedCornerShape(9.dp)) {
+                    Icon(Icons.Outlined.Tune, null, tint = linkaAccent, modifier = Modifier.padding(7.dp).size(16.dp))
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(activeMusicTrack.name, color = main, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
+                    Text(if (musicPlaying) "Linka · играет" else if (musicEnabled) "Тихий плейлист" else "Музыка выключена",
+                        color = muted, fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                IconButton(onClick = { changeMusicTrack(-1) }, modifier = Modifier.size(25.dp)) {
+                    Text("‹", color = muted, fontSize = 18.sp)
+                }
+                IconButton(onClick = {
+                    if (!musicEnabled) {
+                        musicEnabled = true
+                        prefs.edit().putBoolean(ATMOSPHERE_MUSIC_ENABLED_KEY, true).apply()
+                    } else if (musicPlaying) {
+                        runCatching { musicPlayer?.pause() }
+                        musicPlaying = false
+                    } else {
+                        runCatching { musicPlayer?.start(); musicPlaying = true }
+                    }
+                }, modifier = Modifier.size(27.dp)) {
+                    Text(if (musicPlaying) "Ⅱ" else "▶", color = main, fontSize = 12.sp)
+                }
+                IconButton(onClick = { changeMusicTrack(1) }, modifier = Modifier.size(25.dp)) {
+                    Text("›", color = muted, fontSize = 18.sp)
+                }
+            }
+        }
     }
 
     if (playerExpanded) AlertDialog(
