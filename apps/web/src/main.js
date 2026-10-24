@@ -1,4 +1,4 @@
-import { loadCaptures, saveCaptures, makeCapture, visibleCaptures } from "./store.js";
+import { loadCaptures, saveCaptures, makeCapture, visibleCaptures, getCaptureRecovery, startFreshCaptureLibrary } from "./store.js";
 import { initLinkaExperience } from "./experience.js";
 import { initVisualSystem, setLinkaAccent, setLinkaDensity, setLinkaEffects } from "./visual-system.js";
 import { initLinkaAtmosphere, openAtmosphereSettings } from "./atmosphere.js";
@@ -54,6 +54,12 @@ Linka is a personal inbox for saving text and links on the device or browser pro
 
 By selecting “I agree”, you confirm that you have read these terms and understand local storage, optional cloud synchronization and the need to keep backups. This notice is an in-app product agreement, not a substitute for professional legal advice.`;
 let captures = loadCaptures();
+let persistedCaptures = captures.map(item => ({ ...item }));
+const QUICK_DRAFT_KEY = "linka.captureDraft.v1";
+try {
+  const savedDraft = localStorage.getItem(QUICK_DRAFT_KEY);
+  if (savedDraft && !draft.value) draft.value = savedDraft;
+} catch {}
 let activeFilter = "all";
 let editingId = null;
 let statusTimer = null;
@@ -72,14 +78,77 @@ function say(message) {
   clearTimeout(statusTimer);
   statusTimer = setTimeout(() => { status.style.opacity = "0"; }, 2800);
 }
+function showCaptureRecoveryNotice() {
+  const recovery = getCaptureRecovery();
+  if (!recovery || recovery.acknowledged || document.getElementById("linka-capture-recovery")) return;
+
+  const panel = document.createElement("section");
+  panel.id = "linka-capture-recovery";
+  panel.setAttribute("role", "alertdialog");
+  panel.setAttribute("aria-modal", "false");
+  panel.setAttribute("aria-labelledby", "linka-capture-recovery-title");
+  panel.style.cssText = "position:fixed;z-index:10000;top:14px;left:50%;transform:translateX(-50%);width:min(680px,calc(100vw - 28px));padding:18px;border:1px solid #d5a15d;border-radius:16px;background:#1b1711;color:#fff7e8;box-shadow:0 18px 70px #0009;font:13px/1.55 system-ui,sans-serif";
+  const title = document.createElement("h2");
+  title.id = "linka-capture-recovery-title";
+  title.textContent = "Не удалось прочитать библиотеку Linka";
+  title.style.cssText = "margin:0 0 8px;font-size:17px;line-height:1.3";
+  const description = document.createElement("p");
+  description.textContent = "Исходные данные не заменены. Запись новых изменений заблокирована, чтобы не перезаписать библиотеку. Сначала экспортируй повреждённые данные для восстановления.";
+  description.style.cssText = "margin:0 0 14px;color:#f0dfc3";
+  const actions = document.createElement("div");
+  actions.style.cssText = "display:flex;flex-wrap:wrap;gap:8px";
+  const button = (label, primary = false) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.textContent = label;
+    item.style.cssText = "border:1px solid " + (primary ? "#d5a15d" : "#76664f") + ";border-radius:10px;padding:9px 12px;background:" + (primary ? "#d5a15d" : "#29231b") + ";color:" + (primary ? "#21180b" : "#fff7e8") + ";font:600 12px system-ui;cursor:pointer";
+    actions.append(item);
+    return item;
+  };
+  const exportButton = button("Экспортировать исходные данные", true);
+  exportButton.addEventListener("click", () => {
+    const blob = new Blob([recovery.raw], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "linka-capture-recovery.txt";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    say("Исходные данные экспортированы. Сохрани файл до продолжения работы.");
+  });
+  const freshButton = button("Начать с пустой библиотекой");
+  freshButton.addEventListener("click", () => {
+    if (!window.confirm("Сначала экспортируй исходные данные. Linka сохранит их локально для диагностики, но создаст новую пустую библиотеку. Продолжить?")) return;
+    if (!startFreshCaptureLibrary()) {
+      say("Не удалось безопасно сохранить исходные данные. Экспортируй их и проверь свободное место в хранилище.");
+      return;
+    }
+    captures = [];
+    persistedCaptures = [];
+    panel.remove();
+    render();
+    say("Создана новая библиотека. Повреждённые исходные данные сохранены отдельно.");
+  });
+  panel.append(title, description, actions);
+  document.body.append(panel);
+}
+
 function isLink(text) { return /^https?:\/\//i.test(text.trim()); }
 function formatDate(value) {
   try { return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
   catch { return "Saved"; }
 }
 function persist() {
-  if (!saveCaptures(captures)) say("Storage unavailable or full. Export a backup before closing.");
+  if (!saveCaptures(captures)) {
+    // Roll back the in-memory mutation to the last state known to be on disk.
+    // This prevents the UI from presenting an unsaved edit/delete as durable.
+    captures = persistedCaptures.map(item => ({ ...item }));
+    say("Не удалось сохранить данные. Предыдущее состояние восстановлено; освободи место или экспортируй резервную копию.");
+    return false;
+  }
+  persistedCaptures = captures.map(item => ({ ...item }));
   scheduleCloudSync();
+  return true;
 }
 function scheduleCloudSync() {
   if (!getCloudSession()) return;
@@ -91,8 +160,11 @@ async function syncNow({ silent = false } = {}) {
   cloudSyncBusy = true;
   try {
     const result = await syncCloudCaptures(captures, readDeletedIds());
+    if (!saveCaptures(result.captures)) {
+      throw new Error("Облако ответило, но объединённую библиотеку не удалось сохранить на устройстве. Локальные данные не перезаписаны; экспортируй резервную копию и освободи место.");
+    }
     captures = result.captures;
-    saveCaptures(captures);
+    persistedCaptures = captures.map(item => ({ ...item }));
     cloudSyncStatus = result.message;
     render();
     if (!silent) say(result.message);
@@ -673,14 +745,23 @@ function showНастройки() {
   const priorFocus=document.activeElement;
   layer.querySelector("button")?.focus();
 }
-draft.addEventListener("input",()=>{saveButton.disabled=!draft.value.trim();});
+draft.addEventListener("input",()=>{
+  saveButton.disabled=!draft.value.trim();
+  try {
+    if (draft.value) localStorage.setItem(QUICK_DRAFT_KEY, draft.value);
+    else localStorage.removeItem(QUICK_DRAFT_KEY);
+  } catch {}
+});
 draft.addEventListener("keydown",event=>{if((event.ctrlKey||event.metaKey)&&event.key==="Enter"&&draft.value.trim()){event.preventDefault();form.requestSubmit();}});
 form.addEventListener("submit",event=>{
   event.preventDefault();const text=draft.value.trim();if(!text)return;
   const existing=editingId?captures.find(item=>item.id===editingId):null;
   if(existing){captures=captures.map(item=>item.id===editingId?{...item,text:text.slice(0,100000),updatedAt:Date.now()}:item);say("Запись обновлена");}
   else{captures.unshift(makeCapture(text));say("Сохранено на этом устройстве");window.dispatchEvent(new CustomEvent("linka:capture-saved",{detail:{title:"Saved to Linka",body:text.slice(0,140)}}));}
-  persist();resetEditor();render();
+  if (!persist()) { render(); return; }
+  resetEditor();
+  try { localStorage.removeItem(QUICK_DRAFT_KEY); } catch {}
+  render();
 });
 search.addEventListener("input",render);
 filters.forEach(button=>button.addEventListener("click",()=>{
@@ -732,11 +813,14 @@ bulkToolbar.addEventListener("click", async event => {
   }
   if (action === "delete") {
     if (!window.confirm("Delete " + selected.length + " selected item(s)? This cannot be undone from this dialog.")) return;
-    selected.forEach(item => addDeletedId(item.id));
+    const removed = selected;
     captures = captures.filter(item => !selectedIds.has(item.id));
+    if (!persist()) { render(); return; }
+    removed.forEach(item => addDeletedId(item.id));
+    scheduleCloudSync();
     selectedIds.clear(); selectionMode = false;
     if (editingId && !captures.some(item => item.id === editingId)) resetEditor();
-    persist(); render(); say("Selected items deleted");
+    render(); say("Selected items deleted");
   }
 });
 list.addEventListener("click",async event=>{
@@ -751,10 +835,12 @@ list.addEventListener("click",async event=>{
   if(action==="expand"){if(expandedCards.has(id))expandedCards.delete(id);else expandedCards.add(id);render();}
   else if(action==="pin"){captures=captures.map(entry=>entry.id===id?{...entry,pinned:!entry.pinned,updatedAt:Date.now()}:entry);persist();render();say(item.pinned?"Откреплено":"Закреплено");}
   else if(action==="delete"){
-    addDeletedId(id);
     captures=captures.filter(entry=>entry.id!==id);
+    if (!persist()) { render(); return; }
+    addDeletedId(id);
+    scheduleCloudSync();
     if(editingId===id)resetEditor();
-    persist();render();say("Запись удалена");
+    render();say("Запись удалена");
     window.dispatchEvent(new CustomEvent("linka:toast", { detail: {
       message: "Запись удалена",
       actionLabel: "Отменить",
@@ -762,7 +848,7 @@ list.addEventListener("click",async event=>{
         const deleted = readDeletedIds();
         deleted.delete(id);
         try { localStorage.setItem("linka.deletedIds.v1", JSON.stringify(Array.from(deleted))); } catch {}
-        captures = [...captures.filter(entry => entry.id !== id), item].sort((a,b) => b.updatedAt - a.updatedAt).slice(0,1000);
+        captures = [...captures.filter(entry => entry.id !== id), item].sort((a,b) => b.updatedAt - a.updatedAt);
         persist(); render(); say("Удаление отменено");
       }
     }}));
@@ -779,7 +865,8 @@ $("#import-file").addEventListener("change",async event=>{
   const file=event.target.files?.[0];if(!file)return;
   try{const parsed=JSON.parse(await file.text());const imported=Array.isArray(parsed)?parsed:parsed.captures;if(!Array.isArray(imported))throw new Error("Invalid file");
     const normalized=imported.map(item=>makeCapture(item.text,item)).filter(Boolean);const restoredIds=new Set(normalized.map(item=>item.id));const deleted=readDeletedIds();restoredIds.forEach(id=>deleted.delete(id));try{localStorage.setItem("linka.deletedIds.v1",JSON.stringify(Array.from(deleted)));}catch{}const map=new Map(captures.map(item=>[item.id,item]));normalized.forEach(item=>map.set(item.id,item));
-    captures=Array.from(map.values()).sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,1000);persist();render();say("Imported "+normalized.length+" capture(s)");
+    captures=Array.from(map.values()).sort((a,b)=>b.updatedAt-a.updatedAt);
+    if (persist()) { render(); say("Imported "+normalized.length+" capture(s)"); } else render();
   }catch{say("Этот файл не похож на экспорт Linka");}finally{event.target.value="";}
 });
 $("#settings-button").addEventListener("click",showНастройки);
@@ -819,5 +906,6 @@ void completeGoogleOAuthCallback().then(session => {
 initLinkaExperience();
 initLinkaSignature();
 initVisualSystem();
+setTimeout(showCaptureRecoveryNotice, 700);
 void initLinkaAtmosphere().catch(error => console.warn("Linka atmosphere could not start", error));
 void initLinkaDocuments().catch(error => console.warn("Linka documents could not start", error));
