@@ -447,8 +447,7 @@ html[data-platform="web"] body {
     background:
       linear-gradient(145deg, rgba(232,223,200,.075), rgba(19,32,22,.61) 52%, rgba(8,15,10,.52)) !important;
     box-shadow: 0 13px 38px rgba(0,0,0,.13), inset 0 1px 0 rgba(255,255,255,.055);
-    backdrop-filter: blur(18px) saturate(125%);
-    -webkit-backdrop-filter: blur(18px) saturate(125%);
+    /* Translucent fills keep forest media visible without per-card GPU blur. */
     transform: none !important;
     transition: transform 220ms var(--desktop-ease), border-color 220ms ease, background 220ms ease, box-shadow 220ms ease;
   }
@@ -480,8 +479,6 @@ html[data-platform="web"] body {
   html[data-platform="web"] .icon-btn {
     border-color: rgba(232,223,200,.12);
     background: rgba(17,29,20,.46);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
     transition: color 180ms ease, border-color 180ms ease, background 180ms ease, transform 180ms var(--desktop-ease);
   }
   html[data-platform="desktop"] .filter.active,
