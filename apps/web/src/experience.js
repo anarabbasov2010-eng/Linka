@@ -442,19 +442,27 @@ async function installNativeUpdate(targetButton, statusElement) {
   }
 }
 function releaseButton(target, label, url, statusElement = null) {
-  const item = button(label, "linka-button");
+  const item = button(label, "linka-button linka-release-install");
   item.addEventListener("click", async () => {
-    if (isDesktopShell() && pendingNativeUpdate) {
-      const installed = await installNativeUpdate(item, statusElement);
-      if (installed) return;
+    item.disabled = true;
+    try {
+      if (isDesktopShell() && UPDATER_ENABLED && pendingNativeUpdate) {
+        const installed = await installNativeUpdate(item, statusElement);
+        if (installed) return;
+      }
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      if (statusElement) statusElement.textContent = error?.message || tr("errors");
+    } finally {
+      item.disabled = false;
     }
-    window.open(url, "_blank", "noopener,noreferrer");
   });
+  target.querySelector(".linka-release-install")?.remove();
   target.append(item);
 }
 async function checkForRelease({ notify = false } = {}) {
   let nativeUpdate = null;
-  if (isDesktopShell()) {
+  if (isDesktopShell() && UPDATER_ENABLED) {
     try {
       const { check } = await import("@tauri-apps/plugin-updater");
       nativeUpdate = await check();
@@ -508,20 +516,25 @@ function showUpdateSettings(panel) {
   check.addEventListener("click", async () => {
     check.disabled = true;
     detail.textContent = "Checking…";
-    await checkForRelease();
-    const latest = updateRecord?.tag_name?.replace(/^v/i, "");
-    detail.textContent = pendingNativeUpdate
-      ? tr("updateReady") + " " + (pendingNativeUpdate.version || latest || "")
-      : latest && BUILD_VERSION && compareVersions(BUILD_VERSION, latest) < 0
-        ? tr("updateReady") + " " + latest : isDesktopShell() && !UPDATER_ENABLED ? tr("updaterNotConfigured") : tr("latest");
-    if (updateRecord) {
-      releaseButton(section, tr("updateButton"), updateRecord.html_url || RELEASES_URL, detail);
-      notes.replaceChildren(make("strong", "", tr("updateChanges")));
-      const list = make("ul", "");
-      localizeReleaseNotes(updateRecord.body || "").forEach(line => list.append(make("li", "", line)));
-      if (list.children.length) { notes.append(list); notes.hidden = false; }
+    try {
+      await checkForRelease();
+      const latest = updateRecord?.tag_name?.replace(/^v/i, "");
+      detail.textContent = pendingNativeUpdate
+        ? tr("updateReady") + " " + (pendingNativeUpdate.version || latest || "")
+        : latest && BUILD_VERSION && compareVersions(BUILD_VERSION, latest) < 0
+          ? tr("updateReady") + " " + latest : isDesktopShell() && !UPDATER_ENABLED ? tr("updaterNotConfigured") : tr("latest");
+      if (updateRecord) {
+        releaseButton(section, tr("updateButton"), updateRecord.html_url || RELEASES_URL, detail);
+        notes.replaceChildren(make("strong", "", tr("updateChanges")));
+        const list = make("ul", "");
+        localizeReleaseNotes(updateRecord.body || "").forEach(line => list.append(make("li", "", line)));
+        if (list.children.length) { notes.append(list); notes.hidden = false; }
+      }
+    } catch (error) {
+      detail.textContent = error?.message || tr("errors");
+    } finally {
+      check.disabled = false;
     }
-    check.disabled = false;
   });
   section.append(detail, notes, check);
   panel.append(section);
