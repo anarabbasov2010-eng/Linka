@@ -145,6 +145,8 @@ export function setLinkaTheme(value = "forest") {
   root.style.setProperty("--text", palette.text);
   root.style.setProperty("--muted", palette.muted);
   root.style.setProperty("--soft", palette.soft);
+  root.style.setProperty("--linka-paper", palette.text);
+  root.style.setProperty("--linka-brass", palette.accent);
   if (!preference("linka.accent.user", "")) {
     root.style.setProperty("--accent", palette.accent);
     root.style.setProperty("--accent-text", palette.accentText);

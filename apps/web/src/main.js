@@ -64,7 +64,6 @@ let cloudSyncStatus = "";
 let lastCloudRefreshAt = 0;
 const expandedCards = new Set();
 const desktopBuildVersion = String(import.meta.env.VITE_LINKA_DESKTOP_VERSION || "").trim();
-let themeMode = "dark";
 let reduceMotion = localStorage.getItem("linka.reduceMotion") === "true" || (localStorage.getItem("linka.reduceMotion") === null && (() => { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } })());
 
 function say(message) {
@@ -153,14 +152,6 @@ function compareVersions(a, b) {
   }
   return 0;
 }
-function applyTheme() {
-  themeMode = "dark";
-  document.documentElement.dataset.theme = "dark";
-  try { localStorage.setItem("linka.theme", "dark"); } catch {}
-  window.dispatchEvent(new CustomEvent("linka:theme-changed", { detail: { theme: "dark" } }));
-}
-applyTheme();
-
 function render() {
   for (const id of selectedIds) if (!captures.some(item => item.id === id)) selectedIds.delete(id);
   const shown = visibleCaptures(captures, activeFilter, search.value);
@@ -346,7 +337,7 @@ function addTermsBody(container) {
   const body = document.createElement("div");
   const sections = [
     ["Your data stays local", "Captures live in this browser profile or local app storage. Browser resets, cleared data, device loss or uninstallation may erase them. Keep an export backup."],
-    ["Optional cloud sync", "Войти to the same Linka account on Android, Windows and the web to sync your library. Local storage and manual export/import remain available even when you are offline. Sync needs a configured shared Supabase project; never enter a service-role or secret key into the app."],
+    ["Optional cloud sync", "Sign in to the same Linka account on Windows and Web to sync your library. Local storage and manual export/import remain available even when you are offline. Sync needs a configured shared Supabase project; never enter a service-role or secret key into the app."],
     ["Use and responsibility", "You are responsible for what you save, protecting your device, and keeping backups. Do not use Linka as the only copy of critical information."],
     ["Links and early access", "Opened links are handled by external apps/sites. Linka is an early-stage utility; features can change and uninterrupted, error-free operation is not guaranteed."],
     ["Acceptable use", "Use Linka lawfully, respect other people’s rights, and avoid saving sensitive information on shared devices."]
