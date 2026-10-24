@@ -189,12 +189,43 @@ export function visibleCaptures(items, filter = "all", query = "") {
     if (isLink) { try { host = new URL(item.text).hostname.replace(/^www\./i, "").toLocaleLowerCase(); } catch {} }
     if (parsed.site && !(host === parsed.site || host.endsWith("." + parsed.site))) return false;
     const savedAt = Number(item.createdAt || item.updatedAt || 0);
+    if (filter === "today") {
+      const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+      const startOfTomorrow = new Date(startOfToday); startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
+      if (!(savedAt >= startOfToday.getTime() && savedAt < startOfTomorrow.getTime())) return false;
+    }
     if (parsed.before !== null && !(savedAt < parsed.before)) return false;
     if (parsed.after !== null && !(savedAt >= parsed.after)) return false;
     const searchable = [item.text, item.previewTitle, item.previewDescription, host, ...(item.tags || []), item.collection || ""].join(" ").toLocaleLowerCase();
     return !parsed.text || searchable.includes(parsed.text);
   }).sort((a,b) => Number(b.pinned)-Number(a.pinned) || b.updatedAt-a.updatedAt);
 }
+export function normalizeDuplicateKey(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (/^https?:\/\//i.test(raw)) {
+    try {
+      const url = new URL(raw);
+      url.hash = "";
+      const removable = /^(utm_.+|fbclid|gclid|dclid|msclkid|mc_cid|mc_eid|ref_src|igshid)$/i;
+      for (const key of [...url.searchParams.keys()]) if (removable.test(key)) url.searchParams.delete(key);
+      url.searchParams.sort();
+      if (url.pathname.length > 1) url.pathname = url.pathname.replace(/\/+$/, "");
+      return url.toString().replace(/\/$/, url.pathname === "/" && !url.search ? "/" : "");
+    } catch {}
+  }
+  return raw.normalize("NFKC").replace(/\s+/g, " ").trim().toLocaleLowerCase();
+}
+
+export function findDuplicateCapture(items, value, excludeId = "") {
+  const key = normalizeDuplicateKey(value);
+  if (!key) return null;
+  return (items || []).find(item =>
+    item && item.id !== excludeId && !item.trashedAt &&
+    normalizeDuplicateKey(item.text) === key
+  ) || null;
+}
+
 export function makeCapture(text, existing = {}) {
   const now=Date.now();
   return normalizeCapture({
