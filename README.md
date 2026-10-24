@@ -4,9 +4,13 @@
 
 ## Platforms
 
-- **Web:** responsive inbox with dedicated library search (Ctrl/⌘+K or /), metadata-aware search, fixed-ratio link covers, expandable capture cards, link/note filters, pinning, editing, deletion, copy, link opening and JSON import/export.
-- **Windows:** Tauri 2 desktop app using the same web inbox UI, with NSIS EXE and MSI installer targets.
+- **Web:** responsive inbox with dedicated library search (Ctrl/⌘+K or /), tags, collections, `tag:`/`in:` search operators, read-later, archive, trash with restore and explicit permanent deletion, metadata-aware search, link covers, pinning, editing, copy, link opening and JSON import/export.
+- **Windows:** Tauri 2 desktop app using the same web inbox UI and NSIS EXE installer. Windows builds run independently of Android; version-tagged releases publish the installer.
 - **Android:** Kotlin + Jetpack Compose, share-intent capture, search and filters, pin/edit/delete/copy/open, link previews, configurable cloud sync, update notifications and a guarded APK updater that checks package ID, version code and signing certificate before installation.
+
+## Inbox organization
+
+Captures can carry up to 24 tags and one collection label. Use `tag:design` to find a tag, `in:research` to filter a collection, and `is:later` to find items saved for later. The Archive view hides completed items from the main inbox without deleting them. Delete moves an item to Trash; restore it from there, or choose permanent deletion explicitly. Archive, Trash, tags, collection labels, and read-later state are stored as part of each capture and travel with cloud sync.
 
 ## Text documents
 
