@@ -67,9 +67,11 @@ export function initVisualSystem() {
   if (root.dataset.visualSystemReady === "true") return;
   root.dataset.visualSystemReady = "true";
 
-  setLinkaAccent(storageGet("linka.accent", "violet"));
+  setLinkaAccent("violet");
   setLinkaDensity(storageGet("linka.density", "standard"));
-  setLinkaEffects(storageGet("linka.effects", "balanced"));
+  setLinkaEffects("atmosphere");
+  storageSet("linka.accent", "violet");
+  storageSet("linka.effects", "atmosphere");
 
   const savedMotion = storageGet("linka.reduceMotion", "");
   let reducedMotion = savedMotion === "true";
