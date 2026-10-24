@@ -190,7 +190,7 @@ export function initVisualSystem() {
       '<label class="linka-command-search"><span aria-hidden="true">⌕</span><input type="search" autocomplete="off" spellcheck="false" placeholder="Type a command…" aria-label="Search commands"></label>' +
       '<div class="linka-command-meta"><span>COMMANDS</span><span>↑ ↓ select · ↵ run</span></div>' +
       '<div class="linka-command-results" role="listbox" aria-label="Commands"></div>' +
-      '<div class="linka-command-footer"><span><kbd>Ctrl K</kbd> to open</span><span>Linka · Obsidian</span></div>' +
+      '<div class="linka-command-footer"><span><kbd>Ctrl K</kbd> to open</span><span>Linka · Workspace</span></div>' +
     '</section>';
   document.body.append(palette);
   const commandInput = palette.querySelector("input");
