@@ -788,6 +788,9 @@ private object AmbientAudioEngine {
 class MainActivity : ComponentActivity() {
     private var incomingSharedText by mutableStateOf("")
     private var incomingSharedToken by mutableIntStateOf(0)
+    private var incomingLinkaDocumentText by mutableStateOf("")
+    private var incomingLinkaDocumentTitle by mutableStateOf("")
+    private var incomingLinkaDocumentToken by mutableIntStateOf(0)
     private var incomingPairingToken by mutableIntStateOf(0)
     private var incomingOAuthToken by mutableIntStateOf(0)
     private var updateInfo by mutableStateOf<UpdateInfo?>(null)
@@ -891,6 +894,34 @@ class MainActivity : ComponentActivity() {
         prefs().edit().putString(CAPTURES_KEY, array.toString()).apply()
     }
     private fun openExternal(value: String) { runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(value.trim()))) } }
+    private fun rememberLinkaDocumentIntent(value: Intent?) {
+        if (value?.action != Intent.ACTION_VIEW) return
+        val uri = value.data ?: return
+        val name = runCatching {
+            contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) else null
+            }
+        }.getOrNull().orEmpty()
+        val mime = value.type ?: runCatching { contentResolver.getType(uri) }.getOrNull().orEmpty()
+        if (!name.endsWith(".linka", ignoreCase = true) && mime != "application/vnd.linka.document+json") return
+        val raw = runCatching {
+            val reader = contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8) ?: return
+            reader.use {
+                val builder = StringBuilder()
+                val buffer = CharArray(8192)
+                while (true) {
+                    val count = it.read(buffer)
+                    if (count < 0) break
+                    if (builder.length + count > 5_000_000) throw IllegalArgumentException("Документ превышает лимит 5 МБ текста.")
+                    builder.append(buffer, 0, count)
+                }
+                builder.toString()
+            }
+        }.getOrNull() ?: return
+        incomingLinkaDocumentTitle = name.substringBeforeLast('.', name).ifBlank { "Документ Linka" }.take(180)
+        incomingLinkaDocumentText = raw
+        incomingLinkaDocumentToken++
+    }
     private fun copyText(value: String) {
         (getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("Linka", value))
     }
@@ -938,6 +969,7 @@ class MainActivity : ComponentActivity() {
         scheduleUpdateChecks()
         incomingSharedText = extractSharedText(intent)
         incomingSharedToken = 1
+        rememberLinkaDocumentIntent(intent)
         rememberPairingIntent(intent)
         checkForUpdate(true)
         setContent {
@@ -971,6 +1003,7 @@ class MainActivity : ComponentActivity() {
             )) {
                 LinkaApp(
                     sharedText = incomingSharedText, sharedTrigger = incomingSharedToken, pairingTrigger = incomingPairingToken, oauthTrigger = incomingOAuthToken,
+                    externalDocumentText = incomingLinkaDocumentText, externalDocumentTitle = incomingLinkaDocumentTitle, externalDocumentTrigger = incomingLinkaDocumentToken,
                     load = { loadCaptures() }, save = { saveCaptures(it) },
                     copy = { copyText(it) }, open = { openExternal(it) },
                     theme = theme, setTheme = { },
@@ -1021,6 +1054,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         rememberPairingIntent(intent)
+        rememberLinkaDocumentIntent(intent)
         incomingSharedText = extractSharedText(intent)
         incomingSharedToken++
     }
@@ -1321,7 +1355,9 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun LinkaApp(
-    sharedText: String, sharedTrigger: Int, pairingTrigger: Int, oauthTrigger: Int, load: () -> List<Capture>, save: (List<Capture>) -> Unit, copy: (String) -> Unit, open: (String) -> Unit,
+    sharedText: String, sharedTrigger: Int, pairingTrigger: Int, oauthTrigger: Int,
+    externalDocumentText: String, externalDocumentTitle: String, externalDocumentTrigger: Int,
+    load: () -> List<Capture>, save: (List<Capture>) -> Unit, copy: (String) -> Unit, open: (String) -> Unit,
     theme: String, setTheme: (String) -> Unit, accent: String, setAccent: (String) -> Unit, language: String, setLanguage: (String) -> Unit,
     animations: Boolean, setAnimations: (Boolean) -> Unit, ambientAudio: Boolean, setAmbientAudio: (Boolean) -> Unit, density: String, setDensity: (String) -> Unit, effects: String, setEffects: (String) -> Unit, fontScale: Float, setFontScale: (Float) -> Unit,
     alerts: Boolean, notificationPermissionGranted: Boolean, openNotificationSettings: () -> Unit, sendTestNotification: () -> Unit, setAlerts: (Boolean) -> Unit, updateInfo: UpdateInfo?, updateStatus: String, checking: Boolean,
@@ -1741,6 +1777,32 @@ private fun LinkaApp(
             cloudDialog = true
         }
     }
+    LaunchedEffect(externalDocumentTrigger) {
+        if (externalDocumentTrigger <= 0 || externalDocumentText.isBlank()) return@LaunchedEffect
+        while (!linkaDraftRestored) delay(20L)
+        runCatching {
+            require(externalDocumentText.length <= 5_000_000) { "Документ превышает лимит 5 МБ текста." }
+            val parsed = runCatching { JSONObject(externalDocumentText) }.getOrNull()
+            if (parsed?.optString("format") == LINKA_DOCUMENT_FORMAT) {
+                require(parsed.optInt("version", 1) == 1) { "Эта версия документа .linka не поддерживается." }
+                linkaDocumentId = parsed.optString("id").ifBlank { UUID.randomUUID().toString() }
+                linkaDocumentTitle = parsed.optString("title").ifBlank { externalDocumentTitle.ifBlank { "Документ Linka" } }.take(180)
+                linkaDocumentText = parsed.optString("text", "").take(5_000_000)
+                linkaDocumentCreatedAt = parsed.optLong("createdAt", System.currentTimeMillis())
+            } else {
+                require(!externalDocumentText.trimStart().startsWith("[") && parsed?.has("captures") != true) { "Это резервная копия Linka, а не текстовый документ .linka." }
+                linkaDocumentId = UUID.randomUUID().toString()
+                linkaDocumentTitle = externalDocumentTitle.ifBlank { "Документ Linka" }.take(180)
+                linkaDocumentText = externalDocumentText
+                linkaDocumentCreatedAt = System.currentTimeMillis()
+            }
+            linkaDocumentDialog = true
+            message = if (lang == "ru") "Документ .linka открыт" else "Opened .linka document"
+        }.onFailure {
+            message = it.message ?: if (lang == "ru") "Не удалось открыть .linka" else "Could not open .linka"
+        }
+    }
+
     LaunchedEffect(sharedText, sharedTrigger) {
         val incoming = sharedText.trim().take(MAX_CAPTURE_CHARS)
         if (incoming.isNotBlank()) {
