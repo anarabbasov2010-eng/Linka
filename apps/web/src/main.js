@@ -1,6 +1,6 @@
 import { loadCaptures, saveCaptures, makeCapture, visibleCaptures, getCaptureRecovery, startFreshCaptureLibrary } from "./store.js";
 import { initLinkaExperience } from "./experience.js";
-import { initVisualSystem, setLinkaAccent, setLinkaDensity, setLinkaEffects } from "./visual-system.js";
+import { initVisualSystem } from "./visual-system.js";
 import { initLinkaAtmosphere, openAtmosphereSettings } from "./atmosphere.js";
 import { initLinkaDocuments } from "./documents.js";
 import { initLinkaSignature } from "./signature-theme.js";
