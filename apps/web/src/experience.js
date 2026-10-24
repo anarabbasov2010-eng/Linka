@@ -23,8 +23,8 @@ const COPY = {
     privacy: "Private by default · local-first", eyebrow: "Your personal library",
     hero: ["Keep", "what", "matters."], heroBody: "Links, notes, and useful ideas. Saved once. Easy to find again.",
     quick: "Quick capture", subtitle: "Keep the useful stuff.", placeholder: "Drop a link. Save a thought. Keep it for later…",
-    hint: "Saved on this device. Export a backup whenever you need.", tags: "Tags", collection: "Collection", tagsPlaceholder: "design, reading, work", collectionPlaceholder: "Project or topic", later: "Read later", save: "Save to inbox",
-    inbox: "Your inbox", export: "Export", import: "Import", filters: ["All", "Pinned", "Read later", "Links", "Notes"],
+    hint: "Saved on this device. Export a backup whenever you need.", tags: "Tags", collection: "Collection", tagsPlaceholder: "design, reading, work", collectionPlaceholder: "Project or topic", later: "Read later", archive: "Archive", trash: "Trash", save: "Save to inbox",
+    inbox: "Your inbox", export: "Export", import: "Import", filters: ["All", "Pinned", "Read later", "Archive", "Trash", "Links", "Notes"],
     footer: "your personal library", footerRight: "Simple by design. Back up what matters.",
     account: "Account", settings: "Settings", language: "Language", theme: "Appearance", dark: "Dark", light: "Light", system: "System", reducedMotion: "Reduce motion", reducedMotionBody: "Use shorter, calmer transitions.",
     startTitle: "Welcome to Linka", startBody: "Create your account with your email. Your library will be ready on every signed-in device.",
@@ -51,8 +51,8 @@ const COPY = {
     privacy: "Приватность по умолчанию · сначала локально", eyebrow: "Твоя личная библиотека",
     hero: ["Сохраняй", "то,", "что важно."], heroBody: "Ссылки, заметки и идеи. Сохраняй один раз — находи снова.",
     quick: "Быстрое сохранение", subtitle: "Только то, что нужно.", placeholder: "Вставь ссылку или сохрани мысль…",
-    hint: "Сохранено на этом устройстве. Не забывай делать резервную копию.", tags: "Теги", collection: "Коллекция", tagsPlaceholder: "дизайн, чтение, работа", collectionPlaceholder: "Проект или тема", later: "Сохранить на потом", save: "Сохранить",
-    inbox: "Твоя библиотека", export: "Экспорт", import: "Импорт", filters: ["Всё", "Закреплённое", "Сохранить на потом", "Ссылки", "Заметки"],
+    hint: "Сохранено на этом устройстве. Не забывай делать резервную копию.", tags: "Теги", collection: "Коллекция", tagsPlaceholder: "дизайн, чтение, работа", collectionPlaceholder: "Проект или тема", later: "Сохранить на потом", archive: "Архивировать", trash: "Корзина", save: "Сохранить",
+    inbox: "Твоя библиотека", export: "Экспорт", import: "Импорт", filters: ["Всё", "Закреплённое", "Сохранить на потом", "Архив", "Корзина", "Ссылки", "Заметки"],
     footer: "твоя личная библиотека", footerRight: "Ничего лишнего. Сохраняй важное в резервную копию.",
     account: "Аккаунт", settings: "Настройки", language: "Язык", theme: "Оформление", dark: "Тёмная", light: "Светлая", system: "Системная", reducedMotion: "Меньше анимации", reducedMotionBody: "Сокращает движение и переходы.",
     startTitle: "Добро пожаловать в Linka", startBody: "Создай аккаунт по электронной почте. Библиотека будет доступна на устройствах, где выполнен вход.",
@@ -79,8 +79,8 @@ const COPY = {
     privacy: "Məxfilik standartdır · əvvəlcə cihazda", eyebrow: "Şəxsi kitabxanan",
     hero: ["Vacib", "olanı", "saxla."], heroBody: "Linklər, qeydlər və ideyalar. Bir dəfə saxla, sonra asan tap.",
     quick: "Tez yadda saxla", subtitle: "Yalnız lazım olanlar.", placeholder: "Link əlavə et və ya fikrini yaz…",
-    hint: "Bu cihazda saxlanılır. Ehtiyat nüsxə yaratmağı unutma.", tags: "Teqlər", collection: "Kolleksiya", tagsPlaceholder: "dizayn, oxu, iş", collectionPlaceholder: "Layihə və ya mövzu", later: "Sonra oxu", save: "Yadda saxla",
-    inbox: "Kitabxanan", export: "İxrac", import: "İdxal", filters: ["Hamısı", "Sabitlənmiş", "Sonra oxu", "Linklər", "Qeydlər"],
+    hint: "Bu cihazda saxlanılır. Ehtiyat nüsxə yaratmağı unutma.", tags: "Teqlər", collection: "Kolleksiya", tagsPlaceholder: "dizayn, oxu, iş", collectionPlaceholder: "Layihə və ya mövzu", later: "Sonra oxu", archive: "Arxivə köçür", trash: "Zibil qutusu", save: "Yadda saxla",
+    inbox: "Kitabxanan", export: "İxrac", import: "İdxal", filters: ["Hamısı", "Sabitlənmiş", "Sonra oxu", "Arxiv", "Zibil qutusu", "Linklər", "Qeydlər"],
     footer: "şəxsi kitabxanan", footerRight: "Sadə və səliqəli. Vacib olanları ehtiyatda saxla.",
     account: "Hesab", settings: "Parametrlər", language: "Dil", theme: "Görünüş", dark: "Tünd", light: "Açıq", system: "Sistem", reducedMotion: "Az animasiya", reducedMotionBody: "Hərəkət və keçidlər azaldılır.",
     startTitle: "Linka-ya xoş gəlmisən", startBody: "E-poçtla hesab yarat. Kitabxanan daxil olduğun bütün cihazlarda əlçatan olacaq.",
@@ -107,8 +107,8 @@ const COPY = {
     privacy: "Varsayılan gizlilik · önce cihazda", eyebrow: "Kişisel kitaplığın",
     hero: ["Önemli", "olanı", "sakla."], heroBody: "Bağlantılar, notlar ve fikirler. Bir kez kaydet, sonra kolayca bul.",
     quick: "Hızlı kayıt", subtitle: "Yalnızca gerekenler.", placeholder: "Bağlantı ekle veya bir düşünce yaz…",
-    hint: "Bu cihazda saklanır. Yedek almayı unutma.", tags: "Etiketler", collection: "Koleksiyon", tagsPlaceholder: "tasarım, okuma, iş", collectionPlaceholder: "Proje veya konu", later: "Daha sonra oku", save: "Gelen kutusuna kaydet",
-    inbox: "Kitaplığın", export: "Dışa aktar", import: "İçe aktar", filters: ["Tümü", "Sabitlenen", "Daha sonra oku", "Bağlantılar", "Notlar"],
+    hint: "Bu cihazda saklanır. Yedek almayı unutma.", tags: "Etiketler", collection: "Koleksiyon", tagsPlaceholder: "tasarım, okuma, iş", collectionPlaceholder: "Proje veya konu", later: "Daha sonra oku", archive: "Arşivle", trash: "Çöp kutusu", save: "Gelen kutusuna kaydet",
+    inbox: "Kitaplığın", export: "Dışa aktar", import: "İçe aktar", filters: ["Tümü", "Sabitlenen", "Daha sonra oku", "Arşiv", "Çöp kutusu", "Bağlantılar", "Notlar"],
     footer: "kişisel kitaplığın", footerRight: "Sade tasarım. Önemli olanları yedekle.",
     account: "Hesap", settings: "Ayarlar", language: "Dil", theme: "Görünüm", dark: "Koyu", light: "Açık", system: "Sistem", reducedMotion: "Hareketi azalt", reducedMotionBody: "Hareket ve geçişleri azaltır.",
     startTitle: "Linka'ya hoş geldin", startBody: "E-posta adresinle hesap oluştur. Kitaplığın giriş yaptığın tüm cihazlarda kullanılabilir.",
@@ -933,7 +933,7 @@ function mountWebNavigation() {
   const nav = make("nav", "web-side-nav");
   nav.setAttribute("aria-label", "Library sections");
   const entries = [
-    ["all", "▦", tr("inbox")], ["pinned", "⌖", tr("pinned")], ["read-later", "◷", tr("later")],
+    ["all", "▦", tr("inbox")], ["pinned", "⌖", tr("pinned")], ["read-later", "◷", tr("later")], ["archive", "▤", tr("archive")], ["trash", "⌫", tr("trash")],
     ["links", "↗", tr("links")], ["notes", "Aa", tr("notes")],
     ["search", "⌕", tr("search")], ["capture", "+", tr("quick")],
     ["account", "○", tr("account")], ["settings", "⚙", tr("settings")]
@@ -959,7 +959,7 @@ function mountWebNavigation() {
     node.querySelector(".web-nav-glyph").textContent = glyph;
     node.querySelector(".web-nav-label").textContent = label;
     node.addEventListener("click", () => {
-      if (["all", "pinned", "read-later", "links", "notes"].includes(key)) {
+      if (["all", "pinned", "read-later", "archive", "trash", "links", "notes"].includes(key)) {
         document.querySelector('[data-filter="' + key + '"]')?.click();
         activate(key);
         document.querySelector(".workspace")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -992,10 +992,10 @@ function mountWebNavigation() {
 function updateWebNavLabels() {
   const lang = langCode();
   const labels = {
-    en: { all: "Inbox", pinned: "Pinned", "read-later": "Read later", links: "Links", notes: "Notes", search: "Search", capture: "New capture", account: "Account", settings: "Settings" },
-    ru: { all: "Входящие", pinned: "Закреплённое", "read-later": "Сохранить на потом", links: "Ссылки", notes: "Заметки", search: "Поиск", capture: "Сохранить", account: "Аккаунт", settings: "Настройки" },
-    az: { all: "Gələnlər", pinned: "Sabitlənmiş", "read-later": "Sonra oxu", links: "Linklər", notes: "Qeydlər", search: "Axtar", capture: "Yadda saxla", account: "Hesab", settings: "Parametrlər" },
-    tr: { all: "Gelen kutusu", pinned: "Sabitlenen", "read-later": "Daha sonra oku", links: "Bağlantılar", notes: "Notlar", search: "Ara", capture: "Kaydet", account: "Hesap", settings: "Ayarlar" }
+    en: { all: "Inbox", pinned: "Pinned", "read-later": "Read later", archive: "Archive", trash: "Trash", links: "Links", notes: "Notes", search: "Search", capture: "New capture", account: "Account", settings: "Settings" },
+    ru: { all: "Входящие", pinned: "Закреплённое", "read-later": "Сохранить на потом", archive: "Архив", trash: "Корзина", links: "Ссылки", notes: "Заметки", search: "Поиск", capture: "Сохранить", account: "Аккаунт", settings: "Настройки" },
+    az: { all: "Gələnlər", pinned: "Sabitlənmiş", "read-later": "Sonra oxu", archive: "Arxiv", trash: "Zibil qutusu", links: "Linklər", notes: "Qeydlər", search: "Axtar", capture: "Yadda saxla", account: "Hesab", settings: "Parametrlər" },
+    tr: { all: "Gelen kutusu", pinned: "Sabitlenen", "read-later": "Daha sonra oku", archive: "Arşiv", trash: "Çöp kutusu", links: "Bağlantılar", notes: "Notlar", search: "Ara", capture: "Kaydet", account: "Hesap", settings: "Ayarlar" }
   };
   const selected = labels[lang] || labels.en;
   document.querySelectorAll(".web-nav-item[data-nav]").forEach(node => {
