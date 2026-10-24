@@ -1,44 +1,47 @@
 # Linka
 
-**Keep what matters.** A clean, local-first inbox for links, thoughts and text.
+**Keep what matters.** A quiet, local-first workspace for links, thoughts and text.
 
 ## Platforms
 
-- **Web:** responsive inbox with dedicated library search (Ctrl/⌘+K or /), metadata-aware search, fixed-ratio link covers, expandable capture cards, link/note filters, pinning, editing, deletion, copy, link opening and JSON import/export.
-- **Windows:** Tauri 2 desktop app using the same web inbox UI, with NSIS EXE and MSI installer targets.
-- **Android:** Kotlin + Jetpack Compose, share-intent capture, search and filters, pin/edit/delete/copy/open, link previews, configurable cloud sync, update notifications and a guarded APK updater that checks package ID, version code and signing certificate before installation.
+- **Web:** responsive personal library with fast search (Ctrl/⌘+K or /), preview cards, filters, pinning, editing, bulk actions, JSON import/export and optional cloud sync.
+- **Windows:** native Tauri 2 desktop app using the same Web interface, with a per-user NSIS installer, .linka file association and the WebView2 bootstrapper included in the installer.
+
+Linka is developed for **Windows and Web only**. The native Android app and Android build/release pipelines are no longer part of this project.
 
 ## Text documents
 
-Linka includes a separate text editor for personal documents with local autosave, gentle per-character typing and erasing effects, recent drafts, and portable `.linka` files. A standalone document does not become an inbox capture and is not uploaded by Cloud Sync.
+Linka includes a separate text editor with local autosave, per-character typing and erasing effects, recent drafts, and portable .linka files. Documents stay separate from inbox captures and are not sent through Cloud Sync.
 
-- **Web / Windows:** create or open documents from the document icon in the top bar. The Windows NSIS installer registers `.linka` files so opening one from Explorer can launch the editor.
-- **Android:** open the editor from Settings, or open a `.linka` file from a compatible file manager. Use **Save .linka** to export a portable file through Android's document picker.
-- **Portable format:** UTF-8 JSON, schema version 1. The fields and limits are documented in [Linka document format](docs/LINKA-DOCUMENT-FORMAT.md).
+- Create or open documents with the document icon in the top bar.
+- Windows associates .linka files with Linka so documents can be opened from File Explorer.
+- Web and Windows support opening plain-text files and exporting portable documents.
+- The UTF-8 JSON format, schema version and limits are documented in [Linka document format](docs/LINKA-DOCUMENT-FORMAT.md).
 
-Background media and music are configured independently on each device. Pick a personal photo/video or audio file in Atmosphere settings; the bundled forest scene remains the default visual backdrop, but Linka does not autoplay a preselected music track.
+## Atmosphere and music
 
-## Build downloads
+The desktop interface uses one forest-at-dusk visual style, a subtle video backdrop with a static forest fallback, light film grain, translucent glass panels and gentle typing transitions. Choose a personal background image/video or local audio files in Atmosphere settings. Personal media stays on the current device.
 
-- [Android APK workflow](https://github.com/anarabbasov2010-eng/Linka/actions/workflows/android-apk.yml)
+## Downloads
+
+- [Latest Windows release and installer](https://github.com/anarabbasov2010-eng/Linka/releases/latest)
 - [Windows installer workflow](https://github.com/anarabbasov2010-eng/Linka/actions/workflows/windows-build.yml)
-- [Web CI](https://github.com/anarabbasov2010-eng/Linka/actions/workflows/ci.yml)
+- [Web quality checks](https://github.com/anarabbasov2010-eng/Linka/actions/workflows/ci.yml)
 
-Download artifacts from a successful workflow run. CI artifacts are temporary downloads; make a GitHub Release for durable public releases.
+CI artifacts are temporary; use the latest GitHub Release for the Windows installer.
 
 ## Development
 
 ### Web
-From `apps/web`: `npm install`, `npm run dev`, `npm test`, or `npm run build`.
 
-### Android
-Open `apps/android` in Android Studio with JDK 17, or run `gradle assembleDebug` in that directory.
+From apps/web run npm install, npm run dev, npm test, or npm run build.
 
 ### Windows
-Install Node.js, Rust stable/MSVC prerequisites, then run `npm install` in `apps/web` and `apps/desktop`, followed by `npm run build` from `apps/desktop`.
+
+Install Node.js 22, Rust stable and the Windows MSVC prerequisites. Run npm install in apps/web and apps/desktop, followed by npm run build from apps/desktop.
 
 ## Sync, updates and privacy
 
-Linka remains local-first and supports manual JSON export/import. Optional cross-device Cloud Sync is implemented for Android and the web/Windows client when each installation is configured with the same Supabase project and Linka account. The shared table uses Row Level Security; setup and SQL are documented in [Cloud Sync](docs/CLOUD-SYNC.md). Cloud Sync is not preconfigured in this repository; it needs a project URL and a public publishable/anon key. Never use a `service_role` or secret key in a client.
+Linka keeps the main library locally and supports manual JSON backups. Optional Cloud Sync works between Web and Windows when both clients use the same Supabase project and Linka account. The database schema and Row Level Security setup are documented in [Cloud Sync](docs/CLOUD-SYNC.md). Cloud Sync is not preconfigured in the repository; it needs a Supabase project URL and a public publishable/anon key. Never put a service_role or other secret key in client code.
 
-Android update checks are immediate on app launch and also scheduled by WorkManager. If Android blocks notifications, the app reports this in Settings; downloaded APKs are validated against the installed package and signing certificate before the installer opens. Releases are debug-signed for this hobby project, not Play Store production signing. The Windows installer is generated by GitHub Actions and published with the matching release. See [the in-app user agreement](docs/USER-AGREEMENT.md).
+Windows signed in-app updates are enabled only when the repository has both LINKA_UPDATER_PUBLIC_KEY and TAURI_SIGNING_PRIVATE_KEY configured. Otherwise, update from the Windows installer in GitHub Releases. See the [user agreement](docs/USER-AGREEMENT.md).
