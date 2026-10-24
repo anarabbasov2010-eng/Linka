@@ -1,4 +1,4 @@
-import { loadCaptures, saveCaptures, makeCapture, visibleCaptures, getCaptureRecovery, startFreshCaptureLibrary } from "./store.js";
+import { loadCaptures, saveCaptures, makeCapture, visibleCaptures, findDuplicateCapture, getCaptureRecovery, startFreshCaptureLibrary } from "./store.js";
 import { initLinkaExperience } from "./experience.js";
 import { initVisualSystem } from "./visual-system.js";
 import { initLinkaAtmosphere, openAtmosphereSettings } from "./atmosphere.js";
@@ -41,10 +41,10 @@ search.title = "Search operators: type:link, type:note, is:pinned, is:later, tag
 function captureUiText(key) {
   const language = (() => { try { return localStorage.getItem("linka.language.v1") || "en"; } catch { return "en"; } })();
   const copy = {
-    en: { later: "Read later", removeLater: "Remove later", tagSearch: "Search this tag", collectionSearch: "Show this collection", savedLater: "Saved for later", removedLater: "Removed from read later", readLater: "Read later", archive: "Archive", unarchive: "Unarchive", trash: "Move to trash", restore: "Restore", deletePermanent: "Delete permanently", archived: "Archived", unarchived: "Moved out of archive", movedTrash: "Moved to trash", restored: "Restored from trash", deletedPermanent: "Permanently deleted", confirmPermanent: "Permanently delete the selected items? This cannot be undone.", tags: "Edit tags", collection: "Set collection", markLater: "Mark for later", removeLaterBulk: "Remove from read later", tagPrompt: "Comma-separated tags (leave empty to clear)", collectionPrompt: "Collection name (leave empty to clear)", savedViews: "Saved searches", saveView: "Save view", removeView: "Remove view", nameView: "Name this search", viewSaved: "Search saved", viewRemoved: "Saved search removed", enterSearch: "Type a search before saving it." },
-    ru: { later: "Сохранить на потом", removeLater: "Убрать из отложенного", tagSearch: "Найти этот тег", collectionSearch: "Открыть коллекцию", savedLater: "Добавлено в «Сохранить на потом»", removedLater: "Убрано из отложенного", readLater: "Отложено", archive: "В архив", unarchive: "Вернуть из архива", trash: "В корзину", restore: "Восстановить", deletePermanent: "Удалить навсегда", archived: "Перемещено в архив", unarchived: "Возвращено из архива", movedTrash: "Перемещено в корзину", restored: "Восстановлено из корзины", deletedPermanent: "Удалено навсегда", confirmPermanent: "Удалить выбранные записи навсегда? Это действие нельзя отменить.", tags: "Изменить теги", collection: "Задать коллекцию", markLater: "Отложить", removeLaterBulk: "Убрать из отложенного", tagPrompt: "Теги через запятую (пустое поле очистит теги)", collectionPrompt: "Название коллекции (пустое поле очистит её)", savedViews: "Сохранённые поиски", saveView: "Сохранить поиск", removeView: "Удалить поиск", nameView: "Название поиска", viewSaved: "Поиск сохранён", viewRemoved: "Поиск удалён", enterSearch: "Сначала введи поисковый запрос." },
-    az: { later: "Sonra oxu", removeLater: "Sonra oxumaqdan çıxar", tagSearch: "Bu teqi axtar", collectionSearch: "Kolleksiyanı göstər", savedLater: "Sonra oxumaq üçün saxlanıldı", removedLater: "Sonra oxumaq siyahısından çıxarıldı", readLater: "Sonra oxu", archive: "Arxivə köçür", unarchive: "Arxivdən çıxar", trash: "Zibil qutusuna köçür", restore: "Bərpa et", deletePermanent: "Həmişəlik sil", archived: "Arxivə köçürüldü", unarchived: "Arxivdən çıxarıldı", movedTrash: "Zibil qutusuna köçürüldü", restored: "Zibil qutusundan bərpa edildi", deletedPermanent: "Həmişəlik silindi", confirmPermanent: "Seçilmiş qeydlər həmişəlik silinsin? Bu əməl geri qaytarıla bilməz.", tags: "Teqləri dəyiş", collection: "Kolleksiya təyin et", markLater: "Sonra oxu üçün saxla", removeLaterBulk: "Sonra oxu siyahısından çıxar", tagPrompt: "Vergüllə ayrılmış teqlər (boş buraxmaq təmizləyir)", collectionPrompt: "Kolleksiyanın adı (boş buraxmaq təmizləyir)", savedViews: "Saxlanmış axtarışlar", saveView: "Axtarışı saxla", removeView: "Axtarışı sil", nameView: "Axtarışın adı", viewSaved: "Axtarış saxlanıldı", viewRemoved: "Saxlanmış axtarış silindi", enterSearch: "Əvvəlcə axtarış sorğusu yaz." },
-    tr: { later: "Daha sonra oku", removeLater: "Sonradan oku listesinden çıkar", tagSearch: "Bu etiketi ara", collectionSearch: "Bu koleksiyonu göster", savedLater: "Daha sonra okumak için kaydedildi", removedLater: "Sonradan oku listesinden kaldırıldı", readLater: "Daha sonra oku", archive: "Arşivle", unarchive: "Arşivden çıkar", trash: "Çöp kutusuna taşı", restore: "Geri yükle", deletePermanent: "Kalıcı olarak sil", archived: "Arşive taşındı", unarchived: "Arşivden çıkarıldı", movedTrash: "Çöp kutusuna taşındı", restored: "Çöp kutusundan geri yüklendi", deletedPermanent: "Kalıcı olarak silindi", confirmPermanent: "Seçili kayıtlar kalıcı olarak silinsin mi? Bu işlem geri alınamaz.", tags: "Etiketleri düzenle", collection: "Koleksiyon ata", markLater: "Daha sonra oku", removeLaterBulk: "Sonradan oku listesinden çıkar", tagPrompt: "Virgülle ayrılmış etiketler (boş bırakmak temizler)", collectionPrompt: "Koleksiyon adı (boş bırakmak temizler)", savedViews: "Kayıtlı aramalar", saveView: "Aramayı kaydet", removeView: "Aramayı kaldır", nameView: "Arama adı", viewSaved: "Arama kaydedildi", viewRemoved: "Kayıtlı arama silindi", enterSearch: "Önce bir arama yaz." }
+    en: { later: "Read later", removeLater: "Remove later", tagSearch: "Search this tag", collectionSearch: "Show this collection", savedLater: "Saved for later", removedLater: "Removed from read later", readLater: "Read later", archive: "Archive", unarchive: "Unarchive", trash: "Move to trash", restore: "Restore", deletePermanent: "Delete permanently", archived: "Archived", unarchived: "Moved out of archive", movedTrash: "Moved to trash", restored: "Restored from trash", deletedPermanent: "Permanently deleted", confirmPermanent: "Permanently delete the selected items? This cannot be undone.", tags: "Edit tags", collection: "Set collection", markLater: "Mark for later", removeLaterBulk: "Remove from read later", tagPrompt: "Comma-separated tags (leave empty to clear)", collectionPrompt: "Collection name (leave empty to clear)", savedViews: "Saved searches", saveView: "Save view", removeView: "Remove view", nameView: "Name this search", viewSaved: "Search saved", viewRemoved: "Saved search removed", enterSearch: "Type a search before saving it.", exportedJson: "JSON backup downloaded", exportedMarkdown: "Markdown export downloaded", exportedText: "Text export downloaded", exportedHtml: "HTML export downloaded", duplicatePrompt: "A matching item already exists. Save another copy anyway?", duplicateSkipped: "Existing item kept; duplicate was not added." },
+    ru: { later: "Сохранить на потом", removeLater: "Убрать из отложенного", tagSearch: "Найти этот тег", collectionSearch: "Открыть коллекцию", savedLater: "Добавлено в «Сохранить на потом»", removedLater: "Убрано из отложенного", readLater: "Отложено", archive: "В архив", unarchive: "Вернуть из архива", trash: "В корзину", restore: "Восстановить", deletePermanent: "Удалить навсегда", archived: "Перемещено в архив", unarchived: "Возвращено из архива", movedTrash: "Перемещено в корзину", restored: "Восстановлено из корзины", deletedPermanent: "Удалено навсегда", confirmPermanent: "Удалить выбранные записи навсегда? Это действие нельзя отменить.", tags: "Изменить теги", collection: "Задать коллекцию", markLater: "Отложить", removeLaterBulk: "Убрать из отложенного", tagPrompt: "Теги через запятую (пустое поле очистит теги)", collectionPrompt: "Название коллекции (пустое поле очистит её)", savedViews: "Сохранённые поиски", saveView: "Сохранить поиск", removeView: "Удалить поиск", nameView: "Название поиска", viewSaved: "Поиск сохранён", viewRemoved: "Поиск удалён", enterSearch: "Сначала введи поисковый запрос.", exportedJson: "JSON-резервная копия скачана", exportedMarkdown: "Экспорт Markdown скачан", exportedText: "Текстовый экспорт скачан", exportedHtml: "HTML-экспорт скачан", duplicatePrompt: "Похожая запись уже существует. Сохранить ещё одну копию?", duplicateSkipped: "Существующая запись сохранена; дубликат не добавлен." },
+    az: { later: "Sonra oxu", removeLater: "Sonra oxumaqdan çıxar", tagSearch: "Bu teqi axtar", collectionSearch: "Kolleksiyanı göstər", savedLater: "Sonra oxumaq üçün saxlanıldı", removedLater: "Sonra oxumaq siyahısından çıxarıldı", readLater: "Sonra oxu", archive: "Arxivə köçür", unarchive: "Arxivdən çıxar", trash: "Zibil qutusuna köçür", restore: "Bərpa et", deletePermanent: "Həmişəlik sil", archived: "Arxivə köçürüldü", unarchived: "Arxivdən çıxarıldı", movedTrash: "Zibil qutusuna köçürüldü", restored: "Zibil qutusundan bərpa edildi", deletedPermanent: "Həmişəlik silindi", confirmPermanent: "Seçilmiş qeydlər həmişəlik silinsin? Bu əməl geri qaytarıla bilməz.", tags: "Teqləri dəyiş", collection: "Kolleksiya təyin et", markLater: "Sonra oxu üçün saxla", removeLaterBulk: "Sonra oxu siyahısından çıxar", tagPrompt: "Vergüllə ayrılmış teqlər (boş buraxmaq təmizləyir)", collectionPrompt: "Kolleksiyanın adı (boş buraxmaq təmizləyir)", savedViews: "Saxlanmış axtarışlar", saveView: "Axtarışı saxla", removeView: "Axtarışı sil", nameView: "Axtarışın adı", viewSaved: "Axtarış saxlanıldı", viewRemoved: "Saxlanmış axtarış silindi", enterSearch: "Əvvəlcə axtarış sorğusu yaz.", exportedJson: "JSON ehtiyat nüsxəsi endirildi", exportedMarkdown: "Markdown ixracı endirildi", exportedText: "Mətn ixracı endirildi", exportedHtml: "HTML ixracı endirildi", duplicatePrompt: "Oxşar qeyd artıq mövcuddur. Daha bir nüsxə saxlanılsın?", duplicateSkipped: "Mövcud qeyd saxlanıldı; dublikat əlavə edilmədi." },
+    tr: { later: "Daha sonra oku", removeLater: "Sonradan oku listesinden çıkar", tagSearch: "Bu etiketi ara", collectionSearch: "Bu koleksiyonu göster", savedLater: "Daha sonra okumak için kaydedildi", removedLater: "Sonradan oku listesinden kaldırıldı", readLater: "Daha sonra oku", archive: "Arşivle", unarchive: "Arşivden çıkar", trash: "Çöp kutusuna taşı", restore: "Geri yükle", deletePermanent: "Kalıcı olarak sil", archived: "Arşive taşındı", unarchived: "Arşivden çıkarıldı", movedTrash: "Çöp kutusuna taşındı", restored: "Çöp kutusundan geri yüklendi", deletedPermanent: "Kalıcı olarak silindi", confirmPermanent: "Seçili kayıtlar kalıcı olarak silinsin mi? Bu işlem geri alınamaz.", tags: "Etiketleri düzenle", collection: "Koleksiyon ata", markLater: "Daha sonra oku", removeLaterBulk: "Sonradan oku listesinden çıkar", tagPrompt: "Virgülle ayrılmış etiketler (boş bırakmak temizler)", collectionPrompt: "Koleksiyon adı (boş bırakmak temizler)", savedViews: "Kayıtlı aramalar", saveView: "Aramayı kaydet", removeView: "Aramayı kaldır", nameView: "Arama adı", viewSaved: "Arama kaydedildi", viewRemoved: "Kayıtlı arama silindi", enterSearch: "Önce bir arama yaz.", exportedJson: "JSON yedeği indirildi", exportedMarkdown: "Markdown dışa aktarımı indirildi", exportedText: "Metin dışa aktarımı indirildi", exportedHtml: "HTML dışa aktarımı indirildi", duplicatePrompt: "Benzer bir kayıt zaten var. Bir kopya daha kaydedilsin mi?", duplicateSkipped: "Mevcut kayıt korundu; kopya eklenmedi." }
   };
   return (copy[language] || copy.en)[key] || copy.en[key] || key;
 }
@@ -925,6 +925,13 @@ form.addEventListener("submit",event=>{
   if(!text)return;
   const metadata = { tags: parseTagInput(tagsDraft.value), collection: collectionDraft.value.trim().slice(0,80) };
   const existing=editingId?captures.find(item=>item.id===editingId):null;
+  if (!existing) {
+    const duplicate = findDuplicateCapture(captures, text);
+    if (duplicate && !window.confirm(captureUiText("duplicatePrompt") + "\n\n" + duplicate.text.slice(0, 240))) {
+      say(captureUiText("duplicateSkipped"));
+      return;
+    }
+  }
   if(existing){
     captures=captures.map(item=>item.id===editingId?{...item,...metadata,text:text.slice(0,100000),updatedAt:Date.now()}:item);
     say("Запись обновлена");
@@ -947,6 +954,69 @@ selectionButton.addEventListener("click", () => {
   render();
   if (selectionMode) say("Select the items you want to manage together");
 });
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, character => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  })[character]);
+}
+function captureExportTitle(item) {
+  return String(item.previewTitle || item.text.split(/\r?\n/)[0] || "Capture").slice(0, 180);
+}
+function exportCaptureItems(items, baseName = "linka-inbox") {
+  const format = $("#export-format")?.value || "json";
+  let content = "", mime = "application/json;charset=utf-8", extension = format, statusKey = "exportedJson";
+  if (format === "md") {
+    mime = "text/markdown;charset=utf-8"; statusKey = "exportedMarkdown";
+    content = "# Linka export\n\n" + items.map((item, index) => {
+      const state = item.trashedAt ? "Trash" : item.archivedAt ? "Archive" : item.readLater ? "Read later" : item.pinned ? "Pinned" : "Inbox";
+      const saved = new Date(Number(item.createdAt || item.updatedAt || Date.now())).toISOString();
+      return "## " + (index + 1) + ". " + captureExportTitle(item).replace(/\r?\n/g, " ") +
+        "\n\n- Saved: " + saved +
+        "\n- Tags: " + ((item.tags || []).join(", ") || "—") +
+        "\n- Collection: " + (item.collection || "—") +
+        "\n- State: " + state + "\n\n" + item.text + "\n";
+    }).join("\n\n---\n\n");
+  } else if (format === "txt") {
+    mime = "text/plain;charset=utf-8"; statusKey = "exportedText";
+    content = items.map((item, index) => {
+      const saved = new Date(Number(item.createdAt || item.updatedAt || Date.now())).toLocaleString();
+      return "[" + (index + 1) + "] " + captureExportTitle(item) +
+        "\nSaved: " + saved +
+        "\nTags: " + ((item.tags || []).join(", ") || "—") +
+        "\nCollection: " + (item.collection || "—") + "\n\n" + item.text;
+    }).join("\n\n--------------------------------------------------\n\n");
+  } else if (format === "html") {
+    mime = "text/html;charset=utf-8"; statusKey = "exportedHtml";
+    const cards = items.map(item => {
+      const body = escapeHtml(item.text);
+      const title = escapeHtml(captureExportTitle(item));
+      const tags = escapeHtml((item.tags || []).join(", "));
+      const collection = escapeHtml(item.collection || "—");
+      const date = escapeHtml(new Date(Number(item.createdAt || item.updatedAt || Date.now())).toLocaleString());
+      const source = isLink(item.text) && /^https?:\/\//i.test(item.text.trim())
+        ? '<p><a rel="noopener noreferrer" href="' + escapeHtml(item.text.trim()) + '">Open original link</a></p>' : "";
+      const cover = /^https:\/\//i.test(item.previewImageUrl || "")
+        ? '<img loading="lazy" alt="" src="' + escapeHtml(item.previewImageUrl) + '">' : "";
+      return '<article><h2>' + title + '</h2><p class="meta">' + date + ' · ' + tags + ' · ' + collection +
+        '</p>' + cover + '<pre>' + body + '</pre>' + source + '</article>';
+    }).join("\n");
+    content = '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+      '<title>Linka export</title><style>body{max-width:900px;margin:40px auto;padding:0 20px;font:16px/1.6 system-ui,sans-serif;color:#202124;background:#f7f7f5}' +
+      'article{padding:22px;margin:18px 0;border:1px solid #ddd;border-radius:14px;background:white}h2{font-size:20px;margin-top:0}.meta{color:#666;font-size:12px}' +
+      'pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}img{max-width:100%;max-height:360px;object-fit:contain;border-radius:8px}</style>' +
+      '<body><h1>Linka export</h1>' + cards + '</body></html>';
+  } else {
+    content = JSON.stringify(items, null, 2);
+    extension = "json"; statusKey = "exportedJson";
+  }
+  const blob = new Blob([content], { type: mime });
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl; anchor.download = baseName + "." + extension; anchor.click();
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
+  say(captureUiText(statusKey));
+}
+
 bulkToolbar.addEventListener("click", async event => {
   const button = event.target.closest("button[data-bulk-action]");
   if (!button) return;
@@ -979,12 +1049,8 @@ bulkToolbar.addEventListener("click", async event => {
     return;
   }
   if (action === "export") {
-    const blob = new Blob([JSON.stringify(selected, null, 2)], { type: "application/json" });
-    const objectUrl = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = objectUrl; anchor.download = "linka-selection.json"; anchor.click();
-    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-    say("Exported " + selected.length + " selected item(s)"); return;
+    exportCaptureItems(selected, "linka-selection");
+    return;
   }
   if (action === "tags") {
     const current = [...new Set(selected.flatMap(item => item.tags || []))].join(", ");
@@ -1115,15 +1181,28 @@ list.addEventListener("click",async event=>{
   else if(action==="edit"){editingId=id;draft.value=item.text;tagsDraft.value=(item.tags||[]).join(", ");collectionDraft.value=item.collection||"";composeLabel.textContent="Edit capture";saveButton.textContent="Save changes ↗";saveButton.disabled=false;saveCaptureMetadataDraft();draft.focus();window.scrollTo({top:0,behavior:"smooth"});}
   else if(action==="copy"){try{await navigator.clipboard.writeText(item.text);say("Скопировано");}catch{draft.value=item.text;draft.focus();draft.select();say("Text selected for manual copying");}}
 });
-$("#export-button").addEventListener("click",()=>{
-  const blob=new Blob([JSON.stringify(captures,null,2)],{type:"application/json"});
-  const url=URL.createObjectURL(blob);const anchor=document.createElement("a");anchor.href=url;anchor.download="linka-inbox.json";anchor.click();URL.revokeObjectURL(url);say("Резервная копия создана");
-});
+$("#export-button").addEventListener("click",()=> exportCaptureItems(captures, "linka-inbox"));
 $("#import-button").addEventListener("click",()=>$("#import-file").click());
 $("#import-file").addEventListener("change",async event=>{
   const file=event.target.files?.[0];if(!file)return;
-  try{const parsed=JSON.parse(await file.text());const imported=Array.isArray(parsed)?parsed:parsed.captures;if(!Array.isArray(imported))throw new Error("Invalid file");
-    const normalized=imported.map(item=>makeCapture(item.text,item)).filter(Boolean);const restoredIds=new Set(normalized.map(item=>item.id));const beforeImport=captures.map(item=>({...item}));const map=new Map(captures.map(item=>[item.id,item]));normalized.forEach(item=>map.set(item.id,item));
+  try {
+    const raw = await file.text();
+    let imported;
+    if (/\.json$/i.test(file.name) || /^\s*[\[{]/.test(raw)) {
+      const parsed = JSON.parse(raw);
+      imported = Array.isArray(parsed) ? parsed : parsed.captures;
+      if (!Array.isArray(imported)) throw new Error("Invalid Linka JSON backup");
+    } else {
+      // Text and Markdown files are imported as a single note to avoid guessing
+      // where a user's paragraphs, lists, or code samples should be split.
+      imported = [{ id: undefined, text: raw }];
+    }
+    const normalized=imported.map(item=>makeCapture(item.text,item)).filter(Boolean);
+    if (!normalized.length) throw new Error("No text captures found");
+    const restoredIds=new Set(normalized.map(item=>item.id));
+    const beforeImport=captures.map(item=>({...item}));
+    const map=new Map(captures.map(item=>[item.id,item]));
+    normalized.forEach(item=>map.set(item.id,item));
     captures=Array.from(map.values()).sort((a,b)=>b.updatedAt-a.updatedAt);
     if (persist()) {
       if (!removeDeletedIds(restoredIds)) {
@@ -1134,9 +1213,11 @@ $("#import-file").addEventListener("change",async event=>{
         return;
       }
       scheduleCloudSync();
-      render(); say("Imported "+normalized.length+" capture(s)");
+      render(); say(captureUiText("importSuccess") + " " + normalized.length);
     } else render();
-  }catch{say("Этот файл не похож на экспорт Linka");}finally{event.target.value="";}
+  } catch {
+    say(captureUiText("invalidImport"));
+  } finally { event.target.value=""; }
 });
 $("#search-space-button").addEventListener("click",()=>showSearchSpace(search.value));
 document.addEventListener("keydown",event=>{
