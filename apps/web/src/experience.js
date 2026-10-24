@@ -5,6 +5,7 @@ import {
   requestEmailOtp, saveCloudConfig, saveLinkaProfile, verifyEmailOtp,
   startGoogleOAuth, completeGoogleOAuthCallback
 } from "./cloud-sync.js";
+import { setLinkaTheme, setLinkaAccent, setLinkaDensity, setLinkaEffects } from "./visual-system.js";
 
 const LANG_KEY = "linka.language.v1";
 const ONBOARDED_KEY = "linka.experience.onboarded.v1";
@@ -801,6 +802,52 @@ function showSettings() {
   pickerLabel.append(picker);
   dialog.panel.append(pickerLabel);
 
+  const preferenceLabels = ({
+    en: { accent: "Accent color", density: "Interface density", compact: "Compact", standard: "Standard", spacious: "Spacious", effects: "Visual effects", quiet: "Quiet", balanced: "Balanced", atmosphere: "Atmosphere", forest: "Forest", oled: "OLED black", cloud: "Cloud sync", backdrop: "Atmosphere & music", agreement: "User agreement" },
+    ru: { accent: "Акцентный цвет", density: "Плотность интерфейса", compact: "Компактная", standard: "Стандартная", spacious: "Просторная", effects: "Визуальные эффекты", quiet: "Минимальные", balanced: "Сбалансированные", atmosphere: "Атмосфера", forest: "Лес", oled: "OLED-чёрная", cloud: "Облачная синхронизация", backdrop: "Атмосфера и музыка", agreement: "Пользовательское соглашение" },
+    az: { accent: "Vurğu rəngi", density: "İnterfeys sıxlığı", compact: "Yığcam", standard: "Standart", spacious: "Geniş", effects: "Vizual effektlər", quiet: "Sakit", balanced: "Balanslı", atmosphere: "Atmosfer", forest: "Meşə", oled: "OLED qara", cloud: "Bulud sinxronizasiyası", backdrop: "Atmosfer və musiqi", agreement: "İstifadəçi razılaşması" },
+    tr: { accent: "Vurgu rengi", density: "Arayüz yoğunluğu", compact: "Kompakt", standard: "Standart", spacious: "Geniş", effects: "Görsel efektler", quiet: "Sakin", balanced: "Dengeli", atmosphere: "Atmosfer", forest: "Orman", oled: "OLED siyahı", cloud: "Bulut eşitleme", backdrop: "Atmosfer ve müzik", agreement: "Kullanıcı sözleşmesi" }
+  })[langCode()] || {};
+  const addPreference = (label, options, selected, apply) => {
+    const field = make("label", "linka-field");
+    field.append(make("span", "", label));
+    const select = make("select", "linka-select");
+    options.forEach(option => {
+      const item = make("option", "", option.label);
+      item.value = option.value;
+      select.append(item);
+    });
+    select.value = selected;
+    select.addEventListener("change", () => apply(select.value));
+    field.append(select);
+    dialog.panel.append(field);
+    return select;
+  };
+  addPreference(tr("theme"), [
+    { value: "forest", label: preferenceLabels.forest || "Forest" },
+    { value: "dark", label: tr("dark") },
+    { value: "light", label: tr("light") },
+    { value: "system", label: tr("system") },
+    { value: "oled", label: preferenceLabels.oled || "OLED black" }
+  ], localStorage.getItem("linka.theme") || "forest", setLinkaTheme);
+  addPreference(preferenceLabels.accent || "Accent color", [
+    { value: "forest", label: preferenceLabels.forest || "Forest" },
+    { value: "violet", label: "Violet" },
+    { value: "blue", label: "Blue" },
+    { value: "mint", label: "Mint" },
+    { value: "rose", label: "Rose" }
+  ], localStorage.getItem("linka.accent") || "forest", setLinkaAccent);
+  addPreference(preferenceLabels.density || "Interface density", [
+    { value: "compact", label: preferenceLabels.compact || "Compact" },
+    { value: "standard", label: preferenceLabels.standard || "Standard" },
+    { value: "spacious", label: preferenceLabels.spacious || "Spacious" }
+  ], localStorage.getItem("linka.density") || "standard", setLinkaDensity);
+  addPreference(preferenceLabels.effects || "Visual effects", [
+    { value: "quiet", label: preferenceLabels.quiet || "Quiet" },
+    { value: "balanced", label: preferenceLabels.balanced || "Balanced" },
+    { value: "atmosphere", label: preferenceLabels.atmosphere || "Atmosphere" }
+  ], localStorage.getItem("linka.effects") || "atmosphere", setLinkaEffects);
+
   const soundSection = make("div", "linka-settings-block");
   soundSection.append(make("h3", "", tr("ambientSound")), make("p", "linka-muted", tr("ambientSoundBody")));
   const soundToggle = button("", "linka-button linka-button-secondary");
@@ -838,6 +885,17 @@ function showSettings() {
   profile.addEventListener("click", () => { dialog.close(); openProfileEditor(); });
   const actions = make("div", "linka-actions"); actions.append(account, profile);
   dialog.panel.append(actions);
+
+  const utilityActions = make("div", "linka-actions");
+  const cloudSettings = button(preferenceLabels.cloud || "Cloud sync", "linka-button linka-button-secondary");
+  cloudSettings.addEventListener("click", () => { dialog.close(); window.dispatchEvent(new Event("linka:open-cloud-settings")); });
+  const atmosphereSettings = button(preferenceLabels.backdrop || "Atmosphere & music", "linka-button linka-button-secondary");
+  atmosphereSettings.addEventListener("click", () => { dialog.close(); window.dispatchEvent(new Event("linka:open-atmosphere-settings")); });
+  const agreementSettings = button(preferenceLabels.agreement || "User agreement", "linka-button linka-button-secondary");
+  agreementSettings.addEventListener("click", () => { dialog.close(); window.dispatchEvent(new Event("linka:open-agreement")); });
+  utilityActions.append(cloudSettings, atmosphereSettings, agreementSettings);
+  dialog.panel.append(utilityActions);
+
   showNotificationSettings(dialog.panel);
   showUpdateSettings(dialog.panel);
   const close = button(tr("close"), "linka-button linka-button-secondary");
