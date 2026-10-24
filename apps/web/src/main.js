@@ -2,6 +2,8 @@ import { loadCaptures, saveCaptures, makeCapture, visibleCaptures } from "./stor
 import { initLinkaExperience } from "./experience.js";
 import { initVisualSystem, setLinkaAccent, setLinkaDensity, setLinkaEffects } from "./visual-system.js";
 import { initLinkaAtmosphere, openAtmosphereSettings } from "./atmosphere.js";
+import { initLinkaDocuments } from "./documents.js";
+import { initLinkaSignature } from "./signature-theme.js";
 import {
   addDeletedId, disconnectCloud, getCloudConfig, getCloudSession,
   getOtpCooldown, readDeletedIds, requestEmailOtp, saveCloudConfig, syncCloudCaptures,
@@ -815,9 +817,7 @@ void completeGoogleOAuthCallback().then(session => {
   say(error?.message || "Google sign-in could not be completed.");
 });
 initLinkaExperience();
-window.addEventListener("linka:appearance-theme", event => {
-  const mode = event.detail?.theme;
-  if (["dark", "oled", "light", "system"].includes(mode)) applyTheme(mode);
-});
+initLinkaSignature();
 initVisualSystem();
 void initLinkaAtmosphere().catch(error => console.warn("Linka atmosphere could not start", error));
+void initLinkaDocuments().catch(error => console.warn("Linka documents could not start", error));
