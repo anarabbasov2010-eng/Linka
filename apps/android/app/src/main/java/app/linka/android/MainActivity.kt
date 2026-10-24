@@ -1230,6 +1230,10 @@ private fun LinkaApp(
     val ambientOrbit by ambientTransition.animateFloat(initialValue = 0f, targetValue = 1f, animationSpec = infiniteRepeatable(animation = tween(durationMillis = 32_000, easing = LinearEasing), repeatMode = RepeatMode.Restart), label = "sphere-orbit")
     var captures by remember { mutableStateOf(load()) }
     var draft by remember { mutableStateOf(sharedText) }
+    var typingTick by remember { mutableIntStateOf(0) }
+    var inkOpacity by remember { mutableFloatStateOf(1f) }
+    val animatedInkAlpha by androidx.compose.animation.core.animateFloatAsState(targetValue = inkOpacity, animationSpec = tween(190), label = "linka-typing-ink")
+    LaunchedEffect(typingTick) { inkOpacity = 0f; delay(24L); inkOpacity = 1f }
     var editingId by remember { mutableStateOf<String?>(null) }
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf("all") }
@@ -1832,10 +1836,23 @@ private fun LinkaApp(
                             border = BorderStroke(1.dp, border.copy(alpha = .82f)), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
                             modifier = Modifier.fillMaxWidth().animateContentSize(spring(dampingRatio = .82f, stiffness = 320f))) {
                             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
-                                OutlinedTextField(value = draft, onValueChange = { draft = it.take(MAX_CAPTURE_CHARS) }, modifier = Modifier.fillMaxWidth(),
-                                    placeholder = { Text(tr(lang, "placeholder"), color = muted, fontSize = 13.sp * fontScale) },
-                                    textStyle = TextStyle(color = main, fontSize = 14.sp * fontScale, lineHeight = 20.sp * fontScale),
-                                    minLines = 3, maxLines = 7, shape = RoundedCornerShape(18.dp), colors = fieldColors(bg, border, main, muted))
+                                Box(Modifier.fillMaxWidth()) {
+                                    OutlinedTextField(value = draft, onValueChange = { draft = it.take(MAX_CAPTURE_CHARS); typingTick++ }, modifier = Modifier.fillMaxWidth(),
+                                        placeholder = { Text(tr(lang, "placeholder"), color = muted, fontSize = 13.sp * fontScale) },
+                                        textStyle = TextStyle(color = Color.Transparent, fontSize = 14.sp * fontScale, lineHeight = 20.sp * fontScale),
+                                        minLines = 3, maxLines = 7, shape = RoundedCornerShape(18.dp), colors = fieldColors(bg, border, main, muted))
+                                    if (draft.isNotEmpty()) {
+                                        val animatedDraft = androidx.compose.ui.text.buildAnnotatedString {
+                                            append(draft.dropLast(1))
+                                            pushStyle(androidx.compose.ui.text.SpanStyle(color = main.copy(alpha = animatedInkAlpha)))
+                                            append(draft.last())
+                                            pop()
+                                        }
+                                        Text(animatedDraft, color = main, fontSize = 14.sp * fontScale, lineHeight = 20.sp * fontScale,
+                                            maxLines = 7, overflow = TextOverflow.Clip,
+                                            modifier = Modifier.matchParentSize().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 12.dp))
+                                    }
+                                }
                                 Button(onClick = {
                                     val text = draft.trim().take(MAX_CAPTURE_CHARS)
                                     if (text.isNotBlank()) {
