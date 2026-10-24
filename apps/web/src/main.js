@@ -41,10 +41,10 @@ search.title = "Search operators: type:link, type:note, is:pinned, is:later, tag
 function captureUiText(key) {
   const language = (() => { try { return localStorage.getItem("linka.language.v1") || "en"; } catch { return "en"; } })();
   const copy = {
-    en: { later: "Read later", removeLater: "Remove later", tagSearch: "Search this tag", collectionSearch: "Show this collection", savedLater: "Saved for later", removedLater: "Removed from read later", readLater: "Read later", archive: "Archive", unarchive: "Unarchive", trash: "Move to trash", restore: "Restore", deletePermanent: "Delete permanently", archived: "Archived", unarchived: "Moved out of archive", movedTrash: "Moved to trash", restored: "Restored from trash", deletedPermanent: "Permanently deleted", confirmPermanent: "Permanently delete the selected items? This cannot be undone." },
-    ru: { later: "Сохранить на потом", removeLater: "Убрать из отложенного", tagSearch: "Найти этот тег", collectionSearch: "Открыть коллекцию", savedLater: "Добавлено в «Сохранить на потом»", removedLater: "Убрано из отложенного", readLater: "Отложено", archive: "В архив", unarchive: "Вернуть из архива", trash: "В корзину", restore: "Восстановить", deletePermanent: "Удалить навсегда", archived: "Перемещено в архив", unarchived: "Возвращено из архива", movedTrash: "Перемещено в корзину", restored: "Восстановлено из корзины", deletedPermanent: "Удалено навсегда", confirmPermanent: "Удалить выбранные записи навсегда? Это действие нельзя отменить." },
-    az: { later: "Sonra oxu", removeLater: "Sonra oxumaqdan çıxar", tagSearch: "Bu teqi axtar", collectionSearch: "Kolleksiyanı göstər", savedLater: "Sonra oxumaq üçün saxlanıldı", removedLater: "Sonra oxumaq siyahısından çıxarıldı", readLater: "Sonra oxu", archive: "Arxivə köçür", unarchive: "Arxivdən çıxar", trash: "Zibil qutusuna köçür", restore: "Bərpa et", deletePermanent: "Həmişəlik sil", archived: "Arxivə köçürüldü", unarchived: "Arxivdən çıxarıldı", movedTrash: "Zibil qutusuna köçürüldü", restored: "Zibil qutusundan bərpa edildi", deletedPermanent: "Həmişəlik silindi", confirmPermanent: "Seçilmiş qeydlər həmişəlik silinsin? Bu əməl geri qaytarıla bilməz." },
-    tr: { later: "Daha sonra oku", removeLater: "Sonradan oku listesinden çıkar", tagSearch: "Bu etiketi ara", collectionSearch: "Bu koleksiyonu göster", savedLater: "Daha sonra okumak için kaydedildi", removedLater: "Sonradan oku listesinden kaldırıldı", readLater: "Daha sonra oku", archive: "Arşivle", unarchive: "Arşivden çıkar", trash: "Çöp kutusuna taşı", restore: "Geri yükle", deletePermanent: "Kalıcı olarak sil", archived: "Arşive taşındı", unarchived: "Arşivden çıkarıldı", movedTrash: "Çöp kutusuna taşındı", restored: "Çöp kutusundan geri yüklendi", deletedPermanent: "Kalıcı olarak silindi", confirmPermanent: "Seçili kayıtlar kalıcı olarak silinsin mi? Bu işlem geri alınamaz." }
+    en: { later: "Read later", removeLater: "Remove later", tagSearch: "Search this tag", collectionSearch: "Show this collection", savedLater: "Saved for later", removedLater: "Removed from read later", readLater: "Read later", archive: "Archive", unarchive: "Unarchive", trash: "Move to trash", restore: "Restore", deletePermanent: "Delete permanently", archived: "Archived", unarchived: "Moved out of archive", movedTrash: "Moved to trash", restored: "Restored from trash", deletedPermanent: "Permanently deleted", confirmPermanent: "Permanently delete the selected items? This cannot be undone.", savedViews: "Saved searches", saveView: "Save view", removeView: "Remove view", nameView: "Name this search", viewSaved: "Search saved", viewRemoved: "Saved search removed", enterSearch: "Type a search before saving it." },
+    ru: { later: "Сохранить на потом", removeLater: "Убрать из отложенного", tagSearch: "Найти этот тег", collectionSearch: "Открыть коллекцию", savedLater: "Добавлено в «Сохранить на потом»", removedLater: "Убрано из отложенного", readLater: "Отложено", archive: "В архив", unarchive: "Вернуть из архива", trash: "В корзину", restore: "Восстановить", deletePermanent: "Удалить навсегда", archived: "Перемещено в архив", unarchived: "Возвращено из архива", movedTrash: "Перемещено в корзину", restored: "Восстановлено из корзины", deletedPermanent: "Удалено навсегда", confirmPermanent: "Удалить выбранные записи навсегда? Это действие нельзя отменить.", savedViews: "Сохранённые поиски", saveView: "Сохранить поиск", removeView: "Удалить поиск", nameView: "Название поиска", viewSaved: "Поиск сохранён", viewRemoved: "Поиск удалён", enterSearch: "Сначала введи поисковый запрос." },
+    az: { later: "Sonra oxu", removeLater: "Sonra oxumaqdan çıxar", tagSearch: "Bu teqi axtar", collectionSearch: "Kolleksiyanı göstər", savedLater: "Sonra oxumaq üçün saxlanıldı", removedLater: "Sonra oxumaq siyahısından çıxarıldı", readLater: "Sonra oxu", archive: "Arxivə köçür", unarchive: "Arxivdən çıxar", trash: "Zibil qutusuna köçür", restore: "Bərpa et", deletePermanent: "Həmişəlik sil", archived: "Arxivə köçürüldü", unarchived: "Arxivdən çıxarıldı", movedTrash: "Zibil qutusuna köçürüldü", restored: "Zibil qutusundan bərpa edildi", deletedPermanent: "Həmişəlik silindi", confirmPermanent: "Seçilmiş qeydlər həmişəlik silinsin? Bu əməl geri qaytarıla bilməz.", savedViews: "Saxlanmış axtarışlar", saveView: "Axtarışı saxla", removeView: "Axtarışı sil", nameView: "Axtarışın adı", viewSaved: "Axtarış saxlanıldı", viewRemoved: "Saxlanmış axtarış silindi", enterSearch: "Əvvəlcə axtarış sorğusu yaz." },
+    tr: { later: "Daha sonra oku", removeLater: "Sonradan oku listesinden çıkar", tagSearch: "Bu etiketi ara", collectionSearch: "Bu koleksiyonu göster", savedLater: "Daha sonra okumak için kaydedildi", removedLater: "Sonradan oku listesinden kaldırıldı", readLater: "Daha sonra oku", archive: "Arşivle", unarchive: "Arşivden çıkar", trash: "Çöp kutusuna taşı", restore: "Geri yükle", deletePermanent: "Kalıcı olarak sil", archived: "Arşive taşındı", unarchived: "Arşivden çıkarıldı", movedTrash: "Çöp kutusuna taşındı", restored: "Çöp kutusundan geri yüklendi", deletedPermanent: "Kalıcı olarak silindi", confirmPermanent: "Seçili kayıtlar kalıcı olarak silinsin mi? Bu işlem geri alınamaz.", savedViews: "Kayıtlı aramalar", saveView: "Aramayı kaydet", removeView: "Aramayı kaldır", nameView: "Arama adı", viewSaved: "Arama kaydedildi", viewRemoved: "Kayıtlı arama silindi", enterSearch: "Önce bir arama yaz." }
   };
   return (copy[language] || copy.en)[key] || copy.en[key] || key;
 }
@@ -446,8 +446,63 @@ function showSearchSpace(initial = "") {
   const info = document.createElement("div"); info.className = "search-space-meta";
   const count = document.createElement("span"); const scope = document.createElement("span"); scope.textContent = "Across links, notes and documents";
   info.append(count, scope);
+  const savedSearchToolbar = document.createElement("div"); savedSearchToolbar.className = "saved-search-toolbar";
+  const savedSearchSelect = document.createElement("select"); savedSearchSelect.className = "saved-search-select"; savedSearchSelect.setAttribute("aria-label", captureUiText("savedViews"));
+  const savedSearchSave = document.createElement("button"); savedSearchSave.type = "button"; savedSearchSave.className = "search-save-button"; savedSearchSave.textContent = captureUiText("saveView");
+  const savedSearchRemove = document.createElement("button"); savedSearchRemove.type = "button"; savedSearchRemove.className = "search-save-button secondary"; savedSearchRemove.textContent = captureUiText("removeView");
+  savedSearchToolbar.append(savedSearchSelect, savedSearchSave, savedSearchRemove);
   const results = document.createElement("div"); results.className = "search-space-results"; results.setAttribute("role", "listbox"); results.setAttribute("aria-label", "Search results");
-  content.append(head, searchWrap, info, results);
+  content.append(head, searchWrap, info, savedSearchToolbar, results);
+  const SAVED_SEARCHES_KEY = "linka.savedSearches.v1";
+  let savedSearches = [];
+  const readSavedSearches = () => {
+    try {
+      const value = JSON.parse(localStorage.getItem(SAVED_SEARCHES_KEY) || "[]");
+      return Array.isArray(value) ? value.filter(item => item && typeof item.name === "string" && typeof item.query === "string").slice(0, 15) : [];
+    } catch { return []; }
+  };
+  const renderSavedSearches = selectedQuery => {
+    savedSearches = readSavedSearches();
+    const placeholder = document.createElement("option"); placeholder.value = ""; placeholder.textContent = captureUiText("savedViews");
+    savedSearchSelect.replaceChildren(placeholder);
+    for (const item of savedSearches) {
+      const option = document.createElement("option"); option.value = item.query; option.textContent = item.name;
+      savedSearchSelect.append(option);
+    }
+    savedSearchSelect.value = selectedQuery && savedSearches.some(item => item.query === selectedQuery) ? selectedQuery : "";
+    savedSearchRemove.disabled = !savedSearchSelect.value;
+  };
+  renderSavedSearches(input.value.trim());
+  savedSearchSave.addEventListener("click", () => {
+    const query = input.value.trim();
+    if (!query) { say(captureUiText("enterSearch")); return; }
+    const existing = savedSearches.find(item => item.query === query);
+    const name = window.prompt(captureUiText("nameView"), existing?.name || query.slice(0, 48));
+    if (!name || !name.trim()) return;
+    const next = [{ name: name.trim().slice(0, 48), query, updatedAt: Date.now() }, ...savedSearches.filter(item => item.query !== query)].slice(0, 15);
+    try {
+      localStorage.setItem(SAVED_SEARCHES_KEY, JSON.stringify(next));
+      renderSavedSearches(query);
+      say(captureUiText("viewSaved"));
+    } catch { say("Could not save this search. Check available local storage."); }
+  });
+  savedSearchSelect.addEventListener("change", () => {
+    if (!savedSearchSelect.value) return;
+    input.value = savedSearchSelect.value;
+    savedSearchRemove.disabled = false;
+    void refresh();
+    input.focus();
+  });
+  savedSearchRemove.addEventListener("click", () => {
+    const query = savedSearchSelect.value;
+    if (!query) return;
+    const next = savedSearches.filter(item => item.query !== query);
+    try {
+      localStorage.setItem(SAVED_SEARCHES_KEY, JSON.stringify(next));
+      renderSavedSearches(input.value.trim());
+      say(captureUiText("viewRemoved"));
+    } catch { say("Could not update saved searches."); }
+  });
   const layer = modalShell(content, { dismissable: true }); layer.classList.add("search-space-layer");
   let searchSequence = 0;
   let searchTimer = null;
@@ -461,6 +516,7 @@ function showSearchSpace(initial = "") {
       documentFound = await searchLinkaDocuments(freeTextQuery, 20).catch(() => []);
     }
     if (sequence !== searchSequence) return;
+    renderSavedSearches(input.value.trim());
     const totalFound = found.length + documentFound.length;
     count.textContent = q ? (totalFound + " matching " + (totalFound === 1 ? "item" : "items")) : ("Recently saved · " + totalFound);
     results.replaceChildren();
