@@ -71,7 +71,6 @@ function ensureStyles() {
     .linka-type-erasing { display:inline; animation:linka-ink-out .19s ease both; }
     @keyframes linka-ink-out { from {opacity:.9;filter:blur(0)} to {opacity:0;filter:blur(2px)} }
     .linka-player-panel, .linka-doc-overlay { transition-duration:.58s !important; }
-    :root.reduced-motion *, @media(prefers-reduced-motion:reduce) { }
     @media (prefers-reduced-motion: reduce) {
       *,*::before,*::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; scroll-behavior:auto !important; transition-duration:.01ms !important; }
     }
