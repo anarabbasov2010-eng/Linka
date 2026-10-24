@@ -69,11 +69,13 @@ test("search supports type, pinned, site and date operators", () => {
 });
 
 
-test("local storage round-trips more than 1000 captures without truncation", () => {
-  const storage = memoryStorage();
-  const items = Array.from({ length: 1500 }, (_, index) => makeCapture("note " + index));
-  assert.equal(saveCaptures(items, storage), true);
-  assert.equal(loadCaptures(storage).length, 1500);
+test("local storage round-trips 500, 1000, 5000, and 10000 captures without truncation", () => {
+  for (const count of [500, 1000, 5000, 10000]) {
+    const storage = memoryStorage();
+    const items = Array.from({ length: count }, (_, index) => makeCapture("note " + index));
+    assert.equal(saveCaptures(items, storage), true);
+    assert.equal(loadCaptures(storage).length, count);
+  }
 });
 
 test("normalization does not silently truncate long capture text", () => {

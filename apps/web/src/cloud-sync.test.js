@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { completeGoogleOAuthCallback, getOtpCooldown, mergeCloudCaptures, readLinkaProfile, saveLinkaProfile } from "./cloud-sync.js";
+import { completeGoogleOAuthCallback, getOtpCooldown, mergeCloudCaptures, readLinkaProfile, saveLinkaProfile, MAX_SYNC_PAYLOAD_BYTES, estimateCloudPayloadBytes } from "./cloud-sync.js";
 
 test("cloud merge picks the newest copy, keeps pins, and orders newest first", () => {
   const remote = [
@@ -80,11 +80,20 @@ test("Google OAuth callback ignores normal routes and reports provider errors", 
 });
 
 
-test("cloud merge preserves 500, 1000, and 5000 distinct local records", () => {
-  for (const count of [500, 1000, 5000]) {
+test("cloud merge preserves 500, 1000, 5000, and 10000 distinct local records", () => {
+  for (const count of [500, 1000, 5000, 10000]) {
     const records = Array.from({ length: count }, (_, index) => ({ id: String(index), text: "note " + index, createdAt: index + 1, updatedAt: index + 1 }));
     const merged = mergeCloudCaptures(records, [], new Set());
     assert.equal(merged.length, count, `expected all ${count} records to survive`);
     assert.equal(new Set(merged.map(item => item.id)).size, count);
   }
+});
+
+test("cloud upload limits are based on request bytes, not record count", () => {
+  const captures = Array.from({ length: 5000 }, (_, index) => ({
+    id: String(index), text: "short note " + index, createdAt: index + 1, updatedAt: index + 1
+  }));
+  assert.ok(estimateCloudPayloadBytes(JSON.stringify({ captures })) < MAX_SYNC_PAYLOAD_BYTES);
+  const oversized = JSON.stringify({ captures: [{ id: "large", text: "x".repeat(MAX_SYNC_PAYLOAD_BYTES) }] });
+  assert.ok(estimateCloudPayloadBytes(oversized) > MAX_SYNC_PAYLOAD_BYTES);
 });
