@@ -2193,6 +2193,7 @@ private fun LinkaApp(
             }
         }
     }
+    }
 
     if (playerExpanded) AlertDialog(
         onDismissRequest = { playerExpanded = false },
