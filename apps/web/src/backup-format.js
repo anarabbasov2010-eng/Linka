@@ -7,7 +7,8 @@ const PREFERENCE_VALUES = {
   "linka.density": new Set(["compact", "standard", "spacious"]),
   "linka.effects": new Set(["quiet", "balanced", "atmosphere"]),
   "linka.language.v1": new Set(["en", "ru", "az", "tr"]),
-  "linka.reduceMotion": new Set(["true", "false"])
+  "linka.reduceMotion": new Set(["true", "false"]),
+  "linka.sortOrder.v1": new Set(["updated", "newest", "oldest", "title", "domain"])
 };
 
 export function normalizeBackupPreferences(value) {
