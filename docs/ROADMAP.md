@@ -13,7 +13,9 @@ This file is the persistent project checklist for the Linka improvements audit. 
 - [x] Remove silent 500-item truncation from cloud merge; default merge is unlimited.
 - [x] Add regression coverage for 500, 1,000, 5,000 and 10,000 records.
 - [x] Prevent cloud merge from resurrecting items represented by deletion tombstones.
-- [~] Verify paginated remote reads and writes against Supabase limits for very large libraries.
+- [x] Verified the current sync schema stores captures and deletion tombstones in one JSONB row per user; REST row pagination does not paginate individual captures.
+- [x] Give actionable errors for HTTP 413 and recognized oversized-payload failures; integration test covers remote read followed by a rejected upsert.
+- [ ] Design incremental/chunked sync as a schema migration if very large libraries must exceed the current one-row JSONB payload.
 - [ ] Make sync writes atomic or staged so a failed batch cannot leave a partial library.
 - [ ] Add post-sync integrity checks for record count, IDs and changed content.
 - [ ] Add explicit conflict resolution for simultaneous edits on multiple devices.
