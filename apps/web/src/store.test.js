@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { loadCaptures, saveCaptures, makeCapture, visibleCaptures, sortCaptures, normalizeDuplicateKey, findDuplicateCapture, STORAGE_KEY, RECOVERY_KEY, getCaptureRecovery, startFreshCaptureLibrary } from "./store.js";
+import { loadCaptures, saveCaptures, makeCapture, normalizeCapture, normalizePreviewImageUrl, visibleCaptures, sortCaptures, normalizeDuplicateKey, findDuplicateCapture, STORAGE_KEY, RECOVERY_KEY, getCaptureRecovery, startFreshCaptureLibrary } from "./store.js";
 
 function memoryStorage() {
   const data = new Map();
@@ -179,4 +179,16 @@ test("library sorting supports activity, creation date, title and domain orders 
   assert.deepEqual(sortCaptures(items, "domain").map(item => item.id), ["a-url", "z", "a"]);
   assert.deepEqual(items.map(item => item.id), originalIds);
   assert.deepEqual(sortCaptures(items, "unknown").map(item => item.id), sortCaptures(items, "updated").map(item => item.id));
+});
+
+
+test("preview cover URLs allow only valid HTTPS URLs without embedded credentials", () => {
+  assert.equal(normalizePreviewImageUrl("https://example.com/cover.png"), "https://example.com/cover.png");
+  assert.equal(normalizePreviewImageUrl(" https://example.com/cover.png "), "https://example.com/cover.png");
+  assert.equal(normalizePreviewImageUrl("http://example.com/cover.png"), "");
+  assert.equal(normalizePreviewImageUrl("javascript:alert(1)"), "");
+  assert.equal(normalizePreviewImageUrl("https://user:password@example.com/cover.png"), "");
+  assert.equal(normalizePreviewImageUrl("not a url"), "");
+  assert.equal(normalizePreviewImageUrl(""), "");
+  assert.equal(normalizeCapture({ id: "cover", text: "https://example.com", previewImageUrl: "javascript:alert(1)" }).previewImageUrl, "");
 });
