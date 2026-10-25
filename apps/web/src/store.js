@@ -214,7 +214,9 @@ export function sortCaptures(items, mode = "updated") {
     else if (sortMode === "oldest") result = date(a, "createdAt") - date(b, "createdAt");
     else if (sortMode === "title") result = titleOf(a).localeCompare(titleOf(b), undefined, { numeric: true, sensitivity: "base" });
     else if (sortMode === "domain") {
-      result = domainOf(a).localeCompare(domainOf(b), undefined, { numeric: true, sensitivity: "base" });
+      const domainA = domainOf(a), domainB = domainOf(b);
+      if (Boolean(domainA) !== Boolean(domainB)) result = domainA ? -1 : 1;
+      else result = domainA.localeCompare(domainB, undefined, { numeric: true, sensitivity: "base" });
       if (!result) result = titleOf(a).localeCompare(titleOf(b), undefined, { numeric: true, sensitivity: "base" });
     }
     return result || Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) ||
