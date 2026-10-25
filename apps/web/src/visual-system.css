@@ -463,3 +463,39 @@ body { text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; 
 }
 .sort-order:focus-visible { outline: 2px solid color-mix(in srgb,var(--accent) 35%,transparent); outline-offset: 2px; }
 @media (max-width: 680px) { .sort-order { flex: 1 1 135px; max-width: none; } }
+
+
+.linka-shortcuts-list {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+}
+.linka-shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 13px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-top);
+}
+.linka-shortcut-description { min-width: 0; }
+.linka-shortcut-description strong { display: block; color: var(--text); font-size: 12px; font-weight: 650; }
+.linka-shortcut-description p { margin: 4px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.linka-shortcut-keys {
+  flex: 0 0 auto;
+  max-width: 48%;
+  padding: 6px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--panel-raised);
+  color: var(--text);
+  font: 600 10px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: normal;
+  text-align: center;
+}
+@media (max-width: 560px) {
+  .linka-shortcut-row { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .linka-shortcut-keys { max-width: 100%; text-align: left; }
+}
