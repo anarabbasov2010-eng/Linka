@@ -11,6 +11,16 @@ export function trimBackupSnapshots(snapshots, maxCount = MAX_BACKUP_SNAPSHOTS) 
     .slice(0, limit);
 }
 
+/**
+ * Pick the newest snapshot that has at least one recoverable capture or document.
+ * Empty snapshots are useful for history but cannot recover a corrupted library.
+ */
+export function findLatestUsableBackupSnapshot(snapshots) {
+  return trimBackupSnapshots(snapshots).find(snapshot =>
+    Number(snapshot.captureCount || 0) > 0 || Number(snapshot.documentCount || 0) > 0
+  ) || null;
+}
+
 function openBackupHistoryDatabase() {
   if (typeof indexedDB === "undefined") return Promise.resolve(null);
   return new Promise(resolve => {
