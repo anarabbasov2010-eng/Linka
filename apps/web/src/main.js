@@ -12,6 +12,7 @@ import {
 } from "./cloud-sync.js";
 import QRCode from "qrcode";
 import { listen as listenTauriEvent } from "@tauri-apps/api/event";
+import { invoke as invokeTauri } from "@tauri-apps/api/core";
 import {
   createLinkaBackup, parseLinkaBackup
 } from "./backup-format.js";
@@ -137,12 +138,17 @@ let reduceMotion = localStorage.getItem("linka.reduceMotion") === "true" || (loc
 function focusQuickCaptureFromNative() {
   const input = $("#capture-text");
   if (!input) return;
-  document.querySelector(".capture-preview-details")?.removeAttribute("open");
   input.focus({ preventScroll: true });
   input.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
   const capturePanel = document.querySelector(".capture");
   capturePanel?.classList.add("spotlight");
   setTimeout(() => capturePanel?.classList.remove("spotlight"), 900);
+}
+async function applyNativeCloseToTrayPreference() {
+  if (!(window.__TAURI_INTERNALS__ || window.__TAURI__)) return;
+  const enabled = localStorage.getItem("linka.closeToTray") !== "false";
+  try { await invokeTauri("set_close_to_tray", { enabled }); }
+  catch (error) { console.warn("Could not apply Linka close-to-tray preference", error); }
 }
 async function registerNativeDesktopEvents() {
   if (!(window.__TAURI_INTERNALS__ || window.__TAURI__)) return;
@@ -1086,7 +1092,7 @@ function captureExportTitle(item) {
 }
 const BACKUP_PREFERENCE_KEYS = [
   "linka.theme", "linka.accent", "linka.density", "linka.effects",
-  "linka.language.v1", "linka.reduceMotion", "linka.sortOrder.v1"
+  "linka.language.v1", "linka.reduceMotion", "linka.sortOrder.v1", "linka.closeToTray"
 ];
 function readLocalJson(key, fallback) {
   try {
@@ -1144,6 +1150,9 @@ function applyBackupPreferences(backup) {
   if (preferences["linka.accent"]) setLinkaAccent(preferences["linka.accent"]);
   if (preferences["linka.density"]) setLinkaDensity(preferences["linka.density"]);
   if (preferences["linka.effects"]) setLinkaEffects(preferences["linka.effects"]);
+  if (preferences["linka.closeToTray"] === "true" || preferences["linka.closeToTray"] === "false") {
+    void applyNativeCloseToTrayPreference();
+  }
   if (preferences["linka.sortOrder.v1"] && SORT_ORDERS.has(preferences["linka.sortOrder.v1"])) {
     sortMode = preferences["linka.sortOrder.v1"];
     if (sortOrder) sortOrder.value = sortMode;
@@ -1867,6 +1876,7 @@ void completeGoogleOAuthCallback().then(session => {
 window.addEventListener("linka:open-cloud-settings", () => showCloudSyncНастройки());
 window.addEventListener("linka:open-atmosphere-settings", () => openAtmosphereSettings());
 window.addEventListener("linka:open-agreement", () => showAgreement({ mustAccept: false }));
+void applyNativeCloseToTrayPreference();
 void registerNativeDesktopEvents();
 initLinkaExperience();
 initLinkaSignature();
