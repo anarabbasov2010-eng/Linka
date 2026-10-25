@@ -1,4 +1,4 @@
-import { loadCaptures, saveCaptures, makeCapture, normalizeCapture, normalizePreviewImageUrl, visibleCaptures, sortCaptures, findDuplicateCapture, normalizeDuplicateKey, getCaptureRecovery, startFreshCaptureLibrary } from "./store.js";
+import { loadCaptures, saveCaptures, makeCapture, normalizeCapture, normalizePreviewImageUrl, visibleCaptures, sortCaptures, findDuplicateCapture, normalizeDuplicateKey, getCaptureRecovery, startFreshCaptureLibrary, reopenCaptureRecovery } from "./store.js";
 import { initLinkaExperience, setLanguage } from "./experience.js";
 import { initVisualSystem, setLinkaTheme, setLinkaAccent, setLinkaDensity, setLinkaEffects } from "./visual-system.js";
 import { initLinkaAtmosphere, openAtmosphereSettings } from "./atmosphere.js";
@@ -329,6 +329,9 @@ function showCaptureRecoveryNotice() {
       say((result.partial ? captureUiText("backupPartial") : copy.restoreLatestDone) + detail);
     } catch (error) {
       console.error("Could not restore latest backup after capture-store corruption", error);
+      // If the malformed source was acknowledged before a failed write/restore,
+      // put the recovery gate back so a reload cannot hide the recovery options.
+      reopenCaptureRecovery();
       say(copy.restoreLatestFailed);
     } finally {
       restoreLatestButton.disabled = false;
