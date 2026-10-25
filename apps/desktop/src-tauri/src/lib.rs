@@ -10,6 +10,14 @@ fn take_startup_document(state: State<'_, StartupLinkaDocument>) -> Option<Strin
     state.0.lock().ok()?.take()
 }
 
+fn show_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+}
+
 fn read_linka_document(argument: &str) -> Option<String> {
     let path = Path::new(argument);
     if !path.extension().and_then(|extension| extension.to_str())
@@ -43,11 +51,23 @@ pub fn run() {
                         break;
                     }
                 }
+                let _ = window.show();
+                let _ = window.unminimize();
                 let _ = window.set_focus();
             }
         }));
         builder = builder.plugin(tauri_plugin_deep_link::init());
         builder = builder.plugin(tauri_plugin_opener::init());
+        builder = builder.plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, _shortcut, event| {
+                    if event.state() == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                        show_main_window(app);
+                        let _ = app.emit("linka-global-capture", ());
+                    }
+                })
+                .build(),
+        );
     }
 
     builder = builder
@@ -70,6 +90,66 @@ pub fn run() {
                     eprintln!("Could not register Linka URL scheme: {error}");
                 }
             }
+
+            #[cfg(desktop)]
+            {
+                use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+                use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+                use tauri_plugin_global_shortcut::GlobalShortcutExt;
+
+                let open_item = MenuItem::with_id(app, "open", "Open Linka", true, None::<&str>)?;
+                let capture_item = MenuItem::with_id(app, "quick-capture", "Quick capture", true, None::<&str>)?;
+                let separator = PredefinedMenuItem::separator(app)?;
+                let quit_item = MenuItem::with_id(app, "quit", "Quit Linka", true, None::<&str>)?;
+                let menu = Menu::with_items(app, &[&open_item, &capture_item, &separator, &quit_item])?;
+
+                let tray_builder = TrayIconBuilder::with_id("linka-tray")
+                    .tooltip("Linka · local-first")
+                    .menu(&menu)
+                    .show_menu_on_left_click(false)
+                    .on_menu_event(|app, event| match event.id().as_ref() {
+                        "open" => show_main_window(app),
+                        "quick-capture" => {
+                            show_main_window(app);
+                            let _ = app.emit("linka-tray-quick-capture", ());
+                        }
+                        "quit" => app.exit(0),
+                        _ => {}
+                    })
+                    .on_tray_icon_event(|tray, event| {
+                        if let TrayIconEvent::Click {
+                            button: MouseButton::Left,
+                            button_state: MouseButtonState::Up,
+                            ..
+                        } = event
+                        {
+                            show_main_window(tray.app_handle());
+                        }
+                    });
+
+                let tray_builder = if let Some(icon) = app.default_window_icon() {
+                    tray_builder.icon(icon.clone())
+                } else {
+                    tray_builder
+                };
+                tray_builder.build(app)?;
+
+                if let Err(error) = app.global_shortcut().register("Ctrl+Alt+Space") {
+                    eprintln!("Could not register Linka quick-capture shortcut Ctrl+Alt+Space: {error}");
+                }
+
+                #[cfg(windows)]
+                if let Some(window) = app.get_webview_window("main") {
+                    let window_to_hide = window.clone();
+                    window.on_window_event(move |event| {
+                        if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                            api.prevent_close();
+                            let _ = window_to_hide.hide();
+                        }
+                    });
+                }
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![take_startup_document])
