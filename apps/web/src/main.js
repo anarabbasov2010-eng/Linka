@@ -771,8 +771,8 @@ function showSearchSpace(initial = "") {
         if (index === paletteSelection) row.classList.add("command-selected");
         const thumb = document.createElement("span"); thumb.className = "search-thumb"; thumb.textContent = "›";
         const copy = document.createElement("span"); copy.className = "search-result-copy";
-        const rowTitle = document.createElement("span"); rowTitle.className = "search-result-title"; rowTitle.textContent = command.title;
-        const detail = document.createElement("span"); detail.className = "search-result-detail"; detail.textContent = command.description;
+        const rowTitle = document.createElement("span"); rowTitle.className = "search-result-title"; appendSearchHighlights(rowTitle, command.title, rawQuery.slice(1).trim());
+        const detail = document.createElement("span"); detail.className = "search-result-detail"; appendSearchHighlights(detail, command.description, rawQuery.slice(1).trim());
         const type = document.createElement("span"); type.className = "search-result-type"; type.textContent = "Command";
         copy.append(rowTitle, detail); row.append(thumb, copy, type);
         row.addEventListener("click", () => command.run());
@@ -811,9 +811,9 @@ function showSearchSpace(initial = "") {
       const copy = document.createElement("span"); copy.className = "search-result-copy";
       const rowTitle = document.createElement("span"); rowTitle.className = "search-result-title";
       let host = ""; if (isLink(item.text)) { try { host = new URL(item.text).hostname.replace(/^www\./i, ""); } catch {} }
-      rowTitle.textContent = item.previewTitle || host || item.text.slice(0, 100);
+      appendSearchHighlights(rowTitle, item.previewTitle || host || item.text.slice(0, 100), freeTextQuery);
       const detail = document.createElement("span"); detail.className = "search-result-detail";
-      detail.textContent = item.previewDescription || item.text;
+      appendSearchHighlights(detail, item.previewDescription || item.text, freeTextQuery);
       const type = document.createElement("span"); type.className = "search-result-type"; type.textContent = item.pinned ? "Pinned" : (isLink(item.text) ? "Link" : "Note");
       copy.append(rowTitle, detail); row.append(thumb, copy, type);
       row.addEventListener("click", () => {
@@ -837,8 +837,8 @@ function showSearchSpace(initial = "") {
         row.type = "button"; row.className = "search-result"; row.setAttribute("role", "option");
         const thumb = document.createElement("span"); thumb.className = "search-thumb"; thumb.textContent = "Aa";
         const copy = document.createElement("span"); copy.className = "search-result-copy";
-        const rowTitle = document.createElement("span"); rowTitle.className = "search-result-title"; rowTitle.textContent = item.title || "Untitled document";
-        const detail = document.createElement("span"); detail.className = "search-result-detail"; detail.textContent = item.excerpt || "Open local document";
+        const rowTitle = document.createElement("span"); rowTitle.className = "search-result-title"; appendSearchHighlights(rowTitle, item.title || "Untitled document", freeTextQuery);
+        const detail = document.createElement("span"); detail.className = "search-result-detail"; appendSearchHighlights(detail, item.excerpt || "Open local document", freeTextQuery);
         const type = document.createElement("span"); type.className = "search-result-type"; type.textContent = "Document";
         copy.append(rowTitle, detail); row.append(thumb, copy, type);
         row.addEventListener("click", async () => {
