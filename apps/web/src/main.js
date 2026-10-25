@@ -2,7 +2,7 @@ import { loadCaptures, saveCaptures, makeCapture, normalizeCapture, normalizePre
 import { initLinkaExperience, setLanguage } from "./experience.js";
 import { initVisualSystem, setLinkaTheme, setLinkaAccent, setLinkaDensity, setLinkaEffects } from "./visual-system.js";
 import { initLinkaAtmosphere, openAtmosphereSettings } from "./atmosphere.js";
-import { initLinkaDocuments, searchLinkaDocuments, openLinkaDocumentById, exportLinkaDocuments, importLinkaDocuments } from "./documents.js";
+import { initLinkaDocuments, searchLinkaDocuments, openLinkaDocumentById, exportLinkaDocuments, importLinkaDocuments, setLinkaDocumentBeforeSave } from "./documents.js";
 import { initLinkaSignature } from "./signature-theme.js";
 import {
   addDeletedId, addDeletedIds, removeDeletedIds, setDeletedIds, disconnectCloud, getCloudConfig, getCloudSession,
@@ -1246,6 +1246,12 @@ async function storeBackupHistorySnapshot(captureSnapshot = captures, reason = "
 async function saveAutomaticBackupSnapshot(previousCaptures) {
   return storeBackupHistorySnapshot(previousCaptures, "automatic-before-change", true);
 }
+setLinkaDocumentBeforeSave(() => {
+  const recoveryState = getCaptureRecovery();
+  if (recoveryState && !recoveryState.acknowledged) return;
+  const previousState = persistedCaptures.map(item => ({ ...item, tags: [...(item.tags || [])] }));
+  return saveAutomaticBackupSnapshot(previousState);
+});
 
 function downloadBackupPayload(backup, filename = "linka-backup.json") {
   const blob = new Blob([JSON.stringify(backup, null, 2) + "\n"], { type: "application/json;charset=utf-8" });
