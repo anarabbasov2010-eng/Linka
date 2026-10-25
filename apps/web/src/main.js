@@ -1292,53 +1292,117 @@ list.addEventListener("click",async event=>{
   else if(action==="edit"){editingId=id;draft.value=item.text;tagsDraft.value=(item.tags||[]).join(", ");collectionDraft.value=item.collection||"";composeLabel.textContent="Edit capture";saveButton.textContent="Save changes ↗";saveButton.disabled=false;saveCaptureMetadataDraft();draft.focus();window.scrollTo({top:0,behavior:"smooth"});}
   else if(action==="copy"){try{await navigator.clipboard.writeText(item.text);say("Скопировано");}catch{draft.value=item.text;draft.focus();draft.select();say("Text selected for manual copying");}}
 });
-$("#export-button").addEventListener("click",()=> exportCaptureItems(captures, "linka-inbox"));
+$("#export-button").addEventListener("click", async () => {
+  if (($("#export-format")?.value || "json") === "json") {
+    await downloadLinkaBackup();
+  } else {
+    exportCaptureItems(captures, "linka-inbox");
+  }
+});
 $("#import-button").addEventListener("click",()=>$("#import-file").click());
-$("#import-file").addEventListener("change",async event=>{
-  const file=event.target.files?.[0];if(!file)return;
+$("#import-file").addEventListener("change", async event => {
+  const file = event.target.files?.[0];
+  if (!file) return;
   try {
     const raw = await file.text();
-    let imported;
-    if (/\.json$/i.test(file.name) || file.type === "application/json") {
+    let backup = null;
+    let imported = null;
+
+    if (/\\.json$/i.test(file.name) || file.type === "application/json") {
       const parsed = JSON.parse(raw);
-      imported = Array.isArray(parsed) ? parsed : parsed.captures;
+      backup = parseLinkaBackup(parsed);
+      imported = backup
+        ? backup.captures
+        : (Array.isArray(parsed) ? parsed : parsed?.captures);
       if (!Array.isArray(imported)) throw new Error("Invalid Linka JSON backup");
     } else {
-      // Text and Markdown files are imported as a single note to avoid guessing
-      // where a user's paragraphs, lists, or code samples should be split.
-      // JSON without a .json extension is only treated as a backup when it
-      // actually parses to a captures array; otherwise it remains plain text.
+      // TXT/Markdown is kept as a single note. When the contents are valid
+      // JSON, recognize only known backup shapes instead of guessing that any
+      // arbitrary object with a "captures" property is trusted.
       try {
         const parsed = JSON.parse(raw);
-        const candidate = Array.isArray(parsed) ? parsed : parsed?.captures;
-        imported = Array.isArray(candidate) && candidate.every(item => item && typeof item.text === "string")
-          ? candidate
-          : [{ text: raw }];
-      } catch {
+        backup = parseLinkaBackup(parsed);
+        if (backup) {
+          imported = backup.captures;
+        } else {
+          const candidate = Array.isArray(parsed) ? parsed : parsed?.captures;
+          imported = Array.isArray(candidate) && candidate.every(item => item && typeof item.text === "string")
+            ? candidate
+            : [{ text: raw }];
+        }
+      } catch (error) {
+        if (String(error?.message || "").includes("unsupported version") || String(error?.message || "").includes("incomplete or damaged")) throw error;
         imported = [{ text: raw }];
       }
     }
-    const normalized=imported.map(item=>makeCapture(item.text,item)).filter(Boolean);
-    if (!normalized.length) throw new Error("No text captures found");
-    const restoredIds=new Set(normalized.map(item=>item.id));
-    const beforeImport=captures.map(item=>({...item}));
-    const map=new Map(captures.map(item=>[item.id,item]));
-    normalized.forEach(item=>map.set(item.id,item));
-    captures=Array.from(map.values()).sort((a,b)=>b.updatedAt-a.updatedAt);
-    if (persist()) {
-      if (!removeDeletedIds(restoredIds)) {
-        captures=beforeImport;
-        if (!persist()) say("Could not safely restore the previous library. Export a backup before continuing.");
-        else say("Import rolled back because old cloud deletion markers could not be removed.");
-        render();
-        return;
+
+    if (backup && !window.confirm(captureUiText("backupConfirm"))) return;
+    if (!Array.isArray(imported)) throw new Error("Import must contain an array of captures.");
+    const normalized = imported
+      .filter(item => item && typeof item === "object" && typeof item.text === "string")
+      .map(item => normalizeCapture(item))
+      .filter(Boolean);
+    if (!backup && !normalized.length) throw new Error("No text captures found");
+
+    const importedIds = new Set(normalized.map(item => item.id));
+    const beforeImport = captures.map(item => ({ ...item }));
+    const map = new Map(captures.map(item => [item.id, item]));
+    normalized.forEach(item => map.set(item.id, item));
+    const nextCaptures = [...map.values()].sort((a, b) =>
+      Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) ||
+      Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0)
+    );
+
+    // Save captures first; do not change in-memory state or start cloud sync
+    // until local capture data and deletion markers have both been committed.
+    if (!saveCaptures(nextCaptures)) {
+      say("Could not save imported captures. The current library remains unchanged.");
+      return;
+    }
+    const nextDeleted = new Set(readDeletedIds());
+    if (backup) for (const id of backup.deletedIds) nextDeleted.add(id);
+    for (const id of importedIds) nextDeleted.delete(id);
+    if (!setDeletedIds([...nextDeleted])) {
+      const rolledBack = saveCaptures(beforeImport);
+      say(rolledBack
+        ? "Import cancelled because cloud deletion markers could not be saved."
+        : "Import rollback failed. Stop editing and export whatever data remains immediately.");
+      return;
+    }
+
+    captures = nextCaptures;
+    persistedCaptures = captures.map(item => ({ ...item }));
+    localDataRevision += 1;
+
+    let documentResult = { imported: 0, skipped: 0 };
+    let documentFailed = false;
+    if (backup?.documents?.length) {
+      try {
+        documentResult = await importLinkaDocuments(backup.documents);
+      } catch (error) {
+        console.error("Linka document restore failed", error);
+        documentFailed = true;
       }
-      scheduleCloudSync();
-      render(); say(captureUiText("importSuccess") + " " + normalized.length);
-    } else render();
-  } catch {
+    }
+
+    let preferencesApplied = true;
+    if (backup) preferencesApplied = applyBackupPreferences(backup);
+    scheduleCloudSync();
+    render();
+
+    if (backup) {
+      const partial = documentFailed || !preferencesApplied || documentResult.skipped > 0;
+      const detail = " · " + normalized.length + " captures, " + documentResult.imported + " documents";
+      say((partial ? captureUiText("backupPartial") : captureUiText("backupRestored")) + detail);
+    } else {
+      say(captureUiText("importSuccess") + " " + normalized.length);
+    }
+  } catch (error) {
+    console.error("Linka import failed", error);
     say(captureUiText("invalidImport"));
-  } finally { event.target.value=""; }
+  } finally {
+    event.target.value = "";
+  }
 });
 $("#search-space-button").addEventListener("click",()=>showSearchSpace(search.value));
 document.addEventListener("keydown",event=>{
