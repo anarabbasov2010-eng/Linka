@@ -363,6 +363,14 @@ body{background:var(--bg);background-image:radial-gradient(ellipse at 8% 0%,rgba
         <datalist id="linka-tag-options"></datalist>
         <datalist id="linka-collection-options"></datalist>
       </div>
+      <details class="capture-preview-details">
+        <summary id="capture-preview-summary">Link preview (optional)</summary>
+        <div class="capture-meta capture-preview-meta">
+          <label><span id="capture-preview-title-label">Page title</span><input id="capture-preview-title" maxlength="180" placeholder="Title shown on the card" autocomplete="off"></label>
+          <label><span id="capture-preview-description-label">Description</span><input id="capture-preview-description" maxlength="320" placeholder="Short description" autocomplete="off"></label>
+          <label class="capture-preview-image-field"><span id="capture-preview-image-label">Cover image URL (HTTPS)</span><input id="capture-preview-image" type="url" maxlength="2048" placeholder="https://example.com/cover.jpg" autocomplete="url" inputmode="url"></label>
+        </div>
+      </details>
       <div class="capture-foot"><span class="hint">Saved on this device.<br>Export a backup whenever you need.</span><button class="primary" id="save-button" type="submit" disabled>Save to inbox <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg></button></div>
     </form>
     <section class="workspace">
