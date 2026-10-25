@@ -92,7 +92,10 @@ export function getCaptureRecovery(storage = globalThis.localStorage) {
   if (typeof raw === "string" && raw !== "") {
     let validCaptureArray = false;
     try {
-      validCaptureArray = Array.isArray(JSON.parse(raw));
+      const parsed = JSON.parse(raw);
+      // Do not treat an array containing malformed records as healthy: loadCaptures
+      // would otherwise drop those records and a later save would erase them.
+      validCaptureArray = Array.isArray(parsed) && parsed.every(item => normalizeCapture(item));
     } catch {}
 
     if (!validCaptureArray) {
@@ -172,7 +175,9 @@ export function loadCaptures(storage = globalThis.localStorage) {
     if (raw == null || raw === "") return [];
     const data = JSON.parse(raw);
     if (!Array.isArray(data)) throw new Error("Capture storage is not an array");
-    return data.map(normalizeCapture).filter(Boolean);
+    const normalized = data.map(normalizeCapture);
+    if (normalized.some(item => !item)) throw new Error("Capture storage contains an invalid record");
+    return normalized;
   } catch {
     try {
       const raw = storage?.getItem(STORAGE_KEY);
