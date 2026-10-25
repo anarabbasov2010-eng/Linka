@@ -29,6 +29,9 @@ function openBackupHistoryDatabase() {
 }
 
 let databasePromise;
+export async function isBackupHistoryAvailable() {
+  return Boolean(await database());
+}
 function database() {
   if (!databasePromise) databasePromise = openBackupHistoryDatabase();
   return databasePromise;
