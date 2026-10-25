@@ -32,6 +32,15 @@ test("sync result excludes records deleted while a request was in flight", () =>
   ];
   const safe = excludeDeletedCaptures(merged, new Set(["deleted-local", "deleted-remote"]));
   assert.deepEqual(safe.map(item => item.id), ["keep"]);
+  assert.equal(merged.length, 3, "filtering must not mutate the original merge result");
+});
+
+test("deleted-record filtering safely handles malformed input and array tombstones", () => {
+  assert.deepEqual(excludeDeletedCaptures(null, ["gone"]), []);
+  assert.deepEqual(
+    excludeDeletedCaptures([null, {}, { id: "", text: "bad" }, { id: "gone" }, { id: "kept" }], ["gone"]),
+    [{ id: "kept" }]
+  );
 });
 
 test("cloud merge prefers the local copy when update timestamps are equal", () => {
