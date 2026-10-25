@@ -4,6 +4,7 @@ import {
   MAX_BACKUP_SNAPSHOTS,
   MAX_AUTOMATIC_SNAPSHOT_BYTES,
   trimBackupSnapshots,
+  isBackupHistoryAvailable,
   saveBackupSnapshot
 } from "./backup-history.js";
 
@@ -25,4 +26,9 @@ test("backup history retention keeps only the newest valid snapshots without mut
 
 test("backup history refuses malformed snapshots before touching IndexedDB", async () => {
   await assert.rejects(() => saveBackupSnapshot({ id: "bad", createdAt: 1, backup: { format: "other" } }), /Invalid Linka backup snapshot/);
+});
+
+
+test("backup history capability is false when IndexedDB is not present", async () => {
+  assert.equal(await isBackupHistoryAvailable(), false);
 });
