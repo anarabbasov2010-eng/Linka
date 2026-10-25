@@ -101,7 +101,7 @@ pub fn run() {
 
             #[cfg(desktop)]
             {
-                use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+                use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
                 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
                 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
