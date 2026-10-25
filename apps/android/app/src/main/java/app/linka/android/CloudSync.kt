@@ -11,6 +11,11 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.util.concurrent.TimeUnit
 import java.security.KeyStore
 import java.time.Instant
 import javax.crypto.Cipher
@@ -63,6 +68,27 @@ private object LinkaTokenVault {
     }
 }
 
+private val patchHttpClient = OkHttpClient.Builder()
+    .connectTimeout(12, TimeUnit.SECONDS)
+    .readTimeout(15, TimeUnit.SECONDS)
+    .build()
+
+private fun cloudRequestError(code: Int, text: String): IllegalStateException {
+    val detail = runCatching {
+        JSONObject(text).optString("message").ifBlank { JSONObject(text).optString("msg") }
+    }.getOrDefault("")
+    val message = when {
+        code == 401 || code == 403 -> "Sign-in failed. Check your email, password and public anon key."
+        code == 413 || (code == 400 && text.contains("payload too large|request entity too large", ignoreCase = true)) ->
+            "The cloud sync payload is too large. Export a backup and reduce the amount or size of synced data before retrying."
+        code == 404 || (code == 400 && text.contains("linka_sync", true)) ->
+            "Cloud table not found. Copy the SQL setup in Linka and run it in the Supabase SQL Editor."
+        detail.isNotBlank() -> detail.take(220)
+        else -> "Cloud request failed ($code). Check your Supabase settings."
+    }
+    return IllegalStateException(message)
+}
+
 private fun requestJson(
     url: String,
     method: String,
@@ -71,6 +97,25 @@ private fun requestJson(
     body: String? = null,
     prefer: String? = null
 ): String {
+    // HttpURLConnection rejects PATCH on Android. Use OkHttp for the conditional
+    // revision update so the compare-and-set guard works on real devices.
+    if (method.equals("PATCH", ignoreCase = true)) {
+        val requestBuilder = Request.Builder()
+            .url(url)
+            .header("apikey", anonKey)
+            .header("Accept", "application/json")
+        if (bearer != null) requestBuilder.header("Authorization", "Bearer $bearer")
+        if (prefer != null) requestBuilder.header("Prefer", prefer)
+        val requestBody = (body ?: "").toRequestBody("application/json; charset=utf-8".toMediaType())
+        val request = requestBuilder.patch(requestBody).build()
+        patchHttpClient.newCall(request).execute().use { response ->
+            val code = response.code
+            val text = response.body?.string().orEmpty().take(1_000_000)
+            if (!response.isSuccessful) throw cloudRequestError(code, text)
+            return text
+        }
+    }
+
     val connection = (URL(url).openConnection() as HttpURLConnection).apply {
         requestMethod = method
         connectTimeout = 12_000
@@ -90,18 +135,7 @@ private fun requestJson(
         val code = connection.responseCode
         val stream = if (code in 200..299) connection.inputStream else connection.errorStream
         val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText().take(1_000_000) }.orEmpty()
-        if (code !in 200..299) {
-            val detail = runCatching { JSONObject(text).optString("message").ifBlank { JSONObject(text).optString("msg") } }.getOrDefault("")
-            throw IllegalStateException(
-                when {
-                    code == 401 || code == 403 -> "Sign-in failed. Check your email, password and public anon key."
-                    code == 404 || (code == 400 && text.contains("linka_sync", true)) ->
-                        "Cloud table not found. Copy the SQL setup in Linka and run it in the Supabase SQL Editor."
-                    detail.isNotBlank() -> detail.take(220)
-                    else -> "Cloud request failed ($code). Check your Supabase settings."
-                }
-            )
-        }
+        if (code !in 200..299) throw cloudRequestError(code, text)
         return text
     } finally {
         connection.disconnect()
