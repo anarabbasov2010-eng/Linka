@@ -123,6 +123,26 @@ export function startFreshCaptureLibrary(storage = globalThis.localStorage) {
   }
 }
 
+/**
+ * Re-open the recovery notice after a restore attempt fails.
+ * The preserved raw source stays intact and normal writes remain blocked
+ * until the user makes an explicit recovery choice again.
+ */
+export function reopenCaptureRecovery(storage = globalThis.localStorage) {
+  const recovery = getCaptureRecovery(storage);
+  if (!recovery || typeof recovery.raw !== "string") return false;
+  try {
+    storage.setItem(RECOVERY_KEY, JSON.stringify({
+      ...recovery,
+      acknowledged: false,
+      reopenedAt: Date.now()
+    }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function loadCaptures(storage = globalThis.localStorage) {
   try {
     const raw = storage?.getItem(STORAGE_KEY);
