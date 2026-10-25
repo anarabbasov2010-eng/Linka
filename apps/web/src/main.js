@@ -126,7 +126,7 @@ function clipboardCaptureUiText(key) {
     },
     az: {
       paste: "Mübadilə buferindən əlavə et",
-      pasteHelp: "Bufer yalnız düyməni basdıqda oxunur; Linka onu arxa planda izləmir.",
+      pasteHelp: "Bufer yalnız düyməyə basdıqda oxunur; Linka onu arxa planda izləmir.",
       clipboardEmpty: "Buferdə əlavə ediləcək mətn yoxdur.",
       clipboardAccessFailed: "Buferi oxumaq olmadı. Mətni birbaşa saxlama sahəsinə yapışdıra bilərsən.",
       clipboardPasted: "Buferdəki mətn qaralamaya əlavə edildi. Saxlamazdan əvvəl yoxla.",
