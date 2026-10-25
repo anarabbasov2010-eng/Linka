@@ -161,6 +161,50 @@ test("cloud sync retries a stale write and merges the concurrent device's newer 
   }
 });
 
+test("sync refuses a malformed remote library before writing any cloud changes", async () => {
+  const hadStorage = Object.prototype.hasOwnProperty.call(globalThis, "localStorage");
+  const previousStorage = globalThis.localStorage;
+  const previousFetch = globalThis.fetch;
+  const storage = memoryStorage();
+  storage.setItem("linka.cloud.config.v1", JSON.stringify({
+    url: "https://example.supabase.co",
+    key: "public-test-key"
+  }));
+  storage.setItem("linka.cloud.session.v1", JSON.stringify({
+    userId: "user-test",
+    email: "test@example.com",
+    accessToken: "test-access-token",
+    refreshToken: "test-refresh-token",
+    expiresAt: Date.now() + 60 * 60 * 1000
+  }));
+  globalThis.localStorage = storage;
+  let writes = 0;
+  globalThis.fetch = async (_url, options = {}) => {
+    if (options.method === "PATCH" || options.method === "POST") writes += 1;
+    return new Response(JSON.stringify([{
+      data: { captures: { id: "not-an-array" }, deletedIds: [] },
+      updated_at: "2026-10-25T08:00:00+00:00"
+    }]), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    });
+  };
+
+  try {
+    await assert.rejects(
+      syncCloudCaptures([
+        { id: "local-note", text: "Keep the local copy", createdAt: 1, updatedAt: 1 }
+      ], new Set()),
+      /cloud library is incomplete.*left it unchanged/i
+    );
+    assert.equal(writes, 0, "malformed remote data must never be overwritten by a sync attempt");
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (hadStorage) globalThis.localStorage = previousStorage;
+    else delete globalThis.localStorage;
+  }
+});
+
 test("cloud merge picks the newest copy, keeps pins, and orders newest first", () => {
   const remote = [
     { id: "same", text: "old", createdAt: 1, updatedAt: 10, pinned: false },
