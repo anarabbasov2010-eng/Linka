@@ -801,7 +801,7 @@ function showCloudSyncНастройки() {
   meta.append(title, sub); head.append(logo, meta); content.append(head);
 
   const note = document.createElement("p");
-  note.textContent = "Войди через Google. Один аккаунт — твоя библиотека на телефоне, компьютере и сайте.";
+  note.textContent = "Войди через Google. Один аккаунт — твоя библиотека в Windows и веб-версии Linka."
   content.append(note);
 
   const config = getCloudConfig();
@@ -1833,7 +1833,7 @@ list.addEventListener("click",async event=>{
     }}));
   }
   else if(action==="edit"){editingId=id;draft.value=item.text;tagsDraft.value=(item.tags||[]).join(", ");collectionDraft.value=item.collection||"";previewTitleDraft.value=item.previewTitle||"";previewDescriptionDraft.value=item.previewDescription||"";previewImageDraft.value=item.previewImageUrl||"";const previewDetails=document.querySelector(".capture-preview-details");if(previewDetails)previewDetails.open=Boolean(item.previewTitle||item.previewDescription||item.previewImageUrl);composeLabel.textContent="Edit capture";saveButton.textContent="Save changes ↗";saveButton.disabled=false;saveCaptureMetadataDraft();draft.focus();window.scrollTo({top:0,behavior:"smooth"});}
-  else if(action==="copy"){try{await navigator.clipboard.writeText(item.text);say("Скопировано");}catch{draft.value=item.text;draft.focus();draft.select();say("Text selected for manual copying");}}
+  else if(action==="copy"){try{await navigator.clipboard.writeText(item.text);say("Скопировано");}catch{draft.value=item.text;draft.focus();draft.select();say("Текст выделен для копирования вручную");}}
 });
 $("#backup-history-button").addEventListener("click", () => { void showBackupHistory(); });
 $("#export-button").addEventListener("click", async () => {
