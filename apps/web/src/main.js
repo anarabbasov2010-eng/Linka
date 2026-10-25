@@ -1,16 +1,19 @@
-import { loadCaptures, saveCaptures, makeCapture, visibleCaptures, findDuplicateCapture, getCaptureRecovery, startFreshCaptureLibrary } from "./store.js";
-import { initLinkaExperience } from "./experience.js";
-import { initVisualSystem } from "./visual-system.js";
+import { loadCaptures, saveCaptures, makeCapture, normalizeCapture, visibleCaptures, findDuplicateCapture, getCaptureRecovery, startFreshCaptureLibrary } from "./store.js";
+import { initLinkaExperience, setLanguage } from "./experience.js";
+import { initVisualSystem, setLinkaTheme, setLinkaAccent, setLinkaDensity, setLinkaEffects } from "./visual-system.js";
 import { initLinkaAtmosphere, openAtmosphereSettings } from "./atmosphere.js";
-import { initLinkaDocuments, searchLinkaDocuments, openLinkaDocumentById } from "./documents.js";
+import { initLinkaDocuments, searchLinkaDocuments, openLinkaDocumentById, exportLinkaDocuments, importLinkaDocuments } from "./documents.js";
 import { initLinkaSignature } from "./signature-theme.js";
 import {
-  addDeletedId, addDeletedIds, removeDeletedIds, disconnectCloud, getCloudConfig, getCloudSession,
+  addDeletedId, addDeletedIds, removeDeletedIds, setDeletedIds, disconnectCloud, getCloudConfig, getCloudSession,
   getOtpCooldown, readDeletedIds, requestEmailOtp, saveCloudConfig, syncCloudCaptures, mergeCloudCaptures,
   verifyEmailOtp, readLinkaProfile, saveLinkaProfile, beginQrPairing, claimQrPairing,
   startGoogleOAuth, completeGoogleOAuthCallback
 } from "./cloud-sync.js";
 import QRCode from "qrcode";
+import {
+  createLinkaBackup, parseLinkaBackup
+} from "./backup-format.js";
 
 const $ = selector => document.querySelector(selector);
 const form = $("#capture-form");
@@ -41,10 +44,10 @@ search.title = "Search operators: type:link, type:note, is:pinned, is:later, tag
 function captureUiText(key) {
   const language = (() => { try { return localStorage.getItem("linka.language.v1") || "en"; } catch { return "en"; } })();
   const copy = {
-    en: { later: "Read later", removeLater: "Remove later", tagSearch: "Search this tag", collectionSearch: "Show this collection", savedLater: "Saved for later", removedLater: "Removed from read later", readLater: "Read later", archive: "Archive", unarchive: "Unarchive", trash: "Move to trash", restore: "Restore", deletePermanent: "Delete permanently", archived: "Archived", unarchived: "Moved out of archive", movedTrash: "Moved to trash", restored: "Restored from trash", deletedPermanent: "Permanently deleted", confirmPermanent: "Permanently delete the selected items? This cannot be undone.", tags: "Edit tags", collection: "Set collection", markLater: "Mark for later", removeLaterBulk: "Remove from read later", tagPrompt: "Comma-separated tags (leave empty to clear)", collectionPrompt: "Collection name (leave empty to clear)", savedViews: "Saved searches", saveView: "Save view", removeView: "Remove view", nameView: "Name this search", viewSaved: "Search saved", viewRemoved: "Saved search removed", enterSearch: "Type a search before saving it.", exportedJson: "JSON backup downloaded", exportedMarkdown: "Markdown export downloaded", exportedText: "Text export downloaded", exportedHtml: "HTML export downloaded", duplicatePrompt: "A matching item already exists. Save another copy anyway?", duplicateSkipped: "Existing item kept; duplicate was not added.", recentViews: "Recent searches · this device only", clearRecent: "Clear history", recentCleared: "Recent searches cleared." },
-    ru: { later: "Сохранить на потом", removeLater: "Убрать из отложенного", tagSearch: "Найти этот тег", collectionSearch: "Открыть коллекцию", savedLater: "Добавлено в «Сохранить на потом»", removedLater: "Убрано из отложенного", readLater: "Отложено", archive: "В архив", unarchive: "Вернуть из архива", trash: "В корзину", restore: "Восстановить", deletePermanent: "Удалить навсегда", archived: "Перемещено в архив", unarchived: "Возвращено из архива", movedTrash: "Перемещено в корзину", restored: "Восстановлено из корзины", deletedPermanent: "Удалено навсегда", confirmPermanent: "Удалить выбранные записи навсегда? Это действие нельзя отменить.", tags: "Изменить теги", collection: "Задать коллекцию", markLater: "Отложить", removeLaterBulk: "Убрать из отложенного", tagPrompt: "Теги через запятую (пустое поле очистит теги)", collectionPrompt: "Название коллекции (пустое поле очистит её)", savedViews: "Сохранённые поиски", saveView: "Сохранить поиск", removeView: "Удалить поиск", nameView: "Название поиска", viewSaved: "Поиск сохранён", viewRemoved: "Поиск удалён", enterSearch: "Сначала введи поисковый запрос.", exportedJson: "JSON-резервная копия скачана", exportedMarkdown: "Экспорт Markdown скачан", exportedText: "Текстовый экспорт скачан", exportedHtml: "HTML-экспорт скачан", duplicatePrompt: "Похожая запись уже существует. Сохранить ещё одну копию?", duplicateSkipped: "Существующая запись сохранена; дубликат не добавлен.", recentViews: "Недавние поиски · только на устройстве", clearRecent: "Очистить историю", recentCleared: "История поиска очищена." },
-    az: { later: "Sonra oxu", removeLater: "Sonra oxumaqdan çıxar", tagSearch: "Bu teqi axtar", collectionSearch: "Kolleksiyanı göstər", savedLater: "Sonra oxumaq üçün saxlanıldı", removedLater: "Sonra oxumaq siyahısından çıxarıldı", readLater: "Sonra oxu", archive: "Arxivə köçür", unarchive: "Arxivdən çıxar", trash: "Zibil qutusuna köçür", restore: "Bərpa et", deletePermanent: "Həmişəlik sil", archived: "Arxivə köçürüldü", unarchived: "Arxivdən çıxarıldı", movedTrash: "Zibil qutusuna köçürüldü", restored: "Zibil qutusundan bərpa edildi", deletedPermanent: "Həmişəlik silindi", confirmPermanent: "Seçilmiş qeydlər həmişəlik silinsin? Bu əməl geri qaytarıla bilməz.", tags: "Teqləri dəyiş", collection: "Kolleksiya təyin et", markLater: "Sonra oxu üçün saxla", removeLaterBulk: "Sonra oxu siyahısından çıxar", tagPrompt: "Vergüllə ayrılmış teqlər (boş buraxmaq təmizləyir)", collectionPrompt: "Kolleksiyanın adı (boş buraxmaq təmizləyir)", savedViews: "Saxlanmış axtarışlar", saveView: "Axtarışı saxla", removeView: "Axtarışı sil", nameView: "Axtarışın adı", viewSaved: "Axtarış saxlanıldı", viewRemoved: "Saxlanmış axtarış silindi", enterSearch: "Əvvəlcə axtarış sorğusu yaz.", exportedJson: "JSON ehtiyat nüsxəsi endirildi", exportedMarkdown: "Markdown ixracı endirildi", exportedText: "Mətn ixracı endirildi", exportedHtml: "HTML ixracı endirildi", duplicatePrompt: "Oxşar qeyd artıq mövcuddur. Daha bir nüsxə saxlanılsın?", duplicateSkipped: "Mövcud qeyd saxlanıldı; dublikat əlavə edilmədi.", recentViews: "Son axtarışlar · yalnız bu cihazda", clearRecent: "Tarixçəni təmizlə", recentCleared: "Axtarış tarixçəsi təmizləndi." },
-    tr: { later: "Daha sonra oku", removeLater: "Sonradan oku listesinden çıkar", tagSearch: "Bu etiketi ara", collectionSearch: "Bu koleksiyonu göster", savedLater: "Daha sonra okumak için kaydedildi", removedLater: "Sonradan oku listesinden kaldırıldı", readLater: "Daha sonra oku", archive: "Arşivle", unarchive: "Arşivden çıkar", trash: "Çöp kutusuna taşı", restore: "Geri yükle", deletePermanent: "Kalıcı olarak sil", archived: "Arşive taşındı", unarchived: "Arşivden çıkarıldı", movedTrash: "Çöp kutusuna taşındı", restored: "Çöp kutusundan geri yüklendi", deletedPermanent: "Kalıcı olarak silindi", confirmPermanent: "Seçili kayıtlar kalıcı olarak silinsin mi? Bu işlem geri alınamaz.", tags: "Etiketleri düzenle", collection: "Koleksiyon ata", markLater: "Daha sonra oku", removeLaterBulk: "Sonradan oku listesinden çıkar", tagPrompt: "Virgülle ayrılmış etiketler (boş bırakmak temizler)", collectionPrompt: "Koleksiyon adı (boş bırakmak temizler)", savedViews: "Kayıtlı aramalar", saveView: "Aramayı kaydet", removeView: "Aramayı kaldır", nameView: "Arama adı", viewSaved: "Arama kaydedildi", viewRemoved: "Kayıtlı arama silindi", enterSearch: "Önce bir arama yaz.", exportedJson: "JSON yedeği indirildi", exportedMarkdown: "Markdown dışa aktarımı indirildi", exportedText: "Metin dışa aktarımı indirildi", exportedHtml: "HTML dışa aktarımı indirildi", duplicatePrompt: "Benzer bir kayıt zaten var. Bir kopya daha kaydedilsin mi?", duplicateSkipped: "Mevcut kayıt korundu; kopya eklenmedi.", recentViews: "Son aramalar · yalnızca bu cihazda", clearRecent: "Geçmişi temizle", recentCleared: "Arama geçmişi temizlendi." }
+    en: { later: "Read later", removeLater: "Remove later", tagSearch: "Search this tag", collectionSearch: "Show this collection", savedLater: "Saved for later", removedLater: "Removed from read later", readLater: "Read later", archive: "Archive", unarchive: "Unarchive", trash: "Move to trash", restore: "Restore", deletePermanent: "Delete permanently", archived: "Archived", unarchived: "Moved out of archive", movedTrash: "Moved to trash", restored: "Restored from trash", deletedPermanent: "Permanently deleted", confirmPermanent: "Permanently delete the selected items? This cannot be undone.", tags: "Edit tags", collection: "Set collection", markLater: "Mark for later", removeLaterBulk: "Remove from read later", tagPrompt: "Comma-separated tags (leave empty to clear)", collectionPrompt: "Collection name (leave empty to clear)", savedViews: "Saved searches", saveView: "Save view", removeView: "Remove view", nameView: "Name this search", viewSaved: "Search saved", viewRemoved: "Saved search removed", enterSearch: "Type a search before saving it.", exportedJson: "JSON backup downloaded", exportedMarkdown: "Markdown export downloaded", exportedText: "Text export downloaded", exportedHtml: "HTML export downloaded", duplicatePrompt: "A matching item already exists. Save another copy anyway?", duplicateSkipped: "Existing item kept; duplicate was not added.", backupConfirm: "This complete Linka backup merges captures and local documents and restores appearance and search preferences. Existing items will not be deleted. Continue?", backupRestored: "Backup restored", backupPartial: "Captures were restored, but some documents or preferences could not be restored. Check available storage.", backupFailed: "Could not save or restore the complete backup. Check available storage and try again.", recentViews: "Recent searches · this device only", clearRecent: "Clear history", recentCleared: "Recent searches cleared." },
+    ru: { later: "Сохранить на потом", removeLater: "Убрать из отложенного", tagSearch: "Найти этот тег", collectionSearch: "Открыть коллекцию", savedLater: "Добавлено в «Сохранить на потом»", removedLater: "Убрано из отложенного", readLater: "Отложено", archive: "В архив", unarchive: "Вернуть из архива", trash: "В корзину", restore: "Восстановить", deletePermanent: "Удалить навсегда", archived: "Перемещено в архив", unarchived: "Возвращено из архива", movedTrash: "Перемещено в корзину", restored: "Восстановлено из корзины", deletedPermanent: "Удалено навсегда", confirmPermanent: "Удалить выбранные записи навсегда? Это действие нельзя отменить.", tags: "Изменить теги", collection: "Задать коллекцию", markLater: "Отложить", removeLaterBulk: "Убрать из отложенного", tagPrompt: "Теги через запятую (пустое поле очистит теги)", collectionPrompt: "Название коллекции (пустое поле очистит её)", savedViews: "Сохранённые поиски", saveView: "Сохранить поиск", removeView: "Удалить поиск", nameView: "Название поиска", viewSaved: "Поиск сохранён", viewRemoved: "Поиск удалён", enterSearch: "Сначала введи поисковый запрос.", exportedJson: "JSON-резервная копия скачана", exportedMarkdown: "Экспорт Markdown скачан", exportedText: "Текстовый экспорт скачан", exportedHtml: "HTML-экспорт скачан", duplicatePrompt: "Похожая запись уже существует. Сохранить ещё одну копию?", duplicateSkipped: "Существующая запись сохранена; дубликат не добавлен.", backupConfirm: "Эта полная резервная копия объединит записи и локальные документы и восстановит оформление и поисковые настройки. Существующие данные не будут удалены. Продолжить?", backupRestored: "Резервная копия восстановлена", backupPartial: "Записи восстановлены, но часть документов или настроек не удалось восстановить. Проверь свободное место.", backupFailed: "Не удалось сохранить или полностью восстановить резервную копию. Проверь свободное место.", recentViews: "Недавние поиски · только на устройстве", clearRecent: "Очистить историю", recentCleared: "История поиска очищена." },
+    az: { later: "Sonra oxu", removeLater: "Sonra oxumaqdan çıxar", tagSearch: "Bu teqi axtar", collectionSearch: "Kolleksiyanı göstər", savedLater: "Sonra oxumaq üçün saxlanıldı", removedLater: "Sonra oxumaq siyahısından çıxarıldı", readLater: "Sonra oxu", archive: "Arxivə köçür", unarchive: "Arxivdən çıxar", trash: "Zibil qutusuna köçür", restore: "Bərpa et", deletePermanent: "Həmişəlik sil", archived: "Arxivə köçürüldü", unarchived: "Arxivdən çıxarıldı", movedTrash: "Zibil qutusuna köçürüldü", restored: "Zibil qutusundan bərpa edildi", deletedPermanent: "Həmişəlik silindi", confirmPermanent: "Seçilmiş qeydlər həmişəlik silinsin? Bu əməl geri qaytarıla bilməz.", tags: "Teqləri dəyiş", collection: "Kolleksiya təyin et", markLater: "Sonra oxu üçün saxla", removeLaterBulk: "Sonra oxu siyahısından çıxar", tagPrompt: "Vergüllə ayrılmış teqlər (boş buraxmaq təmizləyir)", collectionPrompt: "Kolleksiyanın adı (boş buraxmaq təmizləyir)", savedViews: "Saxlanmış axtarışlar", saveView: "Axtarışı saxla", removeView: "Axtarışı sil", nameView: "Axtarışın adı", viewSaved: "Axtarış saxlanıldı", viewRemoved: "Saxlanmış axtarış silindi", enterSearch: "Əvvəlcə axtarış sorğusu yaz.", exportedJson: "JSON ehtiyat nüsxəsi endirildi", exportedMarkdown: "Markdown ixracı endirildi", exportedText: "Mətn ixracı endirildi", exportedHtml: "HTML ixracı endirildi", duplicatePrompt: "Oxşar qeyd artıq mövcuddur. Daha bir nüsxə saxlanılsın?", duplicateSkipped: "Mövcud qeyd saxlanıldı; dublikat əlavə edilmədi.", backupConfirm: "Bu tam Linka ehtiyat nüsxəsi qeydləri və yerli sənədləri birləşdirəcək, görünüş və axtarış parametrlərini bərpa edəcək. Mövcud məlumatlar silinməyəcək. Davam edilsin?", backupRestored: "Ehtiyat nüsxə bərpa edildi", backupPartial: "Qeydlər bərpa edildi, lakin bəzi sənədlər və ya parametrlər bərpa olunmadı. Yaddaş yerini yoxla.", backupFailed: "Tam ehtiyat nüsxəni saxlamaq və ya bərpa etmək olmadı. Yaddaş yerini yoxla.", recentViews: "Son axtarışlar · yalnız bu cihazda", clearRecent: "Tarixçəni təmizlə", recentCleared: "Axtarış tarixçəsi təmizləndi." },
+    tr: { later: "Daha sonra oku", removeLater: "Sonradan oku listesinden çıkar", tagSearch: "Bu etiketi ara", collectionSearch: "Bu koleksiyonu göster", savedLater: "Daha sonra okumak için kaydedildi", removedLater: "Sonradan oku listesinden kaldırıldı", readLater: "Daha sonra oku", archive: "Arşivle", unarchive: "Arşivden çıkar", trash: "Çöp kutusuna taşı", restore: "Geri yükle", deletePermanent: "Kalıcı olarak sil", archived: "Arşive taşındı", unarchived: "Arşivden çıkarıldı", movedTrash: "Çöp kutusuna taşındı", restored: "Çöp kutusundan geri yüklendi", deletedPermanent: "Kalıcı olarak silindi", confirmPermanent: "Seçili kayıtlar kalıcı olarak silinsin mi? Bu işlem geri alınamaz.", tags: "Etiketleri düzenle", collection: "Koleksiyon ata", markLater: "Daha sonra oku", removeLaterBulk: "Sonradan oku listesinden çıkar", tagPrompt: "Virgülle ayrılmış etiketler (boş bırakmak temizler)", collectionPrompt: "Koleksiyon adı (boş bırakmak temizler)", savedViews: "Kayıtlı aramalar", saveView: "Aramayı kaydet", removeView: "Aramayı kaldır", nameView: "Arama adı", viewSaved: "Arama kaydedildi", viewRemoved: "Kayıtlı arama silindi", enterSearch: "Önce bir arama yaz.", exportedJson: "JSON yedeği indirildi", exportedMarkdown: "Markdown dışa aktarımı indirildi", exportedText: "Metin dışa aktarımı indirildi", exportedHtml: "HTML dışa aktarımı indirildi", duplicatePrompt: "Benzer bir kayıt zaten var. Bir kopya daha kaydedilsin mi?", duplicateSkipped: "Mevcut kayıt korundu; kopya eklenmedi.", backupConfirm: "Bu tam Linka yedeği kayıtları ve yerel belgeleri birleştirir, görünüm ve arama tercihlerini geri yükler. Mevcut veriler silinmez. Devam edilsin mi?", backupRestored: "Yedek geri yüklendi", backupPartial: "Kayıtlar geri yüklendi ancak bazı belgeler veya tercihler yüklenemedi. Depolama alanını kontrol et.", backupFailed: "Tam yedek kaydedilemedi veya geri yüklenemedi. Depolama alanını kontrol et.", recentViews: "Son aramalar · yalnızca bu cihazda", clearRecent: "Geçmişi temizle", recentCleared: "Arama geçmişi temizlendi." }
   };
   return (copy[language] || copy.en)[key] || copy.en[key] || key;
 }
@@ -1001,6 +1004,74 @@ function escapeHtml(value) {
 }
 function captureExportTitle(item) {
   return String(item.previewTitle || item.text.split(/\r?\n/)[0] || "Capture").slice(0, 180);
+}
+const BACKUP_PREFERENCE_KEYS = [
+  "linka.theme", "linka.accent", "linka.density", "linka.effects",
+  "linka.language.v1", "linka.reduceMotion"
+];
+function readLocalJson(key, fallback) {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || "null");
+    return value == null ? fallback : value;
+  } catch { return fallback; }
+}
+function readBackupPreferences() {
+  const result = {};
+  for (const key of BACKUP_PREFERENCE_KEYS) {
+    try {
+      const value = localStorage.getItem(key);
+      if (value !== null) result[key] = value;
+    } catch {}
+  }
+  return result;
+}
+async function downloadLinkaBackup() {
+  try {
+    const documents = await exportLinkaDocuments();
+    const backup = createLinkaBackup({
+      exportedAt: new Date().toISOString(),
+      captures: captures.map(item => ({ ...item })),
+      documents,
+      deletedIds: [...readDeletedIds()],
+      preferences: readBackupPreferences(),
+      savedSearches: readLocalJson("linka.savedSearches.v1", []),
+      recentSearches: readLocalJson("linka.recentSearches.v1", [])
+    });
+    const blob = new Blob([JSON.stringify(backup, null, 2) + "\\n"], { type: "application/json;charset=utf-8" });
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    const day = new Date().toISOString().slice(0, 10);
+    anchor.href = objectUrl;
+    anchor.download = "linka-backup-" + day + ".json";
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
+    say(captureUiText("exportedJson"));
+  } catch (error) {
+    console.error("Linka backup export failed", error);
+    say(captureUiText("backupFailed"));
+  }
+}
+function applyBackupPreferences(backup) {
+  const preferences = backup?.preferences || {};
+  try {
+    for (const [key, value] of Object.entries(preferences)) localStorage.setItem(key, value);
+    localStorage.setItem("linka.savedSearches.v1", JSON.stringify(backup.savedSearches || []));
+    localStorage.setItem("linka.recentSearches.v1", JSON.stringify(backup.recentSearches || []));
+  } catch {
+    // A quota failure should not undo imported user data; the caller reports a partial restore.
+    return false;
+  }
+  if (preferences["linka.theme"]) setLinkaTheme(preferences["linka.theme"]);
+  if (preferences["linka.accent"]) setLinkaAccent(preferences["linka.accent"]);
+  if (preferences["linka.density"]) setLinkaDensity(preferences["linka.density"]);
+  if (preferences["linka.effects"]) setLinkaEffects(preferences["linka.effects"]);
+  if (preferences["linka.reduceMotion"]) {
+    const reduced = preferences["linka.reduceMotion"] === "true";
+    document.documentElement.classList.toggle("reduced-motion", reduced);
+    document.documentElement.dataset.reduceMotion = String(reduced);
+  }
+  if (preferences["linka.language.v1"]) setLanguage(preferences["linka.language.v1"]);
+  return true;
 }
 function exportCaptureItems(items, baseName = "linka-inbox") {
   const format = $("#export-format")?.value || "json";
