@@ -10,12 +10,15 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 import java.security.KeyStore
 import java.time.Instant
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
+
+private const val MAX_SYNC_WRITE_ATTEMPTS = 4
 
 internal data class CloudSyncResult(
     val captures: List<Capture>,
@@ -283,42 +286,84 @@ internal suspend fun syncWithSupabase(
         )
     }
 
-    val remoteResponse = requestJson(
-        "$base/rest/v1/linka_sync?user_id=eq.$userId&select=data",
-        "GET", key, accessToken
-    )
-    val row = runCatching { JSONArray(remoteResponse).optJSONObject(0) }.getOrNull()
-    val remoteData = row?.optJSONObject("data")
-    val remoteCaptures = remoteData?.optJSONArray("captures")?.let(::parseCaptureArray).orEmpty()
-    val remoteDeletedIds = remoteData?.optJSONArray("deletedIds")?.let { array ->
-        (0 until array.length()).mapNotNull { index ->
-            array.optString(index).takeIf { it.isNotBlank() }
+    var merged: List<Capture> = emptyList()
+    var deleted: Set<String> = emptySet()
+    var syncedProfile: JSONObject? = null
+    var committed = false
+
+    // Use optimistic concurrency on the row revision. If a newer client sync
+    // wins the race, re-read and merge its data before trying another write.
+    for (attempt in 0 until MAX_SYNC_WRITE_ATTEMPTS) {
+        val remoteResponse = requestJson(
+            "$base/rest/v1/linka_sync?user_id=eq.$userId&select=data,updated_at",
+            "GET", key, accessToken
+        )
+        val rows = runCatching { JSONArray(remoteResponse) }.getOrElse {
+            throw IllegalStateException("Could not read the cloud library safely. No cloud changes were written.")
         }
-    }.orEmpty()
-    val deleted = mergeCloudDeletedIds(localDeletedIds, remoteDeletedIds)
-    val remoteProfile = remoteData?.optJSONObject("profile")
-    val validLocalProfile = localProfile?.takeIf { it.optString("displayName").isNotBlank() }
-    val syncedProfile = when {
-        validLocalProfile == null -> remoteProfile
-        remoteProfile == null -> validLocalProfile
-        validLocalProfile.optLong("updatedAt", 0L) >= remoteProfile.optLong("updatedAt", 0L) -> validLocalProfile
-        else -> remoteProfile
+        if (rows.length() > 1) {
+            throw IllegalStateException("The cloud sync table returned duplicate rows. Linka left the library unchanged.")
+        }
+        val row = rows.optJSONObject(0)
+        val remoteData = row?.optJSONObject("data")
+        val remoteRevision = row?.optString("updated_at")?.takeIf { it.isNotBlank() && it != "null" }
+        val rawCaptures = remoteData?.opt("captures")
+        val rawDeletedIds = remoteData?.opt("deletedIds")
+        if (row != null && (remoteData == null || rawCaptures !is JSONArray || rawDeletedIds !is JSONArray || remoteRevision == null)) {
+            throw IllegalStateException(
+                "The cloud library is incomplete or missing its revision. Linka left it unchanged; export a backup and inspect the sync database before retrying."
+            )
+        }
+        val remoteCaptures = (rawCaptures as? JSONArray)?.let(::parseCaptureArray).orEmpty()
+        val remoteDeletedIds = (rawDeletedIds as? JSONArray)?.let { array ->
+            (0 until array.length()).mapNotNull { index -> array.optString(index).takeIf { it.isNotBlank() } }
+        }.orEmpty()
+        deleted = mergeCloudDeletedIds(localDeletedIds, remoteDeletedIds)
+
+        val remoteProfile = remoteData?.optJSONObject("profile")
+        val validLocalProfile = localProfile?.takeIf { it.optString("displayName").isNotBlank() }
+        syncedProfile = when {
+            validLocalProfile == null -> remoteProfile
+            remoteProfile == null -> validLocalProfile
+            validLocalProfile.optLong("updatedAt", 0L) >= remoteProfile.optLong("updatedAt", 0L) -> validLocalProfile
+            else -> remoteProfile
+        }
+
+        merged = mergeCloudCapturesSafely(
+            localCaptures = localCaptures,
+            remoteCaptures = remoteCaptures,
+            deletedIds = deleted,
+            maxCaptures = MAX_CAPTURES
+        )
+
+        val data = JSONObject().put("captures", captureArray(merged)).put("deletedIds", JSONArray(deleted))
+        if (syncedProfile != null) data.put("profile", syncedProfile)
+        val nextRevision = Instant.now().toString()
+        val writeResponse = if (row == null) {
+            val insert = JSONObject().put("user_id", userId).put("data", data).put("updated_at", nextRevision)
+            requestJson(
+                "$base/rest/v1/linka_sync?on_conflict=user_id",
+                "POST", key, accessToken, insert.toString(), "resolution=ignore-duplicates,return=representation"
+            )
+        } else {
+            val encodedRevision = URLEncoder.encode(remoteRevision, "UTF-8")
+            val conditionalUrl = "$base/rest/v1/linka_sync?user_id=eq.$userId&updated_at=eq.$encodedRevision&select=user_id,updated_at"
+            val update = JSONObject().put("data", data).put("updated_at", nextRevision)
+            requestJson(conditionalUrl, "PATCH", key, accessToken, update.toString(), "return=representation")
+        }
+        val writtenRows = runCatching { JSONArray(writeResponse) }.getOrNull()
+        if (writtenRows != null && writtenRows.length() > 0) {
+            committed = true
+            break
+        }
+        // No rows returned means a concurrent change or first insert won.
     }
 
-    val merged = mergeCloudCapturesSafely(
-        localCaptures = localCaptures,
-        remoteCaptures = remoteCaptures,
-        deletedIds = deleted,
-        maxCaptures = MAX_CAPTURES
-    )
-
-    val data = JSONObject().put("captures", captureArray(merged)).put("deletedIds", JSONArray(deleted))
-    if (syncedProfile != null) data.put("profile", syncedProfile)
-    val upsert = JSONObject().put("user_id", userId).put("data", data).put("updated_at", Instant.now().toString())
-    requestJson(
-        "$base/rest/v1/linka_sync?on_conflict=user_id",
-        "POST", key, accessToken, upsert.toString(), "resolution=merge-duplicates,return=minimal"
-    )
+    if (!committed) {
+        throw IllegalStateException(
+            "Cloud sync could not commit because another device kept changing the library. No conflicting update was written; retry sync in a moment."
+        )
+    }
 
     CloudSyncResult(
         captures = merged,
@@ -329,10 +374,6 @@ internal suspend fun syncWithSupabase(
     )
 }
 
-/**
- * Merge deletion tombstones without a fixed-size cap. Dropping old tombstones
- * can resurrect items on another device after a later sync.
- */
 internal fun mergeCloudDeletedIds(
     localDeletedIds: Set<String>,
     remoteDeletedIds: Iterable<String>
