@@ -79,7 +79,7 @@ private fun cloudRequestError(code: Int, text: String): IllegalStateException {
     }.getOrDefault("")
     val message = when {
         code == 401 || code == 403 -> "Sign-in failed. Check your email, password and public anon key."
-        code == 413 || (code == 400 && text.contains("payload too large|request entity too large", ignoreCase = true)) ->
+        code == 413 || (code == 400 && Regex("payload too large|request entity too large", RegexOption.IGNORE_CASE).containsMatchIn(text)) ->
             "The cloud sync payload is too large. Export a backup and reduce the amount or size of synced data before retrying."
         code == 404 || (code == 400 && text.contains("linka_sync", true)) ->
             "Cloud table not found. Copy the SQL setup in Linka and run it in the Supabase SQL Editor."
