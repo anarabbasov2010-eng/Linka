@@ -1,13 +1,14 @@
 import { linkaFilename, normalizeLinkaDocument, parseLinkaDocument, serializeLinkaDocument } from "./linka-format.js";
+import { readEmergencyDocumentDraft, writeEmergencyDocumentDraft, clearEmergencyDocumentDraft } from "./document-recovery.js";
 
 const DB_NAME = "linka-documents-v1";
 const STORE_NAME = "documents";
 const MAX_RECENT = 8;
 const labels = {
-  ru: { documents: "Текстовые документы", newDoc: "Новый документ", open: "Открыть .linka", save: "Сохранить .linka", saved: "Черновик сохранён на этом устройстве", unsaved: "Есть несохранённые изменения", saving: "Сохраняем…", savedAt: "Сохранено в {time}", failed: "Не удалось сохранить черновик", untitled: "Новый документ", placeholder: "Начни писать…", close: "Закрыть", recent: "Недавние документы", local: "Локально · не отправляется в облако", openFailed: "Не удалось открыть файл .linka", fileSaved: "Файл .linka подготовлен", content: "Текст документа", title: "Название документа", help: "Файл можно открыть в Linka на другом устройстве.", },
-  en: { documents: "Text documents", newDoc: "New document", open: "Open .linka", save: "Save .linka", saved: "Draft saved on this device", unsaved: "Unsaved changes", saving: "Saving…", savedAt: "Saved at {time}", failed: "Could not save draft", untitled: "New document", placeholder: "Start writing…", close: "Close", recent: "Recent documents", local: "Local only · not sent to cloud sync", openFailed: "Could not open this .linka file", fileSaved: ".linka file prepared", content: "Document text", title: "Document title", help: "Open this file in Linka on another device.", },
-  az: { documents: "Mətn sənədləri", newDoc: "Yeni sənəd", open: ".linka aç", save: ".linka saxla", saved: "Qaralama bu cihazda saxlanıldı", unsaved: "Saxlanmamış dəyişikliklər var", saving: "Saxlanılır…", savedAt: "{time} vaxtı saxlanıldı", failed: "Qaralamanı saxlamaq olmadı", untitled: "Yeni sənəd", placeholder: "Yazmağa başla…", close: "Bağla", recent: "Son sənədlər", local: "Yalnız cihazda · buludla paylaşılmır", openFailed: ".linka faylını açmaq olmadı", fileSaved: ".linka faylı hazırdır", content: "Sənədin mətni", title: "Sənədin adı", help: "Bu faylı başqa cihazda Linka ilə aça bilərsən.", },
-  tr: { documents: "Metin belgeleri", newDoc: "Yeni belge", open: ".linka aç", save: ".linka kaydet", saved: "Taslak bu cihazda kaydedildi", unsaved: "Kaydedilmemiş değişiklikler", saving: "Kaydediliyor…", savedAt: "Kaydedildi · {time}", failed: "Taslak kaydedilemedi", untitled: "Yeni belge", placeholder: "Yazmaya başla…", close: "Kapat", recent: "Son belgeler", local: "Yalnızca cihazda · bulut eşitlemesine gönderilmez", openFailed: ".linka dosyası açılamadı", fileSaved: ".linka dosyası hazır", content: "Belge metni", title: "Belge başlığı", help: "Bu dosyayı başka bir cihazda Linka ile açabilirsin.", }
+  ru: { documents: "Текстовые документы", newDoc: "Новый документ", open: "Открыть .linka", save: "Сохранить .linka", saved: "Черновик сохранён на этом устройстве", unsaved: "Есть несохранённые изменения", saving: "Сохраняем…", savedAt: "Сохранено в {time}", recoverFound: "Найден несохранённый черновик «{title}». Можно восстановить его или удалить.", restoreDraft: "Восстановить черновик", discardDraft: "Удалить черновик", discardDraftConfirm: "Удалить несохранённый черновик? Это действие нельзя отменить.", draftDiscarded: "Несохранённый черновик удалён.", draftRecovered: "Несохранённый черновик восстановлен и сохранён.", failed: "Не удалось сохранить черновик", untitled: "Новый документ", placeholder: "Начни писать…", close: "Закрыть", recent: "Недавние документы", local: "Локально · не отправляется в облако", openFailed: "Не удалось открыть файл .linka", fileSaved: "Файл .linka подготовлен", content: "Текст документа", title: "Название документа", help: "Файл можно открыть в Linka на другом устройстве.", },
+  en: { documents: "Text documents", newDoc: "New document", open: "Open .linka", save: "Save .linka", saved: "Draft saved on this device", unsaved: "Unsaved changes", saving: "Saving…", savedAt: "Saved at {time}", recoverFound: "An unsaved draft “{title}” was found. Restore or discard it.", restoreDraft: "Restore draft", discardDraft: "Discard draft", discardDraftConfirm: "Discard this unsaved draft? This cannot be undone.", draftDiscarded: "Unsaved draft discarded.", draftRecovered: "Unsaved draft restored and saved.", failed: "Could not save draft", untitled: "New document", placeholder: "Start writing…", close: "Close", recent: "Recent documents", local: "Local only · not sent to cloud sync", openFailed: "Could not open this .linka file", fileSaved: ".linka file prepared", content: "Document text", title: "Document title", help: "Open this file in Linka on another device.", },
+  az: { documents: "Mətn sənədləri", newDoc: "Yeni sənəd", open: ".linka aç", save: ".linka saxla", saved: "Qaralama bu cihazda saxlanıldı", unsaved: "Saxlanmamış dəyişikliklər var", saving: "Saxlanılır…", savedAt: "{time} vaxtı saxlanıldı", recoverFound: "Saxlanmamış “{title}” qaralaması tapıldı. Onu bərpa et və ya sil.", restoreDraft: "Qaralamanı bərpa et", discardDraft: "Qaralamanı sil", discardDraftConfirm: "Saxlanmamış qaralama silinsin? Bu əməliyyat geri qaytarılmır.", draftDiscarded: "Saxlanmamış qaralama silindi.", draftRecovered: "Qaralama bərpa edildi və saxlanıldı.", failed: "Qaralamanı saxlamaq olmadı", untitled: "Yeni sənəd", placeholder: "Yazmağa başla…", close: "Bağla", recent: "Son sənədlər", local: "Yalnız cihazda · buludla paylaşılmır", openFailed: ".linka faylını açmaq olmadı", fileSaved: ".linka faylı hazırdır", content: "Sənədin mətni", title: "Sənədin adı", help: "Bu faylı başqa cihazda Linka ilə aça bilərsən.", },
+  tr: { documents: "Metin belgeleri", newDoc: "Yeni belge", open: ".linka aç", save: ".linka kaydet", saved: "Taslak bu cihazda kaydedildi", unsaved: "Kaydedilmemiş değişiklikler", saving: "Kaydediliyor…", savedAt: "Kaydedildi · {time}", recoverFound: "Kaydedilmemiş “{title}” taslağı bulundu. Geri yükleyebilir veya silebilirsin.", restoreDraft: "Taslağı geri yükle", discardDraft: "Taslağı sil", discardDraftConfirm: "Kaydedilmemiş taslak silinsin mi? Bu işlem geri alınamaz.", draftDiscarded: "Kaydedilmemiş taslak silindi.", draftRecovered: "Taslak geri yüklendi ve kaydedildi.", failed: "Taslak kaydedilemedi", untitled: "Yeni belge", placeholder: "Yazmaya başla…", close: "Kapat", recent: "Son belgeler", local: "Yalnızca cihazda · bulut eşitlemesine gönderilmez", openFailed: ".linka dosyası açılamadı", fileSaved: ".linka dosyası hazır", content: "Belge metni", title: "Belge başlığı", help: "Bu dosyayı başka bir cihazda Linka ile açabilirsin.", }
 };
 let initialized = false;
 let dbPromise = null;
@@ -23,6 +24,10 @@ let editRevision = 0;
 let lastSavedAt = 0;
 let previousFocus = null;
 let inputPicker = null;
+let suppressSaveOnInput = false;
+let recoveryBanner = null;
+let recoveryNotice = null;
+let recoveryDraftCandidate = null;
 const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches || document.documentElement.classList.contains("reduced-motion");
 const uid = () => globalThis.crypto?.randomUUID?.() || ("doc-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 9));
 const lang = () => {
@@ -72,6 +77,11 @@ function addStyles() {
     @keyframes linka-doc-letter-in { from {opacity:0;filter:blur(2px);transform:translateY(2px)} to {opacity:1;filter:blur(0);transform:translateY(0)} }
     @keyframes linka-doc-letter-out { from {opacity:.88;filter:blur(0)} to {opacity:0;filter:blur(2px)} }
     .linka-doc-footer { display:flex; align-items:center; flex-wrap:wrap; gap:8px 14px; padding:10px 21px 16px; color:#aeb7a7; font-size:10px; line-height:1.6; }
+    .linka-doc-recovery { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; padding:12px 14px; border:1px solid rgba(181,154,105,.45); border-radius:13px; background:rgba(181,154,105,.09); }
+    .linka-doc-recovery[hidden] { display:none; }
+    .linka-doc-recovery p { margin:0; color:var(--linka-paper); font-size:11px; line-height:1.55; flex:1 1 220px; }
+    .linka-doc-recovery-actions { display:flex; flex-wrap:wrap; gap:7px; }
+    .linka-doc-recovery-actions .linka-doc-btn { min-height:34px; padding:7px 10px; font-size:11px; }
     .linka-doc-footer-status { flex:1 1 170px; color:#c6b78e; }
     .linka-doc-recent { padding:0 21px 15px; }
     .linka-doc-recent h3 { margin:0 0 8px; color:#b7c0ad; font-size:10px; font-weight:650; letter-spacing:.11em; text-transform:uppercase; }
@@ -362,7 +372,7 @@ async function closeEditor() {
   const old = overlay;
   overlay = null;
   currentDocument = null;
-  titleField = null; bodyField = null; statusLine = null; recentList = null; inputPicker = null;
+  titleField = null; bodyField = null; statusLine = null; recentList = null; inputPicker = null; recoveryBanner = null; recoveryNotice = null; recoveryDraftCandidate = null;
   setTimeout(() => old?.remove(), reducedMotion() ? 0 : 460);
   document.removeEventListener("keydown", handleKeyDown);
   previousFocus?.focus?.();
@@ -389,6 +399,11 @@ async function persistCurrent(showSaved = false) {
     if (currentDocument?.id === documentId) {
       lastSavedAt = snapshot.updatedAt;
       if (saveRevision === editRevision) {
+        clearEmergencyDocumentDraft(localStorage, documentId);
+        if (recoveryDraftCandidate?.id === documentId) {
+          recoveryDraftCandidate = null;
+          if (recoveryBanner) recoveryBanner.hidden = true;
+        }
         setStatus(savedStatusText(lastSavedAt));
       } else {
         setStatus(t("unsaved"));
@@ -396,18 +411,56 @@ async function persistCurrent(showSaved = false) {
       }
     }
     await refreshRecentList();
+    await refreshEmergencyDraftNotice();
     return true;
   } catch {
     if (currentDocument?.id === documentId) setStatus(t("failed"), true);
     return false;
   }
 }
+function dispatchEditorInputWithoutSaving() {
+  suppressSaveOnInput = true;
+  try { bodyField?.dispatchEvent(new Event("input", { bubbles: true })); }
+  finally { suppressSaveOnInput = false; }
+}
 function scheduleSave() {
   if (!currentDocument || !bodyField) return;
   editRevision += 1;
+  const emergency = writeEmergencyDocumentDraft(localStorage, {
+    ...currentDocument,
+    title: titleField?.value || t("untitled"),
+    text: bodyField.value,
+    updatedAt: Date.now()
+  });
+  if (emergency.saved && recoveryDraftCandidate?.id === emergency.draft.id) {
+    recoveryDraftCandidate = emergency.draft;
+    if (recoveryNotice) recoveryNotice.textContent = t("recoverFound").replace("{title}", emergency.draft.title || t("untitled"));
+  }
   setStatus(t("unsaved"));
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => void persistCurrent(true), 460);
+}
+async function refreshEmergencyDraftNotice() {
+  if (!recoveryBanner) return;
+  const candidate = readEmergencyDocumentDraft(localStorage);
+  if (!candidate) {
+    recoveryDraftCandidate = null;
+    recoveryBanner.hidden = true;
+    return;
+  }
+  let savedDocument = null;
+  try {
+    savedDocument = (await listDocuments()).find(item => item.id === candidate.id) || null;
+  } catch {}
+  if (savedDocument && savedDocument.title === candidate.title && savedDocument.text === candidate.text) {
+    clearEmergencyDocumentDraft(localStorage, candidate.id);
+    recoveryDraftCandidate = null;
+    recoveryBanner.hidden = true;
+    return;
+  }
+  recoveryDraftCandidate = candidate;
+  recoveryNotice.textContent = t("recoverFound").replace("{title}", candidate.title || t("untitled"));
+  recoveryBanner.hidden = false;
 }
 async function refreshRecentList() {
   if (!recentList || !currentDocument) return;
@@ -446,9 +499,10 @@ function attachImportedFilePicker() {
       lastSavedAt = Number(currentDocument.updatedAt || Date.now());
       titleField.value = currentDocument.title;
       bodyField.value = currentDocument.text;
-      bodyField.dispatchEvent(new Event("input", { bubbles: true }));
+      dispatchEditorInputWithoutSaving();
       setStatus(savedStatusText(lastSavedAt));
       await refreshRecentList();
+    await refreshEmergencyDraftNotice();
     } catch (error) {
       setStatus(error?.message || t("openFailed"), true);
     } finally {
@@ -464,6 +518,54 @@ function buildEditorUI() {
   overlay.innerHTML = '<section class="linka-doc-window" role="dialog" aria-modal="true" aria-labelledby="linka-doc-heading"><header class="linka-doc-header"><div class="linka-doc-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3.8h7l4 4V20H7z"/><path d="M14 3.8V8h4M10 12h5M10 15.5h5M10 18.5h3"/></svg></div><div class="linka-doc-headcopy"><h2 id="linka-doc-heading"></h2><p></p></div><button class="linka-doc-btn" type="button" data-close></button></header><div class="linka-doc-actions"><button class="linka-doc-btn primary" type="button" data-new></button><button class="linka-doc-btn" type="button" data-open></button><button class="linka-doc-btn" type="button" data-save></button></div><div class="linka-doc-fields"><label class="linka-doc-label"><span data-title-label></span><input class="linka-doc-title" type="text" maxlength="180" autocomplete="off"></label><label class="linka-doc-label"><span data-body-label></span><div class="linka-doc-body-wrap"><div class="linka-doc-type-mirror" aria-hidden="true"></div><textarea class="linka-doc-body" spellcheck="true" maxlength="5000000"></textarea></div></label></div><div class="linka-doc-footer"><span class="linka-doc-footer-status" role="status" aria-live="polite"></span><span data-help></span></div><div class="linka-doc-recent"><h3></h3><div class="linka-doc-recent-list"></div></div></section>';
   const panel = overlay.querySelector(".linka-doc-window");
   const q = selector => panel.querySelector(selector);
+  recoveryBanner = document.createElement("div");
+  recoveryBanner.className = "linka-doc-recovery";
+  recoveryBanner.hidden = true;
+  recoveryNotice = document.createElement("p");
+  recoveryNotice.setAttribute("role", "status");
+  recoveryNotice.setAttribute("aria-live", "polite");
+  const recoveryActions = document.createElement("div");
+  recoveryActions.className = "linka-doc-recovery-actions";
+  const restoreDraftButton = document.createElement("button");
+  restoreDraftButton.type = "button";
+  restoreDraftButton.className = "linka-doc-btn primary";
+  restoreDraftButton.textContent = t("restoreDraft");
+  const discardDraftButton = document.createElement("button");
+  discardDraftButton.type = "button";
+  discardDraftButton.className = "linka-doc-btn";
+  discardDraftButton.textContent = t("discardDraft");
+  recoveryActions.append(restoreDraftButton, discardDraftButton);
+  recoveryBanner.append(recoveryNotice, recoveryActions);
+  q(".linka-doc-actions").after(recoveryBanner);
+  restoreDraftButton.addEventListener("click", async () => {
+    const candidate = recoveryDraftCandidate;
+    if (!candidate) return;
+    if (currentDocument?.id !== candidate.id && !(await persistCurrent(true))) return;
+    currentDocument = normalizeLinkaDocument(candidate);
+    editRevision = 0;
+    lastSavedAt = Number(currentDocument.updatedAt || 0);
+    titleField.value = currentDocument.title || t("untitled");
+    bodyField.value = currentDocument.text;
+    dispatchEditorInputWithoutSaving();
+    if (!(await persistCurrent(true))) {
+      setStatus(t("failed"), true);
+      return;
+    }
+    recoveryDraftCandidate = null;
+    recoveryBanner.hidden = true;
+    setStatus(t("draftRecovered"));
+  });
+  discardDraftButton.addEventListener("click", () => {
+    const candidate = recoveryDraftCandidate;
+    if (!candidate || !window.confirm(t("discardDraftConfirm"))) return;
+    if (!clearEmergencyDocumentDraft(localStorage, candidate.id)) {
+      setStatus(t("failed"), true);
+      return;
+    }
+    recoveryDraftCandidate = null;
+    if (recoveryBanner) recoveryBanner.hidden = true;
+    setStatus(t("draftDiscarded"));
+  });
   q("#linka-doc-heading").textContent = "Linka · " + t("documents");
   q(".linka-doc-headcopy p").textContent = t("local");
   q("[data-close]").textContent = t("close");
@@ -489,12 +591,13 @@ function buildEditorUI() {
     lastSavedAt = 0;
     titleField.value = currentDocument.title;
     bodyField.value = "";
-    bodyField.dispatchEvent(new Event("input", { bubbles: true }));
+    dispatchEditorInputWithoutSaving();
     try {
       currentDocument = await storeDocument(currentDocument);
       lastSavedAt = currentDocument.updatedAt;
       setStatus(savedStatusText(lastSavedAt));
       await refreshRecentList();
+    await refreshEmergencyDraftNotice();
     } catch {
       setStatus(t("failed"), true);
     }
@@ -503,8 +606,8 @@ function buildEditorUI() {
   q("[data-save]").addEventListener("click", () => {
     void persistCurrent(false).then(() => downloadDocument(normalizeLinkaDocument({ ...currentDocument, title: titleField.value || t("untitled"), text: bodyField.value, updatedAt: Date.now() })));
   });
-  titleField.addEventListener("input", scheduleSave);
-  bodyField.addEventListener("input", scheduleSave);
+  titleField.addEventListener("input", () => { if (!suppressSaveOnInput) scheduleSave(); });
+  bodyField.addEventListener("input", () => { if (!suppressSaveOnInput) scheduleSave(); });
   createMirrorAnimation(bodyField, q(".linka-doc-type-mirror"));
   overlay.addEventListener("click", event => { if (event.target === overlay) closeEditor(); });
   document.body.append(overlay);
@@ -523,7 +626,7 @@ async function openEditor(documentValue = null) {
     lastSavedAt = Number(currentDocument.updatedAt || 0);
     titleField.value = currentDocument.title;
     bodyField.value = currentDocument.text;
-    bodyField.dispatchEvent(new Event("input", { bubbles: true }));
+    dispatchEditorInputWithoutSaving();
     try {
       currentDocument = await storeDocument(currentDocument);
       lastSavedAt = currentDocument.updatedAt;
@@ -533,6 +636,7 @@ async function openEditor(documentValue = null) {
       return;
     }
     await refreshRecentList();
+    await refreshEmergencyDraftNotice();
     bodyField.focus();
     return;
   }
@@ -544,7 +648,7 @@ async function openEditor(documentValue = null) {
   buildEditorUI();
   titleField.value = currentDocument.title;
   bodyField.value = currentDocument.text;
-  bodyField.dispatchEvent(new Event("input", { bubbles: true }));
+  dispatchEditorInputWithoutSaving();
   try {
     currentDocument = await storeDocument(currentDocument);
     lastSavedAt = currentDocument.updatedAt;
@@ -553,6 +657,7 @@ async function openEditor(documentValue = null) {
     setStatus(t("failed"), true);
   }
   await refreshRecentList();
+    await refreshEmergencyDraftNotice();
 }
 async function openRawDocument(raw, fallbackTitle = t("untitled")) {
   const parsed = parseLinkaDocument(raw, fallbackTitle);
