@@ -128,8 +128,16 @@ function database() {
   if (!dbPromise) dbPromise = openDatabase();
   return dbPromise;
 }
+let beforeDocumentSave = null;
+export function setLinkaDocumentBeforeSave(handler) {
+  beforeDocumentSave = typeof handler === "function" ? handler : null;
+}
 async function storeDocument(document) {
   const normalized = normalizeLinkaDocument(document);
+  // An optional callback may write a prior-state snapshot. Snapshot failures
+  // must never block the user's document autosave.
+  try { await beforeDocumentSave?.(normalized); }
+  catch (error) { console.warn("Could not snapshot before document save", error); }
   const db = await database();
   if (db) {
     await new Promise((resolve, reject) => {
