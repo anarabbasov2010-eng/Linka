@@ -69,6 +69,22 @@ test("recovery gate can only be re-opened when preserved source exists and stora
   assert.equal(reopenCaptureRecovery(blocked), false);
 });
 
+test("a stale acknowledged recovery record cannot mask a newer storage corruption", () => {
+  const storage = memoryStorage();
+  storage.setItem(STORAGE_KEY, "{first damaged source");
+  loadCaptures(storage);
+  assert.equal(startFreshCaptureLibrary(storage), true);
+  assert.equal(getCaptureRecovery(storage).acknowledged, true);
+
+  storage.setItem(STORAGE_KEY, "{second damaged source");
+  const recovery = getCaptureRecovery(storage);
+  assert.equal(recovery.raw, "{second damaged source");
+  assert.equal(recovery.acknowledged, false);
+  assert.equal(JSON.parse(storage.getItem(RECOVERY_KEY)).raw, "{second damaged source");
+  assert.equal(saveCaptures([makeCapture("must not overwrite second corruption")], storage), false);
+  assert.equal(storage.getItem(STORAGE_KEY), "{second damaged source");
+});
+
 test("malformed recovery metadata does not prevent recovery of the original capture JSON", () => {
   const storage = memoryStorage();
   storage.setItem(RECOVERY_KEY, "{bad recovery metadata");
