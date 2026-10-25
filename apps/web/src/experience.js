@@ -838,6 +838,7 @@ function showKeyboardShortcuts() {
       title: "Keyboard shortcuts", subtitle: "Actions you can use throughout Linka.", close: "Close",
       rows: [
         ["Ctrl / ⌘ + K", "Open global search", "Search captures and local text documents."],
+        ["Ctrl / ⌘ + Shift + P", "Open command palette", "Filter actions by words; use ↑ / ↓ and Enter. You can also type > in global search."],
         ["/", "Search from anywhere", "Opens global search when focus is not inside a field."],
         ["Ctrl / ⌘ + Enter", "Save quick capture", "Save the current capture draft without reaching for the mouse."],
         ["Ctrl / ⌘ + Shift + E", "Export", "Export selected captures, or the currently visible results."],
@@ -849,6 +850,7 @@ function showKeyboardShortcuts() {
       title: "Горячие клавиши", subtitle: "Быстрые действия в Linka.", close: "Закрыть",
       rows: [
         ["Ctrl / ⌘ + K", "Открыть общий поиск", "Поиск по записям и локальным текстовым документам."],
+        ["Ctrl / ⌘ + Shift + P", "Открыть палитру команд", "Найди действие по словам; ↑ / ↓ выбирают пункт, Enter запускает. Также можно ввести > в общем поиске."],
         ["/", "Поиск из любого раздела", "Открывает общий поиск, если фокус не находится в поле ввода."],
         ["Ctrl / ⌘ + Enter", "Сохранить быструю запись", "Сохраняет текущий черновик без мыши."],
         ["Ctrl / ⌘ + Shift + E", "Экспортировать", "Экспорт выбранных записей или текущих результатов."],
@@ -860,6 +862,7 @@ function showKeyboardShortcuts() {
       title: "Klaviatura qısayolları", subtitle: "Linka-da sürətli əmrlər.", close: "Bağla",
       rows: [
         ["Ctrl / ⌘ + K", "Ümumi axtarışı aç", "Qeydlərdə və yerli mətn sənədlərində axtar."],
+        ["Ctrl / ⌘ + Shift + P", "Əmr panelini aç", "Əmrləri sözlərlə süz; ↑ / ↓ ilə seç, Enter ilə işə sal. Ümumi axtarışda > yazmaq da olar."],
         ["/", "İstənilən yerdən axtar", "Fokus mətn sahəsində olmayanda ümumi axtarışı açır."],
         ["Ctrl / ⌘ + Enter", "Sürətli qeydi saxla", "Cari qaralamanı siçansız saxlayır."],
         ["Ctrl / ⌘ + Shift + E", "İxrac et", "Seçilmiş qeydləri və ya görünən nəticələri ixrac edir."],
@@ -871,6 +874,7 @@ function showKeyboardShortcuts() {
       title: "Klavye kısayolları", subtitle: "Linka içinde hızlı işlemler.", close: "Kapat",
       rows: [
         ["Ctrl / ⌘ + K", "Genel aramayı aç", "Kayıtlarda ve yerel metin belgelerinde ara."],
+        ["Ctrl / ⌘ + Shift + P", "Komut paletini aç", "Eylemleri sözcüklerle filtrele; ↑ / ↓ ile seçip Enter’a bas. Genel aramada > da yazabilirsin."],
         ["/", "Her yerden ara", "Odak bir metin alanında değilken genel aramayı açar."],
         ["Ctrl / ⌘ + Enter", "Hızlı kaydı kaydet", "Geçerli taslağı fareye uzanmadan kaydeder."],
         ["Ctrl / ⌘ + Shift + E", "Dışa aktar", "Seçilen kayıtları veya görünür sonuçları dışa aktarır."],
