@@ -1,5 +1,6 @@
 import { loadCaptures, saveCaptures, makeCapture, normalizeCapture, normalizePreviewImageUrl, visibleCaptures, sortCaptures, findDuplicateCapture, normalizeDuplicateKey, parseSearchQuery, getCaptureRecovery, startFreshCaptureLibrary, reopenCaptureRecovery } from "./store.js";
 import { splitSearchHighlights } from "./search-highlight.js";
+import { filterPaletteCommands } from "./command-palette.js";
 import { initLinkaExperience, setLanguage } from "./experience.js";
 import { initVisualSystem, setLinkaTheme, setLinkaAccent, setLinkaDensity, setLinkaEffects } from "./visual-system.js";
 import { initLinkaAtmosphere, openAtmosphereSettings } from "./atmosphere.js";
@@ -626,7 +627,7 @@ function showSearchSpace(initial = "") {
   const recentSearchClear = document.createElement("button"); recentSearchClear.type = "button"; recentSearchClear.className = "search-save-button secondary"; recentSearchClear.textContent = captureUiText("clearRecent");
   savedSearchToolbar.append(savedSearchSelect, savedSearchSave, savedSearchRemove, recentSearchSelect, recentSearchClear);
   const results = document.createElement("div"); results.className = "search-space-results"; results.setAttribute("role", "listbox"); results.setAttribute("aria-label", "Search results");
-  results.addEventListener("click", () => rememberRecentSearch(input.value));
+  results.addEventListener("click", () => { if (!input.value.trim().startsWith(">")) rememberRecentSearch(input.value); });
   content.append(head, searchWrap, info, savedSearchToolbar, results);
   const SAVED_SEARCHES_KEY = "linka.savedSearches.v1";
   let savedSearches = [];
@@ -682,9 +683,7 @@ function showSearchSpace(initial = "") {
   recentSearchClear.addEventListener("click", () => {
     try { localStorage.removeItem(RECENT_SEARCHES_KEY); renderRecentSearches(); say(captureUiText("recentCleared")); } catch {}
   });
-  input.addEventListener("keydown", event => {
-    if (event.key === "Enter" && input.value.trim().length >= 2) rememberRecentSearch(input.value);
-  });
+
   savedSearchSave.addEventListener("click", () => {
     const query = input.value.trim();
     if (!query) { say(captureUiText("enterSearch")); return; }
@@ -717,10 +716,73 @@ function showSearchSpace(initial = "") {
   });
   const layer = modalShell(content, { dismissable: true }); layer.classList.add("search-space-layer");
   let searchSequence = 0;
+  let activePaletteCommands = [];
+  let paletteSelection = 0;
+  const activateView = filter => {
+    modalRoot.replaceChildren();
+    activeFilter = filter;
+    search.value = "";
+    filters.forEach(button => button.classList.toggle("active", button.dataset.filter === activeFilter));
+    render();
+  };
+  const runPaletteAction = action => {
+    modalRoot.replaceChildren();
+    action();
+  };
+  const paletteCommands = [
+    { title: "All items", description: "Show your full capture inbox", keywords: ["view", "inbox", "library"], run: () => activateView("all") },
+    { title: "Today", description: "Show captures saved today", keywords: ["view", "date", "recent"], run: () => activateView("today") },
+    { title: "Pinned", description: "Show pinned captures", keywords: ["view", "favorites", "favourites"], run: () => activateView("pinned") },
+    { title: "Read later", description: "Open items saved for later", keywords: ["view", "later", "reading"], run: () => activateView("read-later") },
+    { title: "Links", description: "Show saved web links", keywords: ["view", "urls", "web"], run: () => activateView("links") },
+    { title: "Notes", description: "Show saved text notes", keywords: ["view", "thoughts", "text"], run: () => activateView("notes") },
+    { title: "Archive", description: "Show archived captures", keywords: ["view", "completed"], run: () => activateView("archive") },
+    { title: "Trash", description: "Restore or permanently delete removed captures", keywords: ["view", "deleted", "recycle"], run: () => activateView("trash") },
+    { title: "Quick capture", description: "Focus the capture field", keywords: ["new", "shortcut", "save"], run: () => runPaletteAction(() => focusQuickCaptureFromNative()) },
+    { title: "Text documents", description: "Open the local document editor", keywords: ["editor", "new document", "write"], run: () => runPaletteAction(() => document.dispatchEvent(new Event("linka:open-documents"))) },
+    { title: "Settings", description: "Open Linka settings", keywords: ["preferences", "configuration"], run: () => runPaletteAction(() => $("#settings-button")?.click()) },
+    { title: "Backup history", description: "Restore or download a local snapshot", keywords: ["backup", "recovery", "storage"], run: () => runPaletteAction(() => $("#backup-history-button")?.click()) },
+    { title: "Export JSON backup", description: "Download a full Linka backup", keywords: ["export", "backup", "data"], run: () => runPaletteAction(() => { const format = $("#export-format"); if (format) format.value = "json"; $("#export-button")?.click(); }) },
+    { title: "Keyboard shortcuts", description: "Review available keyboard commands", keywords: ["keys", "help", "hotkeys"], run: () => runPaletteAction(() => window.dispatchEvent(new Event("linka:open-keyboard-shortcuts"))) },
+    { title: "Atmosphere settings", description: "Configure background media and ambience", keywords: ["appearance", "background", "music"], run: () => runPaletteAction(() => window.dispatchEvent(new Event("linka:open-atmosphere-settings"))) },
+    { title: "Toggle selection mode", description: "Select multiple captures for bulk actions", keywords: ["bulk", "multi-select", "manage"], run: () => runPaletteAction(() => selectionButton.click()) }
+  ];
   let searchTimer = null;
   async function refresh() {
     const sequence = ++searchSequence;
-    const q = input.value.trim().toLocaleLowerCase();
+    const rawQuery = input.value.trim();
+    const q = rawQuery.toLocaleLowerCase();
+    if (rawQuery.startsWith(">")) {
+      activePaletteCommands = filterPaletteCommands(paletteCommands, rawQuery.slice(1).trim());
+      paletteSelection = 0;
+      count.textContent = activePaletteCommands.length + (activePaletteCommands.length === 1 ? " command" : " commands");
+      scope.textContent = "Use ↑ and ↓ to choose · Enter to run";
+      results.replaceChildren();
+      if (!activePaletteCommands.length) {
+        const empty = document.createElement("div"); empty.className = "search-empty";
+        empty.textContent = "No matching commands. Try > today, > backup, or > settings.";
+        results.append(empty);
+        return;
+      }
+      activePaletteCommands.forEach((command, index) => {
+        const row = document.createElement("button");
+        row.type = "button"; row.className = "search-result command-result";
+        row.setAttribute("role", "option"); row.setAttribute("aria-selected", String(index === paletteSelection));
+        if (index === paletteSelection) row.classList.add("command-selected");
+        const thumb = document.createElement("span"); thumb.className = "search-thumb"; thumb.textContent = "›";
+        const copy = document.createElement("span"); copy.className = "search-result-copy";
+        const rowTitle = document.createElement("span"); rowTitle.className = "search-result-title"; rowTitle.textContent = command.title;
+        const detail = document.createElement("span"); detail.className = "search-result-detail"; detail.textContent = command.description;
+        const type = document.createElement("span"); type.className = "search-result-type"; type.textContent = "Command";
+        copy.append(rowTitle, detail); row.append(thumb, copy, type);
+        row.addEventListener("click", () => command.run());
+        results.append(row);
+      });
+      return;
+    }
+    activePaletteCommands = [];
+    paletteSelection = 0;
+    scope.textContent = "Across links, notes and documents";
     const found = visibleCaptures(captures, "all", input.value).slice(0, 80);
     const freeTextQuery = q.includes(":") ? "" : input.value.trim().replace(/^"|"$/g, "");
     let documentFound = [];
@@ -788,7 +850,36 @@ function showSearchSpace(initial = "") {
       });
     }
   }
+  input.addEventListener("keydown", event => {
+    if (input.value.trim().startsWith(">")) {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        if (!activePaletteCommands.length) return;
+        event.preventDefault();
+        const direction = event.key === "ArrowDown" ? 1 : -1;
+        paletteSelection = (paletteSelection + direction + activePaletteCommands.length) % activePaletteCommands.length;
+        results.querySelectorAll(".command-result").forEach((row, index) => {
+          const selected = index === paletteSelection;
+          row.classList.toggle("command-selected", selected);
+          row.setAttribute("aria-selected", String(selected));
+        });
+        results.querySelector(".command-selected")?.scrollIntoView({ block: "nearest" });
+        return;
+      }
+      if (event.key === "Enter") {
+        event.preventDefault();
+        activePaletteCommands[paletteSelection]?.run();
+        return;
+      }
+      return;
+    }
+    if (event.key === "Enter" && input.value.trim().length >= 2) rememberRecentSearch(input.value);
+  });
   input.addEventListener("input", () => {
+    paletteSelection = 0;
+    activePaletteCommands = [];
+    const commandMode = input.value.trim().startsWith(">");
+    input.placeholder = commandMode ? "Commands · try > today" : "Search everything you’ve saved…";
+    scope.textContent = commandMode ? "Use ↑ and ↓ to choose · Enter to run" : "Across links, notes and documents";
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => { void refresh(); }, 160);
   });
