@@ -198,6 +198,31 @@ export function visibleCaptures(items, filter = "all", query = "") {
     return !parsed.text || searchable.includes(parsed.text);
   }).sort((a,b) => Number(b.pinned)-Number(a.pinned) || b.updatedAt-a.updatedAt);
 }
+export function sortCaptures(items, mode = "updated") {
+  const allowed = new Set(["updated", "newest", "oldest", "title", "domain"]);
+  const sortMode = allowed.has(mode) ? mode : "updated";
+  const titleOf = item => String(item.previewTitle || item.text || "").trim().toLocaleLowerCase();
+  const domainOf = item => {
+    try { return new URL(String(item.text || "")).hostname.replace(/^www\./i, "").toLocaleLowerCase(); }
+    catch { return ""; }
+  };
+  const date = (item, key) => Number(item?.[key] || item?.createdAt || 0);
+  return [...(items || [])].sort((a, b) => {
+    let result = 0;
+    if (sortMode === "updated") result = date(b, "updatedAt") - date(a, "updatedAt");
+    else if (sortMode === "newest") result = date(b, "createdAt") - date(a, "createdAt");
+    else if (sortMode === "oldest") result = date(a, "createdAt") - date(b, "createdAt");
+    else if (sortMode === "title") result = titleOf(a).localeCompare(titleOf(b), undefined, { numeric: true, sensitivity: "base" });
+    else if (sortMode === "domain") {
+      result = domainOf(a).localeCompare(domainOf(b), undefined, { numeric: true, sensitivity: "base" });
+      if (!result) result = titleOf(a).localeCompare(titleOf(b), undefined, { numeric: true, sensitivity: "base" });
+    }
+    return result || Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) ||
+      date(b, "updatedAt") - date(a, "updatedAt") ||
+      String(a.id || "").localeCompare(String(b.id || ""));
+  });
+}
+
 export function normalizeDuplicateKey(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
