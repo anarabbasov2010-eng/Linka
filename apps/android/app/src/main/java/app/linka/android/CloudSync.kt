@@ -290,12 +290,12 @@ internal suspend fun syncWithSupabase(
     val row = runCatching { JSONArray(remoteResponse).optJSONObject(0) }.getOrNull()
     val remoteData = row?.optJSONObject("data")
     val remoteCaptures = remoteData?.optJSONArray("captures")?.let(::parseCaptureArray).orEmpty()
-    val deleted = linkedSetOf<String>().apply {
-        addAll(localDeletedIds)
-        remoteData?.optJSONArray("deletedIds")?.let { array ->
-            for (i in 0 until array.length()) array.optString(i).takeIf { it.isNotBlank() }?.let(::add)
+    val remoteDeletedIds = remoteData?.optJSONArray("deletedIds")?.let { array ->
+        (0 until array.length()).mapNotNull { index ->
+            array.optString(index).takeIf { it.isNotBlank() }
         }
-    }.toList().takeLast(5000).toSet()
+    }.orEmpty()
+    val deleted = mergeCloudDeletedIds(localDeletedIds, remoteDeletedIds)
     val remoteProfile = remoteData?.optJSONObject("profile")
     val validLocalProfile = localProfile?.takeIf { it.optString("displayName").isNotBlank() }
     val syncedProfile = when {
@@ -305,12 +305,12 @@ internal suspend fun syncWithSupabase(
         else -> remoteProfile
     }
 
-    val merged = (remoteCaptures + localCaptures)
-        .filterNot { it.id in deleted }
-        .groupBy { it.id }
-        .values.map { copies -> copies.maxByOrNull { it.updatedAt }!! }
-        .sortedWith(compareByDescending<Capture> { it.pinned }.thenByDescending { it.updatedAt })
-        .take(MAX_CAPTURES)
+    val merged = mergeCloudCapturesSafely(
+        localCaptures = localCaptures,
+        remoteCaptures = remoteCaptures,
+        deletedIds = deleted,
+        maxCaptures = MAX_CAPTURES
+    )
 
     val data = JSONObject().put("captures", captureArray(merged)).put("deletedIds", JSONArray(deleted))
     if (syncedProfile != null) data.put("profile", syncedProfile)
@@ -329,6 +329,44 @@ internal suspend fun syncWithSupabase(
     )
 }
 
+/**
+ * Merge deletion tombstones without a fixed-size cap. Dropping old tombstones
+ * can resurrect items on another device after a later sync.
+ */
+internal fun mergeCloudDeletedIds(
+    localDeletedIds: Set<String>,
+    remoteDeletedIds: Iterable<String>
+): Set<String> = linkedSetOf<String>().apply {
+    localDeletedIds.filter { it.isNotBlank() }.forEach { add(it) }
+    remoteDeletedIds.filter { it.isNotBlank() }.forEach { add(it) }
+}
+
+/**
+ * Merge the shared library but refuse to publish a truncated result.
+ * The Android local store currently has a 500-capture limit, while Web/Windows
+ * can hold more. Sending only the first 500 items would overwrite and destroy
+ * the larger cloud library, so an oversized merge must stop before the upsert.
+ */
+internal fun mergeCloudCapturesSafely(
+    localCaptures: List<Capture>,
+    remoteCaptures: List<Capture>,
+    deletedIds: Set<String>,
+    maxCaptures: Int
+): List<Capture> {
+    require(maxCaptures > 0) { "The capture limit must be positive." }
+    val merged = (remoteCaptures + localCaptures)
+        .filterNot { it.id in deletedIds }
+        .groupBy { it.id }
+        .values.map { copies -> copies.maxByOrNull { it.updatedAt }!! }
+        .sortedWith(compareByDescending<Capture> { it.pinned }.thenByDescending { it.updatedAt })
+    if (merged.size > maxCaptures) {
+        throw IllegalStateException(
+            "This Android version can safely sync up to $maxCaptures captures, but the cloud merge contains ${merged.size}. " +
+                "Sync was stopped before writing to avoid deleting records. Open Linka Web or Windows to manage the larger library and export a backup."
+        )
+    }
+    return merged
+}
 internal val CLOUD_SYNC_SETUP_SQL = """
     create table if not exists public.linka_sync (
         user_id uuid primary key references auth.users(id) on delete cascade,
