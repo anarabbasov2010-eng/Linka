@@ -48,6 +48,27 @@ test("failed restore can re-open recovery and continue blocking writes", () => {
   assert.equal(storage.getItem(STORAGE_KEY), "[]");
 });
 
+test("recovery gate can only be re-opened when preserved source exists and storage is writable", () => {
+  const missing = memoryStorage();
+  assert.equal(reopenCaptureRecovery(missing), false);
+
+  const storage = memoryStorage();
+  storage.setItem(STORAGE_KEY, "{damaged}");
+  loadCaptures(storage);
+  assert.equal(startFreshCaptureLibrary(storage), true);
+  assert.equal(reopenCaptureRecovery(storage), true);
+  assert.equal(getCaptureRecovery(storage).raw, "{damaged}");
+  assert.equal(getCaptureRecovery(storage).acknowledged, false);
+
+  const blocked = {
+    getItem: key => key === RECOVERY_KEY
+      ? JSON.stringify({ raw: "{preserved}", acknowledged: true })
+      : null,
+    setItem: () => { throw new Error("storage quota exceeded"); }
+  };
+  assert.equal(reopenCaptureRecovery(blocked), false);
+});
+
 test("malformed recovery metadata does not prevent recovery of the original capture JSON", () => {
   const storage = memoryStorage();
   storage.setItem(RECOVERY_KEY, "{bad recovery metadata");
