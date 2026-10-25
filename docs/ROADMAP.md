@@ -23,7 +23,7 @@ This file is the persistent project checklist for the Linka improvements audit. 
 - [ ] Add sync diagnostics that redact session tokens and private capture content.
 - [~] Keep local-only mode usable when cloud credentials are not configured.
 - [~] Audit all storage reads/writes for silent parse, quota and permission failures.
-- [ ] On malformed local JSON, preserve the raw source instead of replacing it with an empty library.
+- [x] On malformed local JSON, preserve the raw source instead of replacing it with an empty library; block writes until the user exports the source or explicitly starts a new library.
 - [ ] Offer recovery from a known-good snapshot after storage corruption.
 - [~] Maintain automatic local backup snapshots and explicit backup-history recovery.
 - [ ] Add crash-recovery tests for interrupted save, import, migration and restore.
@@ -45,7 +45,7 @@ This file is the persistent project checklist for the Linka improvements audit. 
 ## P1 — Windows, web and release engineering
 
 - [x] Keep Windows builds independent of Android release success.
-- [ ] Run the Windows installer build and tests on pull requests that touch web or desktop code.
+- [~] Windows pull-request validation is configured in .github/workflows/desktop-pr.yml; its live result must pass before this item is considered complete.
 - [~] Use apps/web/package.json as the canonical version source for desktop and Rust manifests.
 - [ ] Add a consistency check for package.json, tauri.conf.json, Cargo.toml and lockfiles.
 - [~] Build a Windows NSIS installer in GitHub Actions and expose it as a downloadable artifact.
