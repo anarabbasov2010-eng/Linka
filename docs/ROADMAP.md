@@ -19,6 +19,7 @@ This file is the persistent project checklist for the Linka improvements audit. 
 - [ ] Design incremental/chunked sync as a schema migration if very large libraries must exceed the current one-row JSONB payload.
 - [~] Use optimistic compare-and-set on `updated_at` and bounded retry/re-merge in updated Web/Windows and Android clients; older unconditional-upsert clients can still bypass this protection.
 - [ ] Add post-sync integrity checks for record count, IDs and changed content.
+- [x] Add a regression test proving malformed remote capture payloads are rejected before any cloud write.
 - [ ] Add a server-side atomic merge/RPC or migration path to protect against legacy clients that still issue unconditional upserts.
 - [~] Re-read and re-merge when updated clients detect a concurrent cloud write; a dedicated user-facing conflict review and cross-version protection remain open.
 - [ ] Surface sync state: last success, pending changes, retrying, and actionable errors.
