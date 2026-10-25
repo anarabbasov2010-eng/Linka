@@ -1504,13 +1504,18 @@ async function showBackupHistory() {
   const subtitle = document.createElement("p"); subtitle.className = "backup-history-subtitle"; subtitle.textContent = backupHistoryText("subtitle");
   const controls = document.createElement("div"); controls.className = "backup-history-controls";
   const createButton = document.createElement("button"); createButton.type = "button"; createButton.className = "ghost"; createButton.textContent = backupHistoryText("create");
+  const healthButton = document.createElement("button"); healthButton.type = "button"; healthButton.className = "ghost"; healthButton.textContent = backupHistoryText("storageTitle");
   const closeButton = document.createElement("button"); closeButton.type = "button"; closeButton.className = "ghost"; closeButton.textContent = backupHistoryText("close");
-  controls.append(createButton, closeButton);
+  controls.append(createButton, healthButton, closeButton);
   const statusLine = document.createElement("p"); statusLine.className = "backup-history-status"; statusLine.setAttribute("role", "status");
   const rows = document.createElement("div"); rows.className = "backup-history-rows";
   content.append(heading, subtitle, controls, statusLine, rows);
   const layer = modalShell(content, { dismissable: true });
   closeButton.addEventListener("click", () => layer.remove());
+  healthButton.addEventListener("click", async () => {
+    layer.remove();
+    await showStorageHealth();
+  });
 
   const refreshRows = async () => {
     rows.replaceChildren();
