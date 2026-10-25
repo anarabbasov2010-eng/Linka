@@ -24,7 +24,7 @@ const COPY = {
     hero: ["Keep", "what", "matters."], heroBody: "Links, notes, and useful ideas. Saved once. Easy to find again.",
     quick: "Quick capture", subtitle: "Keep the useful stuff.", placeholder: "Drop a link. Save a thought. Keep it for later…",
     hint: "Saved on this device. Export a backup whenever you need.", exportFormat: "Export format", sortBy: "Sort order", sortOptions: { updated: "Recently changed", newest: "Newest first", oldest: "Oldest first", title: "Title A–Z", domain: "Domain A–Z" }, previewSummary: "Link preview (optional)", previewTitle: "Page title", previewTitlePlaceholder: "Title shown on the card", previewDescription: "Description", previewDescriptionPlaceholder: "Short description", previewImage: "Cover image URL (HTTPS)", previewImagePlaceholder: "https://example.com/cover.jpg", tags: "Tags", collection: "Collection", tagsPlaceholder: "design, reading, work", collectionPlaceholder: "Project or topic", later: "Read later", archive: "Archive", trash: "Trash", save: "Save to inbox",
-    inbox: "Your inbox", export: "Export", import: "Import", filters: ["All", "Today", "Pinned", "Read later", "Archive", "Trash", "Links", "Notes"],
+    inbox: "Your inbox", export: "Export", backupHistory: "Backup history", import: "Import", filters: ["All", "Today", "Pinned", "Read later", "Archive", "Trash", "Links", "Notes"],
     footer: "your personal library", footerRight: "Simple by design. Back up what matters.",
     account: "Account", settings: "Settings", language: "Language", theme: "Appearance", dark: "Dark", light: "Light", system: "System", reducedMotion: "Reduce motion", reducedMotionBody: "Use shorter, calmer transitions.",
     startTitle: "Welcome to Linka", startBody: "Create your account with your email. Your library will be ready on every signed-in device.",
@@ -52,7 +52,7 @@ const COPY = {
     hero: ["Сохраняй", "то,", "что важно."], heroBody: "Ссылки, заметки и идеи. Сохраняй один раз — находи снова.",
     quick: "Быстрое сохранение", subtitle: "Только то, что нужно.", placeholder: "Вставь ссылку или сохрани мысль…",
     hint: "Сохранено на этом устройстве. Не забывай делать резервную копию.", exportFormat: "Формат экспорта", sortBy: "Сортировка", sortOptions: { updated: "Недавно изменённые", newest: "Сначала новые", oldest: "Сначала старые", title: "По названию А–Я", domain: "По домену А–Я" }, previewSummary: "Превью ссылки (необязательно)", previewTitle: "Заголовок страницы", previewTitlePlaceholder: "Заголовок на карточке", previewDescription: "Описание", previewDescriptionPlaceholder: "Краткое описание", previewImage: "URL обложки (HTTPS)", previewImagePlaceholder: "https://example.com/cover.jpg", tags: "Теги", collection: "Коллекция", tagsPlaceholder: "дизайн, чтение, работа", collectionPlaceholder: "Проект или тема", later: "Сохранить на потом", archive: "Архивировать", trash: "Корзина", save: "Сохранить",
-    inbox: "Твоя библиотека", export: "Экспорт", import: "Импорт", filters: ["Всё", "Сегодня", "Закреплённое", "Сохранить на потом", "Архив", "Корзина", "Ссылки", "Заметки"],
+    inbox: "Твоя библиотека", export: "Экспорт", backupHistory: "История копий", import: "Импорт", filters: ["Всё", "Сегодня", "Закреплённое", "Сохранить на потом", "Архив", "Корзина", "Ссылки", "Заметки"],
     footer: "твоя личная библиотека", footerRight: "Ничего лишнего. Сохраняй важное в резервную копию.",
     account: "Аккаунт", settings: "Настройки", language: "Язык", theme: "Оформление", dark: "Тёмная", light: "Светлая", system: "Системная", reducedMotion: "Меньше анимации", reducedMotionBody: "Сокращает движение и переходы.",
     startTitle: "Добро пожаловать в Linka", startBody: "Создай аккаунт по электронной почте. Библиотека будет доступна на устройствах, где выполнен вход.",
@@ -80,7 +80,7 @@ const COPY = {
     hero: ["Vacib", "olanı", "saxla."], heroBody: "Linklər, qeydlər və ideyalar. Bir dəfə saxla, sonra asan tap.",
     quick: "Tez yadda saxla", subtitle: "Yalnız lazım olanlar.", placeholder: "Link əlavə et və ya fikrini yaz…",
     hint: "Bu cihazda saxlanılır. Ehtiyat nüsxə yaratmağı unutma.", exportFormat: "İxrac formatı", sortBy: "Sıralama", sortOptions: { updated: "Son dəyişiklik", newest: "Əvvəlcə yenilər", oldest: "Əvvəlcə köhnələr", title: "Ad A–Z", domain: "Domen A–Z" }, previewSummary: "Link önbaxışı (istəyə bağlı)", previewTitle: "Səhifənin başlığı", previewTitlePlaceholder: "Kartda göstərilən başlıq", previewDescription: "Təsvir", previewDescriptionPlaceholder: "Qısa təsvir", previewImage: "Üz qabığının URL-i (HTTPS)", previewImagePlaceholder: "https://example.com/cover.jpg", tags: "Teqlər", collection: "Kolleksiya", tagsPlaceholder: "dizayn, oxu, iş", collectionPlaceholder: "Layihə və ya mövzu", later: "Sonra oxu", archive: "Arxivə köçür", trash: "Zibil qutusu", save: "Yadda saxla",
-    inbox: "Kitabxanan", export: "İxrac", import: "İdxal", filters: ["Hamısı", "Bu gün", "Sabitlənmiş", "Sonra oxu", "Arxiv", "Zibil qutusu", "Linklər", "Qeydlər"],
+    inbox: "Kitabxanan", export: "İxrac", backupHistory: "Ehtiyat nüsxə tarixçəsi", import: "İdxal", filters: ["Hamısı", "Bu gün", "Sabitlənmiş", "Sonra oxu", "Arxiv", "Zibil qutusu", "Linklər", "Qeydlər"],
     footer: "şəxsi kitabxanan", footerRight: "Sadə və səliqəli. Vacib olanları ehtiyatda saxla.",
     account: "Hesab", settings: "Parametrlər", language: "Dil", theme: "Görünüş", dark: "Tünd", light: "Açıq", system: "Sistem", reducedMotion: "Az animasiya", reducedMotionBody: "Hərəkət və keçidlər azaldılır.",
     startTitle: "Linka-ya xoş gəlmisən", startBody: "E-poçtla hesab yarat. Kitabxanan daxil olduğun bütün cihazlarda əlçatan olacaq.",
@@ -108,7 +108,7 @@ const COPY = {
     hero: ["Önemli", "olanı", "sakla."], heroBody: "Bağlantılar, notlar ve fikirler. Bir kez kaydet, sonra kolayca bul.",
     quick: "Hızlı kayıt", subtitle: "Yalnızca gerekenler.", placeholder: "Bağlantı ekle veya bir düşünce yaz…",
     hint: "Bu cihazda saklanır. Yedek almayı unutma.", exportFormat: "Dışa aktarma biçimi", sortBy: "Sıralama", sortOptions: { updated: "Son değişiklik", newest: "Önce en yeniler", oldest: "Önce en eskiler", title: "Başlık A–Z", domain: "Alan adı A–Z" }, previewSummary: "Bağlantı önizlemesi (isteğe bağlı)", previewTitle: "Sayfa başlığı", previewTitlePlaceholder: "Kartta gösterilen başlık", previewDescription: "Açıklama", previewDescriptionPlaceholder: "Kısa açıklama", previewImage: "Kapak görseli URL’si (HTTPS)", previewImagePlaceholder: "https://example.com/cover.jpg", tags: "Etiketler", collection: "Koleksiyon", tagsPlaceholder: "tasarım, okuma, iş", collectionPlaceholder: "Proje veya konu", later: "Daha sonra oku", archive: "Arşivle", trash: "Çöp kutusu", save: "Gelen kutusuna kaydet",
-    inbox: "Kitaplığın", export: "Dışa aktar", import: "İçe aktar", filters: ["Tümü", "Bugün", "Sabitlenen", "Daha sonra oku", "Arşiv", "Çöp kutusu", "Bağlantılar", "Notlar"],
+    inbox: "Kitaplığın", export: "Dışa aktar", backupHistory: "Yedek geçmişi", import: "İçe aktar", filters: ["Tümü", "Bugün", "Sabitlenen", "Daha sonra oku", "Arşiv", "Çöp kutusu", "Bağlantılar", "Notlar"],
     footer: "kişisel kitaplığın", footerRight: "Sade tasarım. Önemli olanları yedekle.",
     account: "Hesap", settings: "Ayarlar", language: "Dil", theme: "Görünüm", dark: "Koyu", light: "Açık", system: "Sistem", reducedMotion: "Hareketi azalt", reducedMotionBody: "Hareket ve geçişleri azaltır.",
     startTitle: "Linka'ya hoş geldin", startBody: "E-posta adresinle hesap oluştur. Kitaplığın giriş yaptığın tüm cihazlarda kullanılabilir.",
@@ -358,6 +358,7 @@ function translateInterface() {
   if (title?.firstChild) title.firstChild.textContent = tr("inbox") + " ";
   const exportButton = document.querySelector("#export-button");
   const importButton = document.querySelector("#import-button");
+  const backupHistoryButton = document.querySelector("#backup-history-button");
   const exportFormat = document.querySelector("#export-format");
   if (exportFormat) exportFormat.setAttribute("aria-label", tr("exportFormat"));
   const sortOrder = document.querySelector("#sort-order");
@@ -370,6 +371,7 @@ function translateInterface() {
   }
   if (exportButton) exportButton.textContent = tr("export");
   if (importButton) importButton.textContent = tr("import");
+  if (backupHistoryButton) backupHistoryButton.textContent = tr("backupHistory");
   document.querySelectorAll("[data-filter]").forEach((el, i) => { el.textContent = tr("filters")[i] || el.textContent; });
   const footer = document.querySelector(".footer");
   if (footer?.children[0]) footer.children[0].innerHTML = "<strong>linka</strong> · " + tr("footer");
