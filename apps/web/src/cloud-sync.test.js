@@ -1,6 +1,50 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addDeletedIds, completeGoogleOAuthCallback, excludeDeletedCaptures, getOtpCooldown, mergeCloudCaptures, readDeletedIds, removeDeletedIds, setDeletedIds, readLinkaProfile, saveLinkaProfile, DELETED_IDS_KEY } from "./cloud-sync.js";
+import { addDeletedIds, completeGoogleOAuthCallback, excludeDeletedCaptures, getOtpCooldown, mergeCloudCaptures, readDeletedIds, removeDeletedIds, setDeletedIds, readLinkaProfile, saveLinkaProfile, syncCloudCaptures, DELETED_IDS_KEY } from "./cloud-sync.js";
+
+test("cloud sync reports an actionable message when the server rejects an oversized sync payload", async () => {
+  const hadStorage = Object.prototype.hasOwnProperty.call(globalThis, "localStorage");
+  const previousStorage = globalThis.localStorage;
+  const previousFetch = globalThis.fetch;
+  const storage = memoryStorage();
+  storage.setItem("linka.cloud.config.v1", JSON.stringify({
+    url: "https://example.supabase.co",
+    key: "public-test-key"
+  }));
+  storage.setItem("linka.cloud.session.v1", JSON.stringify({
+    userId: "user-test",
+    email: "test@example.com",
+    accessToken: "test-access-token",
+    refreshToken: "test-refresh-token",
+    expiresAt: Date.now() + 60 * 60 * 1000
+  }));
+  globalThis.localStorage = storage;
+  let requests = 0;
+  globalThis.fetch = async (_url, options = {}) => {
+    requests += 1;
+    if (options.method !== "POST") {
+      return new Response(JSON.stringify([{ data: { captures: [], deletedIds: [] } }]), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    return new Response(JSON.stringify({ message: "Payload too large" }), {
+      status: 413,
+      headers: { "Content-Type": "application/json" }
+    });
+  };
+  try {
+    await assert.rejects(
+      syncCloudCaptures([{ id: "capture-1", text: "A saved thought", createdAt: 1, updatedAt: 1 }], new Set()),
+      /payload is too large.*export a backup.*retrying/i
+    );
+    assert.equal(requests, 2, "the sync should read remote state, attempt one upsert, and report the server rejection");
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (hadStorage) globalThis.localStorage = previousStorage;
+    else delete globalThis.localStorage;
+  }
+});
 
 test("cloud merge picks the newest copy, keeps pins, and orders newest first", () => {
   const remote = [
