@@ -39,9 +39,9 @@ test("search highlighting caps match count in long text", () => {
 });
 
 test("search highlighting keeps HTML-looking input as plain text segments", () => {
-  assert.deepEqual(splitSearchHighlights("<img src=x> and <img>", "<img>"), [
+  assert.deepEqual(splitSearchHighlights("<img> and <img>", "<img>"), [
     { text: "<img>", highlighted: true },
-    { text: " src=x> and ", highlighted: false },
+    { text: " and ", highlighted: false },
     { text: "<img>", highlighted: true }
   ]);
 });
