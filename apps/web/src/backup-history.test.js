@@ -31,7 +31,7 @@ test("latest recoverable backup skips empty snapshots and prefers newest data", 
     { id: "older-captures", createdAt: 40, captureCount: 12, documentCount: 0 },
     { id: "newer-documents", createdAt: 45, captureCount: 0, documentCount: 2 },
     { id: "invalid-date", createdAt: "invalid", captureCount: 100, documentCount: 0 },
-    { id: "no-id", createdAt: 60, captureCount: 100, documentCount: 0 }
+    { createdAt: 60, captureCount: 100, documentCount: 0 }
   ];
   assert.equal(findLatestUsableBackupSnapshot(snapshots)?.id, "newer-documents");
   assert.equal(findLatestUsableBackupSnapshot([{ id: "empty", createdAt: 10, captureCount: 0, documentCount: 0 }]), null);
