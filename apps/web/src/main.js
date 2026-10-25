@@ -18,7 +18,7 @@ import {
 } from "./backup-format.js";
 import {
   saveBackupSnapshot, listBackupSnapshots, getBackupSnapshot, deleteBackupSnapshot,
-  isBackupHistoryAvailable, findLatestUsableBackupSnapshot, MAX_AUTOMATIC_SNAPSHOT_BYTES
+  isBackupHistoryAvailable, findLatestUsableBackupSnapshot, findUsableBackupSnapshots, MAX_AUTOMATIC_SNAPSHOT_BYTES
 } from "./backup-history.js";
 
 const $ = selector => document.querySelector(selector);
@@ -304,14 +304,20 @@ function showCaptureRecoveryNotice() {
     restoreLatestButton.disabled = true;
     try {
       const snapshots = await listBackupSnapshots();
-      const snapshot = findLatestUsableBackupSnapshot(snapshots);
-      if (!snapshot) {
+      let stored = null;
+      // A newer snapshot can have valid metadata but a damaged payload. Try
+      // older candidates instead of giving up on the first unreadable backup.
+      for (const snapshot of findUsableBackupSnapshots(snapshots)) {
+        const candidate = await getBackupSnapshot(snapshot.id);
+        const parsed = candidate?.backup ? parseLinkaBackup(candidate.backup) : null;
+        if (parsed && (parsed.captures.length > 0 || parsed.documents.length > 0)) {
+          stored = candidate;
+          break;
+        }
+      }
+      if (!stored) {
         say(copy.restoreLatestUnavailable);
         return;
-      }
-      const stored = await getBackupSnapshot(snapshot.id);
-      if (!stored?.backup || !parseLinkaBackup(stored.backup)) {
-        throw new Error(copy.restoreLatestFailed);
       }
 
       // Keep the malformed source in RECOVERY_KEY, acknowledge it and open a
