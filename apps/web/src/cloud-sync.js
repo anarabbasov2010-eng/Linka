@@ -151,6 +151,13 @@ export function removeDeletedIds(ids, storage = globalThis.localStorage) {
     return false;
   }
 }
+export function excludeDeletedCaptures(captures, deletedIds) {
+  const tombstones = deletedIds instanceof Set ? deletedIds : new Set(deletedIds || []);
+  return (Array.isArray(captures) ? captures : []).filter(item =>
+    item && typeof item.id === "string" && item.id && !tombstones.has(item.id)
+  );
+}
+
 export function mergeCloudCaptures(localCaptures, remoteCaptures, deletedIds, maxItems = Number.POSITIVE_INFINITY) {
   const tombstones = deletedIds instanceof Set ? deletedIds : new Set(deletedIds || []);
   const mergedById = new Map();
@@ -343,6 +350,6 @@ export async function syncCloudCaptures(localCaptures, localDeletedIds = readDel
   // the next sync will also propagate these tombstones to the remote copy.
   for (const id of readDeletedIds()) deleted.add(id);
   try { localStorage.setItem(DELETED_IDS_KEY, JSON.stringify(Array.from(deleted))); } catch {}
-  const safeMerged = merged.filter(item => !deleted.has(item.id));
+  const safeMerged = excludeDeletedCaptures(merged, deleted);
   return { captures: safeMerged, deletedIds: deleted, session, message: `Synced ${safeMerged.length} items` };
 }
