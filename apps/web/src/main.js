@@ -18,7 +18,7 @@ import {
 } from "./backup-format.js";
 import {
   saveBackupSnapshot, listBackupSnapshots, getBackupSnapshot, deleteBackupSnapshot,
-  MAX_AUTOMATIC_SNAPSHOT_BYTES
+  isBackupHistoryAvailable, MAX_AUTOMATIC_SNAPSHOT_BYTES
 } from "./backup-history.js";
 
 const $ = selector => document.querySelector(selector);
@@ -1386,6 +1386,17 @@ async function showBackupHistory() {
 
   const refreshRows = async () => {
     rows.replaceChildren();
+    let available = false;
+    try { available = await isBackupHistoryAvailable(); }
+    catch { available = false; }
+    if (!available) {
+      statusLine.textContent = backupHistoryText("unavailable");
+      const note = document.createElement("p");
+      note.className = "backup-history-empty";
+      note.textContent = backupHistoryText("unavailable");
+      rows.append(note);
+      return;
+    }
     let snapshots;
     try { snapshots = await listBackupSnapshots(); }
     catch (error) { console.error("Could not list backup history", error); statusLine.textContent = backupHistoryText("failed"); return; }
