@@ -338,7 +338,11 @@ export async function syncCloudCaptures(localCaptures, localDeletedIds = readDel
   await readResponse(upsert);
   // A delete can happen while the request is in flight. Preserve any newer
   // local tombstones rather than replacing them with the stale request snapshot.
+  // A delete can happen while the request is in flight. Preserve newer local
+  // tombstones and exclude those records from the result returned to the UI;
+  // the next sync will also propagate these tombstones to the remote copy.
   for (const id of readDeletedIds()) deleted.add(id);
   try { localStorage.setItem(DELETED_IDS_KEY, JSON.stringify(Array.from(deleted))); } catch {}
-  return { captures: merged, deletedIds: deleted, session, message: `Synced ${merged.length} items` };
+  const safeMerged = merged.filter(item => !deleted.has(item.id));
+  return { captures: safeMerged, deletedIds: deleted, session, message: `Synced ${safeMerged.length} items` };
 }
