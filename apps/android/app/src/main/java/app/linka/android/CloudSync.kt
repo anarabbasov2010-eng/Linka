@@ -89,7 +89,7 @@ private fun cloudRequestError(code: Int, text: String): IllegalStateException {
     return IllegalStateException(message)
 }
 
-private fun requestJson(
+internal fun requestJson(
     url: String,
     method: String,
     anonKey: String,
