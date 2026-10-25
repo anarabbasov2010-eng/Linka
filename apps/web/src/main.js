@@ -1037,7 +1037,7 @@ async function downloadLinkaBackup() {
       savedSearches: readLocalJson("linka.savedSearches.v1", []),
       recentSearches: readLocalJson("linka.recentSearches.v1", [])
     });
-    const blob = new Blob([JSON.stringify(backup, null, 2) + "\\n"], { type: "application/json;charset=utf-8" });
+    const blob = new Blob([JSON.stringify(backup, null, 2) + "\n"], { type: "application/json;charset=utf-8" });
     const objectUrl = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     const day = new Date().toISOString().slice(0, 10);
@@ -1308,7 +1308,7 @@ $("#import-file").addEventListener("change", async event => {
     let backup = null;
     let imported = null;
 
-    if (/\\.json$/i.test(file.name) || file.type === "application/json") {
+    if (/\.json$/i.test(file.name) || file.type === "application/json") {
       const parsed = JSON.parse(raw);
       backup = parseLinkaBackup(parsed);
       imported = backup
