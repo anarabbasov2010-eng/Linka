@@ -86,7 +86,7 @@ This file is the persistent project checklist for the Linka improvements audit. 
 ## Capture and import
 
 - [ ] Support drag-and-drop capture from Explorer and browsers.
-- [ ] Support paste-from-clipboard capture with clear source feedback.
+- [x] Add an explicit clipboard-paste button that appends text to the capture draft, respects the 100,000-character limit, reports empty/permission errors, and never monitors the clipboard in the background.
 - [ ] Add bulk import with a preview, validation and duplicate report.
 - [ ] Add a configurable global capture shortcut and quick-capture window.
 - [ ] Keep clipboard monitoring opt-in and explain what is collected.
