@@ -568,3 +568,7 @@ mark.search-highlight {
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
+
+.search-result.command-result { text-align: left; }
+.search-result.command-selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--surface-top)); }
+.search-result.command-selected .search-thumb { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
