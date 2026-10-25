@@ -56,6 +56,9 @@ async function readResponse(response) {
   if (!response.ok) {
     const detail = data.msg || data.message || data.error_description || data.error || "";
     if (response.status === 401 || response.status === 403) throw new Error("Linka sign-in failed. Check the Google OAuth configuration and try again.");
+    if (response.status === 413 || (response.status === 400 && /payload too large|request entity too large/i.test(raw))) {
+      throw new Error("The cloud service rejected a request because its payload is too large. For Cloud Sync, export a backup and reduce the amount or size of synced data before retrying.");
+    }
     if (response.status === 404 || (response.status === 400 && /linka_sync/i.test(raw))) {
       throw new Error("The Linka sync table is missing. Set up the shared sync database first.");
     }
