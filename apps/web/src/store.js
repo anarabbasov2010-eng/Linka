@@ -69,34 +69,57 @@ function rememberCaptureRecovery(raw, storage) {
  * An acknowledged recovery record is retained for manual export/diagnostics.
  */
 export function getCaptureRecovery(storage = globalThis.localStorage) {
+  let saved = null;
   try {
     const savedRaw = storage?.getItem(RECOVERY_KEY);
     if (savedRaw) {
       try {
-        const saved = JSON.parse(savedRaw);
-        if (saved && typeof saved.raw === "string") return saved;
+        const parsed = JSON.parse(savedRaw);
+        if (parsed && typeof parsed.raw === "string") saved = parsed;
       } catch {}
     }
-  } catch {}
-
-  try {
-    const raw = storage?.getItem(STORAGE_KEY);
-    if (raw == null || raw === "") return null;
-    try {
-      if (Array.isArray(JSON.parse(raw))) return null;
-    } catch {}
-    rememberCaptureRecovery(raw, storage);
-    try {
-      const preserved = storage?.getItem(RECOVERY_KEY);
-      if (preserved) {
-        const value = JSON.parse(preserved);
-        if (value && typeof value.raw === "string") return value;
-      }
-    } catch {}
-    return { raw, reason: "capture-store-parse-error", createdAt: Date.now(), acknowledged: false, preservedSeparately: false };
   } catch {
-    return null;
+    return saved;
   }
+
+  let raw;
+  try {
+    raw = storage?.getItem(STORAGE_KEY);
+  } catch {
+    return saved;
+  }
+
+  if (typeof raw === "string" && raw !== "") {
+    let validCaptureArray = false;
+    try {
+      validCaptureArray = Array.isArray(JSON.parse(raw));
+    } catch {}
+
+    if (!validCaptureArray) {
+      // A stale recovery record must never mask a second corruption event.
+      // Preserve the newly damaged value before allowing any write decision.
+      if (!saved || saved.raw !== raw) {
+        rememberCaptureRecovery(raw, storage);
+        try {
+          const preserved = storage?.getItem(RECOVERY_KEY);
+          const parsed = preserved ? JSON.parse(preserved) : null;
+          if (parsed && typeof parsed.raw === "string" && parsed.raw === raw) saved = parsed;
+        } catch {}
+      }
+      if (saved && saved.raw === raw) return saved;
+      return {
+        raw,
+        reason: "capture-store-parse-error",
+        createdAt: Date.now(),
+        acknowledged: false,
+        preservedSeparately: false
+      };
+    }
+  }
+
+  // Retain the previous recovery record after a deliberate fresh start so
+  // users can still export the damaged source even though the new store is [].
+  return saved;
 }
 
 /**
