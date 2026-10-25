@@ -49,6 +49,54 @@ test("cloud sync reports an actionable message when the server rejects an oversi
   }
 });
 
+test("cloud sync retries transient server failures before reading or writing the library", async () => {
+  const hadStorage = Object.prototype.hasOwnProperty.call(globalThis, "localStorage");
+  const previousStorage = globalThis.localStorage;
+  const previousFetch = globalThis.fetch;
+  const storage = memoryStorage();
+  storage.setItem("linka.cloud.config.v1", JSON.stringify({
+    url: "https://example.supabase.co",
+    key: "public-test-key"
+  }));
+  storage.setItem("linka.cloud.session.v1", JSON.stringify({
+    userId: "user-test",
+    email: "test@example.com",
+    accessToken: "test-access-token",
+    refreshToken: "test-refresh-token",
+    expiresAt: Date.now() + 60 * 60 * 1000
+  }));
+  globalThis.localStorage = storage;
+  let reads = 0;
+  let patches = 0;
+  globalThis.fetch = async (_url, options = {}) => {
+    if (options.method === "PATCH") {
+      patches += 1;
+      return new Response(JSON.stringify([{ user_id: "user-test", updated_at: "2026-10-25T08:00:01+00:00" }]), {
+        status: 200, headers: { "Content-Type": "application/json" }
+      });
+    }
+    reads += 1;
+    if (reads === 1) return new Response("temporarily unavailable", { status: 503, headers: { "Retry-After": "0" } });
+    return new Response(JSON.stringify([{
+      data: { captures: [], deletedIds: [] },
+      updated_at: "2026-10-25T08:00:00+00:00"
+    }]), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+
+  try {
+    const result = await syncCloudCaptures([
+      { id: "local-retry", text: "Keep this note", createdAt: 1, updatedAt: 1 }
+    ], new Set(), null);
+    assert.equal(reads, 2, "one transient 503 should be retried");
+    assert.equal(patches, 1, "the cloud write should happen only after a successful read");
+    assert.equal(result.captures[0].id, "local-retry");
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (hadStorage) globalThis.localStorage = previousStorage;
+    else delete globalThis.localStorage;
+  }
+});
+
 test("cloud sync retries a stale write and merges the concurrent device's newer records", async () => {
   const hadStorage = Object.prototype.hasOwnProperty.call(globalThis, "localStorage");
   const previousStorage = globalThis.localStorage;
