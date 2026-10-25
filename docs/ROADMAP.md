@@ -127,7 +127,7 @@ This file is the persistent project checklist for the Linka improvements audit. 
 - [ ] Search extracted PDF text and offline snapshots.
 - [~] Keep named saved searches and a bounded local search history.
 - [ ] Add advanced filter builder and combined query groups.
-- [ ] Add a command palette for navigation and actions.
+- [x] Add a command palette opened by typing `>` in global search, with filtered commands, arrow-key navigation and actions for views, capture, documents, settings, backups, export and shortcuts.
 - [ ] Add search within the open document.
 - [ ] Add an index with measured performance and safe rebuild/recovery.
 
