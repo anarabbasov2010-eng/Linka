@@ -20,6 +20,9 @@ const form = $("#capture-form");
 const draft = $("#capture-text");
 const tagsDraft = $("#capture-tags");
 const collectionDraft = $("#capture-collection");
+const previewTitleDraft = $("#capture-preview-title");
+const previewDescriptionDraft = $("#capture-preview-description");
+const previewImageDraft = $("#capture-preview-image");
 const saveButton = $("#save-button");
 const list = $("#capture-list");
 const search = $("#search");
@@ -78,6 +81,9 @@ let persistedCaptures = captures.map(item => ({ ...item }));
 const QUICK_DRAFT_KEY = "linka.captureDraft.v1";
 const QUICK_DRAFT_TAGS_KEY = "linka.captureDraft.tags.v1";
 const QUICK_DRAFT_COLLECTION_KEY = "linka.captureDraft.collection.v1";
+const QUICK_DRAFT_PREVIEW_TITLE_KEY = "linka.captureDraft.previewTitle.v1";
+const QUICK_DRAFT_PREVIEW_DESCRIPTION_KEY = "linka.captureDraft.previewDescription.v1";
+const QUICK_DRAFT_PREVIEW_IMAGE_KEY = "linka.captureDraft.previewImage.v1";
 function parseTagInput(value) {
   return String(value || "").split(/[,;\n]+/).map(tag => tag.trim().replace(/^#+/, "").replace(/\s+/g, " ").slice(0, 40)).filter(Boolean).slice(0, 24);
 }
@@ -87,15 +93,27 @@ function saveCaptureMetadataDraft() {
     else localStorage.removeItem(QUICK_DRAFT_TAGS_KEY);
     if (collectionDraft.value) localStorage.setItem(QUICK_DRAFT_COLLECTION_KEY, collectionDraft.value);
     else localStorage.removeItem(QUICK_DRAFT_COLLECTION_KEY);
+    if (previewTitleDraft.value) localStorage.setItem(QUICK_DRAFT_PREVIEW_TITLE_KEY, previewTitleDraft.value);
+    else localStorage.removeItem(QUICK_DRAFT_PREVIEW_TITLE_KEY);
+    if (previewDescriptionDraft.value) localStorage.setItem(QUICK_DRAFT_PREVIEW_DESCRIPTION_KEY, previewDescriptionDraft.value);
+    else localStorage.removeItem(QUICK_DRAFT_PREVIEW_DESCRIPTION_KEY);
+    if (previewImageDraft.value) localStorage.setItem(QUICK_DRAFT_PREVIEW_IMAGE_KEY, previewImageDraft.value);
+    else localStorage.removeItem(QUICK_DRAFT_PREVIEW_IMAGE_KEY);
   } catch {}
 }
 try {
   const savedDraft = localStorage.getItem(QUICK_DRAFT_KEY);
   const savedTags = localStorage.getItem(QUICK_DRAFT_TAGS_KEY);
   const savedCollection = localStorage.getItem(QUICK_DRAFT_COLLECTION_KEY);
+  const savedPreviewTitle = localStorage.getItem(QUICK_DRAFT_PREVIEW_TITLE_KEY);
+  const savedPreviewDescription = localStorage.getItem(QUICK_DRAFT_PREVIEW_DESCRIPTION_KEY);
+  const savedPreviewImage = localStorage.getItem(QUICK_DRAFT_PREVIEW_IMAGE_KEY);
   if (savedDraft && !draft.value) draft.value = savedDraft;
   if (savedTags && !tagsDraft.value) tagsDraft.value = savedTags;
   if (savedCollection && !collectionDraft.value) collectionDraft.value = savedCollection;
+  if (savedPreviewTitle && !previewTitleDraft.value) previewTitleDraft.value = savedPreviewTitle;
+  if (savedPreviewDescription && !previewDescriptionDraft.value) previewDescriptionDraft.value = savedPreviewDescription;
+  if (savedPreviewImage && !previewImageDraft.value) previewImageDraft.value = savedPreviewImage;
   saveButton.disabled = !draft.value.trim();
 } catch {}
 let activeFilter = "all";
@@ -645,6 +663,9 @@ function resetEditor() {
     localStorage.removeItem(QUICK_DRAFT_KEY);
     localStorage.removeItem(QUICK_DRAFT_TAGS_KEY);
     localStorage.removeItem(QUICK_DRAFT_COLLECTION_KEY);
+    localStorage.removeItem(QUICK_DRAFT_PREVIEW_TITLE_KEY);
+    localStorage.removeItem(QUICK_DRAFT_PREVIEW_DESCRIPTION_KEY);
+    localStorage.removeItem(QUICK_DRAFT_PREVIEW_IMAGE_KEY);
   } catch {}
   saveButton.innerHTML = 'Save to inbox <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg>';
   saveButton.disabled = true;
@@ -966,6 +987,9 @@ draft.addEventListener("input",()=>{
 });
 tagsDraft.addEventListener("input", saveCaptureMetadataDraft);
 collectionDraft.addEventListener("input", saveCaptureMetadataDraft);
+previewTitleDraft.addEventListener("input", saveCaptureMetadataDraft);
+previewDescriptionDraft.addEventListener("input", saveCaptureMetadataDraft);
+previewImageDraft.addEventListener("input", saveCaptureMetadataDraft);
 draft.addEventListener("keydown",event=>{if((event.ctrlKey||event.metaKey)&&event.key==="Enter"&&draft.value.trim()){event.preventDefault();form.requestSubmit();}});
 form.addEventListener("submit",event=>{
   event.preventDefault();
