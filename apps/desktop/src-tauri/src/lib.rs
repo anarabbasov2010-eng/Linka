@@ -1,13 +1,19 @@
 use std::fs;
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{atomic::{AtomicBool, Ordering}, Arc, Mutex};
 use tauri::{Emitter, Manager, State};
 
 struct StartupLinkaDocument(Mutex<Option<String>>);
+struct CloseToTrayState(Arc<AtomicBool>);
 
 #[tauri::command]
 fn take_startup_document(state: State<'_, StartupLinkaDocument>) -> Option<String> {
     state.0.lock().ok()?.take()
+}
+
+#[tauri::command]
+fn set_close_to_tray(enabled: bool, state: State<'_, CloseToTrayState>) {
+    state.0.store(enabled, Ordering::Relaxed);
 }
 
 fn show_main_window(app: &tauri::AppHandle) {
@@ -82,6 +88,8 @@ pub fn run() {
             let startup_document = std::env::args().skip(1)
                 .find_map(|argument| read_linka_document(&argument));
             app.manage(StartupLinkaDocument(Mutex::new(startup_document)));
+            let close_to_tray = Arc::new(AtomicBool::new(true));
+            app.manage(CloseToTrayState(close_to_tray.clone()));
 
             #[cfg(any(windows, target_os = "linux"))]
             {
@@ -141,10 +149,13 @@ pub fn run() {
                 #[cfg(windows)]
                 if let Some(window) = app.get_webview_window("main") {
                     let window_to_hide = window.clone();
+                    let close_to_tray_state = close_to_tray.clone();
                     window.on_window_event(move |event| {
                         if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                            api.prevent_close();
-                            let _ = window_to_hide.hide();
+                            if close_to_tray_state.load(Ordering::Relaxed) {
+                                api.prevent_close();
+                                let _ = window_to_hide.hide();
+                            }
                         }
                     });
                 }
@@ -152,7 +163,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![take_startup_document])
+        .invoke_handler(tauri::generate_handler![take_startup_document, set_close_to_tray])
         .run(tauri::generate_context!())
         .expect("failed to run Linka desktop application");
 }
