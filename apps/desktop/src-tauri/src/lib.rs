@@ -109,11 +109,56 @@ pub fn run() {
                 let capture_item = MenuItem::with_id(app, "quick-capture", "Quick capture", true, None::<&str>)?;
                 let separator = PredefinedMenuItem::separator(app)?;
                 let quit_item = MenuItem::with_id(app, "quit", "Quit Linka", true, None::<&str>)?;
-                let menu = Menu::with_items(app, &[&open_item, &capture_item, &separator, &quit_item])?;
+                let tray_menu = Menu::with_items(app, &[&open_item, &capture_item, &separator, &quit_item])?;
+
+                // Native application menu. The "app-" prefix keeps these menu
+                // IDs separate from the context-menu IDs in the tray.
+                let app_capture = MenuItem::with_id(app, "app-quick-capture", "Quick capture", true, None::<&str>)?;
+                let app_document = MenuItem::with_id(app, "app-new-document", "New text document", true, None::<&str>)?;
+                let app_export = MenuItem::with_id(app, "app-export-backup", "Export full backup", true, None::<&str>)?;
+                let app_quit = MenuItem::with_id(app, "app-quit", "Quit Linka", true, None::<&str>)?;
+                let file_menu = Submenu::with_items(app, "File", true, &[&app_capture, &app_document, &app_export, &separator, &app_quit])?;
+
+                let undo = PredefinedMenuItem::undo(app, None)?;
+                let redo = PredefinedMenuItem::redo(app, None)?;
+                let cut = PredefinedMenuItem::cut(app, None)?;
+                let copy = PredefinedMenuItem::copy(app, None)?;
+                let paste = PredefinedMenuItem::paste(app, None)?;
+                let select_all = PredefinedMenuItem::select_all(app, None)?;
+                let edit_menu = Submenu::with_items(app, "Edit", true, &[&undo, &redo, &separator, &cut, &copy, &paste, &select_all])?;
+
+                let app_search = MenuItem::with_id(app, "app-search", "Search library", true, None::<&str>)?;
+                let app_backups = MenuItem::with_id(app, "app-backup-history", "Backup history", true, None::<&str>)?;
+                let app_settings = MenuItem::with_id(app, "app-settings", "Settings", true, None::<&str>)?;
+                let view_menu = Submenu::with_items(app, "View", true, &[&app_search, &app_backups, &app_settings])?;
+
+                let app_shortcuts = MenuItem::with_id(app, "app-shortcuts", "Keyboard shortcuts", true, None::<&str>)?;
+                let navigate_menu = Submenu::with_items(app, "Navigate", true, &[&app_search, &app_capture, &app_document])?;
+                let help_menu = Submenu::with_items(app, "Help", true, &[&app_shortcuts])?;
+                let app_menu = Menu::with_items(app, &[&file_menu, &edit_menu, &view_menu, &navigate_menu, &help_menu])?;
+                app.set_menu(app_menu)?;
+
+                app.on_menu_event(|app, event| {
+                    let action = match event.id().as_ref() {
+                        "app-quick-capture" => Some("quick-capture"),
+                        "app-new-document" => Some("new-document"),
+                        "app-export-backup" => Some("export-backup"),
+                        "app-search" => Some("search"),
+                        "app-backup-history" => Some("backup-history"),
+                        "app-settings" => Some("settings"),
+                        "app-shortcuts" => Some("shortcuts"),
+                        "app-quit" => { app.exit(0); None },
+                        _ => None,
+                    };
+                    if let Some(action) = action {
+                        show_main_window(app);
+                        let _ = app.emit("linka-menu-action", action);
+                    }
+                });
 
                 let tray_builder = TrayIconBuilder::with_id("linka-tray")
                     .tooltip("Linka · local-first")
-                    .menu(&menu)
+                    .menu(&tray_menu)
                     .show_menu_on_left_click(false)
                     .on_menu_event(|app, event| match event.id().as_ref() {
                         "open" => show_main_window(app),
