@@ -758,7 +758,7 @@ function addTermsBody(container) {
   const body = document.createElement("div");
   const sections = [
     ["Your data stays local", "Captures live in this browser profile or local app storage. Browser resets, cleared data, device loss or uninstallation may erase them. Keep an export backup."],
-    ["Optional cloud sync", "Войти to the same Linka account on Android, Windows and the web to sync your library. Local storage and manual export/import remain available even when you are offline. Sync needs a configured shared Supabase project; never enter a service-role or secret key into the app."],
+    ["Optional cloud sync", "Sign in to the same Linka account on supported devices to sync your library. Local storage and manual export/import remain available offline. Sync requires a configured shared Supabase project; never enter a service-role or secret key into the app."],
     ["Use and responsibility", "You are responsible for what you save, protecting your device, and keeping backups. Do not use Linka as the only copy of critical information."],
     ["Links and early access", "Opened links are handled by external apps/sites. Linka is an early-stage utility; features can change and uninterrupted, error-free operation is not guaranteed."],
     ["Acceptable use", "Use Linka lawfully, respect other people’s rights, and avoid saving sensitive information on shared devices."]
@@ -1014,7 +1014,7 @@ function showCloudSyncНастройки() {
   }
 }
 async function checkWindowsInstaller(statusLine, downloadLink) {
-  statusLine.textContent = "Проверитьing the latest Linka release…";
+  statusLine.textContent = "Checking the latest Linka release…";
   downloadLink.hidden = true;
   try {
     const response = await fetch("https://api.github.com/repos/anarabbasov2010-eng/Linka/releases/latest", {
@@ -1025,16 +1025,16 @@ async function checkWindowsInstaller(statusLine, downloadLink) {
     const tag = String(release.tag_name || "").replace(/^v/, "");
     const asset = (release.assets || []).find(item => item.name === "Linka-Windows-x64-setup.exe");
     if (!asset) {
-      statusLine.textContent = "The Windows installer for this release is still being built. Проверить again shortly.";
+      statusLine.textContent = "The Windows installer for this release is still being built. Check again shortly.";
       return;
     }
     downloadLink.href = asset.browser_download_url;
     downloadLink.hidden = false;
     downloadLink.textContent = desktopBuildVersion && compareVersions(tag, desktopBuildVersion) > 0
-      ? `Скачать update ${tag}`
-      : "Скачать Windows installer";
+      ? `Download update ${tag}`
+      : "Download Windows installer";
     if (desktopBuildVersion && compareVersions(tag, desktopBuildVersion) <= 0) {
-      statusLine.textContent = `Приложение для Windows version ${desktopBuildVersion} is current. You can reinstall the latest installer over the existing copy.`;
+      statusLine.textContent = `Linka for Windows ${desktopBuildVersion} is up to date. You can reinstall the latest installer over the existing copy.`;
     } else {
       statusLine.textContent = `Linka Windows ${tag} is available. Run the installer over your existing copy to update it.`;
     }
