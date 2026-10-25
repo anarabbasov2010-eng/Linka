@@ -442,10 +442,12 @@ function attachImportedFilePicker() {
       if (file.size > 32 * 1024 * 1024) throw new Error("Файл больше 32 МиБ. Раздели документ на несколько файлов.");
       const parsed = parseLinkaDocument(await file.text(), file.name.replace(/\.[^.]+$/, "") || t("untitled"));
       currentDocument = await storeDocument(parsed);
+      editRevision = 0;
+      lastSavedAt = Number(currentDocument.updatedAt || Date.now());
       titleField.value = currentDocument.title;
       bodyField.value = currentDocument.text;
       bodyField.dispatchEvent(new Event("input", { bubbles: true }));
-      setStatus(t("saved"));
+      setStatus(savedStatusText(lastSavedAt));
       await refreshRecentList();
     } catch (error) {
       setStatus(error?.message || t("openFailed"), true);
@@ -479,14 +481,23 @@ function buildEditorUI() {
   statusLine = q(".linka-doc-footer-status");
   recentList = q(".linka-doc-recent-list");
   q("[data-close]").addEventListener("click", closeEditor);
-  q("[data-new]").addEventListener("click", () => {
-    void persistCurrent(false);
+  q("[data-new]").addEventListener("click", async () => {
+    // Do not switch away from a dirty document unless its current revision was saved.
+    if (!(await persistCurrent(true))) return;
     currentDocument = normalizeLinkaDocument({ id: uid(), title: t("untitled"), text: "" });
+    editRevision = 0;
+    lastSavedAt = 0;
     titleField.value = currentDocument.title;
     bodyField.value = "";
     bodyField.dispatchEvent(new Event("input", { bubbles: true }));
-    setStatus(t("saved"));
-    void storeDocument(currentDocument).then(refreshRecentList).catch(() => setStatus(t("failed"), true));
+    try {
+      currentDocument = await storeDocument(currentDocument);
+      lastSavedAt = currentDocument.updatedAt;
+      setStatus(savedStatusText(lastSavedAt));
+      await refreshRecentList();
+    } catch {
+      setStatus(t("failed"), true);
+    }
   });
   q("[data-open]").addEventListener("click", () => inputPicker?.click());
   q("[data-save]").addEventListener("click", () => {
@@ -506,13 +517,21 @@ async function openEditor(documentValue = null) {
   // modal overlays used to trap focus and duplicate the Escape/save lifecycle.
   if (overlay && titleField && bodyField) {
     if (!documentValue) { titleField.focus(); return; }
-    await persistCurrent(false);
+    if (!(await persistCurrent(true))) return;
     currentDocument = normalizeLinkaDocument(documentValue);
+    editRevision = 0;
+    lastSavedAt = Number(currentDocument.updatedAt || 0);
     titleField.value = currentDocument.title;
     bodyField.value = currentDocument.text;
     bodyField.dispatchEvent(new Event("input", { bubbles: true }));
-    setStatus(t("saved"));
-    await storeDocument(currentDocument).catch(() => setStatus(t("failed"), true));
+    try {
+      currentDocument = await storeDocument(currentDocument);
+      lastSavedAt = currentDocument.updatedAt;
+      setStatus(savedStatusText(lastSavedAt));
+    } catch {
+      setStatus(t("failed"), true);
+      return;
+    }
     await refreshRecentList();
     bodyField.focus();
     return;
@@ -520,12 +539,19 @@ async function openEditor(documentValue = null) {
   previousFocus = document.activeElement;
   clearTimeout(saveTimer);
   currentDocument = normalizeLinkaDocument(documentValue || { id: uid(), title: t("untitled"), text: "" });
+  editRevision = 0;
+  lastSavedAt = Number(currentDocument.updatedAt || 0);
   buildEditorUI();
   titleField.value = currentDocument.title;
   bodyField.value = currentDocument.text;
   bodyField.dispatchEvent(new Event("input", { bubbles: true }));
-  setStatus(t("saved"));
-  await storeDocument(currentDocument).catch(() => setStatus(t("failed"), true));
+  try {
+    currentDocument = await storeDocument(currentDocument);
+    lastSavedAt = currentDocument.updatedAt;
+    setStatus(savedStatusText(lastSavedAt));
+  } catch {
+    setStatus(t("failed"), true);
+  }
   await refreshRecentList();
 }
 async function openRawDocument(raw, fallbackTitle = t("untitled")) {
