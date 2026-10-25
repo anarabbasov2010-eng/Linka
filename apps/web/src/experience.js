@@ -809,6 +809,69 @@ function showAccount({ firstRun = false } = {}) {
   });
   if (!service.url.value || !service.key.value) setStatus(status, tr("setupNeeded"));
 }
+function showKeyboardShortcuts() {
+  const variants = {
+    en: {
+      title: "Keyboard shortcuts", subtitle: "Actions you can use throughout Linka.", close: "Close",
+      rows: [
+        ["Ctrl / ⌘ + K", "Open global search", "Search captures and local text documents."],
+        ["/", "Search from anywhere", "Opens global search when focus is not inside a field."],
+        ["Ctrl / ⌘ + Enter", "Save quick capture", "Save the current capture draft without reaching for the mouse."],
+        ["Ctrl / ⌘ + Shift + E", "Export", "Export selected captures, or the currently visible results."],
+        ["Ctrl / ⌘ + Shift + L", "Toggle Read Later", "Mark selected captures for later or remove that status."],
+        ["Delete", "Move selection to Trash", "Works when items are selected and focus is not in a text field."]
+      ]
+    },
+    ru: {
+      title: "Горячие клавиши", subtitle: "Быстрые действия в Linka.", close: "Закрыть",
+      rows: [
+        ["Ctrl / ⌘ + K", "Открыть общий поиск", "Поиск по записям и локальным текстовым документам."],
+        ["/", "Поиск из любого раздела", "Открывает общий поиск, если фокус не находится в поле ввода."],
+        ["Ctrl / ⌘ + Enter", "Сохранить быструю запись", "Сохраняет текущий черновик без мыши."],
+        ["Ctrl / ⌘ + Shift + E", "Экспортировать", "Экспорт выбранных записей или текущих результатов."],
+        ["Ctrl / ⌘ + Shift + L", "Отложить на потом", "Меняет статус «Сохранить на потом» у выбранных записей."],
+        ["Delete", "Переместить в корзину", "Работает для выбранных записей, когда фокус не в текстовом поле."]
+      ]
+    },
+    az: {
+      title: "Klaviatura qısayolları", subtitle: "Linka-da sürətli əmrlər.", close: "Bağla",
+      rows: [
+        ["Ctrl / ⌘ + K", "Ümumi axtarışı aç", "Qeydlərdə və yerli mətn sənədlərində axtar."],
+        ["/", "İstənilən yerdən axtar", "Fokus mətn sahəsində olmayanda ümumi axtarışı açır."],
+        ["Ctrl / ⌘ + Enter", "Sürətli qeydi saxla", "Cari qaralamanı siçansız saxlayır."],
+        ["Ctrl / ⌘ + Shift + E", "İxrac et", "Seçilmiş qeydləri və ya görünən nəticələri ixrac edir."],
+        ["Ctrl / ⌘ + Shift + L", "Sonra oxu", "Seçilmiş qeydlərin sonradan oxunma statusunu dəyişir."],
+        ["Delete", "Zibil qutusuna köçür", "Mətn sahəsində fokus olmayanda seçilmiş qeydlərlə işləyir."]
+      ]
+    },
+    tr: {
+      title: "Klavye kısayolları", subtitle: "Linka içinde hızlı işlemler.", close: "Kapat",
+      rows: [
+        ["Ctrl / ⌘ + K", "Genel aramayı aç", "Kayıtlarda ve yerel metin belgelerinde ara."],
+        ["/", "Her yerden ara", "Odak bir metin alanında değilken genel aramayı açar."],
+        ["Ctrl / ⌘ + Enter", "Hızlı kaydı kaydet", "Geçerli taslağı fareye uzanmadan kaydeder."],
+        ["Ctrl / ⌘ + Shift + E", "Dışa aktar", "Seçilen kayıtları veya görünür sonuçları dışa aktarır."],
+        ["Ctrl / ⌘ + Shift + L", "Daha sonra oku", "Seçilen kayıtların daha sonra okunma durumunu değiştirir."],
+        ["Delete", "Çöp kutusuna taşı", "Odak bir metin alanında değilken seçilen kayıtlar için çalışır."]
+      ]
+    }
+  };
+  const copy = variants[langCode()] || variants.en;
+  const dialog = modal(copy.title, copy.subtitle);
+  const rows = make("div", "linka-shortcuts-list");
+  copy.rows.forEach(([keys, title, detail]) => {
+    const row = make("div", "linka-shortcut-row");
+    const description = make("div", "linka-shortcut-description");
+    description.append(make("strong", "", title), make("p", "", detail));
+    row.append(description, make("code", "linka-shortcut-keys", keys));
+    rows.append(row);
+  });
+  const footer = make("div", "linka-actions");
+  const close = button(copy.close, "linka-button linka-button-secondary");
+  close.addEventListener("click", dialog.close);
+  footer.append(close);
+  dialog.panel.append(rows, footer);
+}
 function showSettings() {
   const dialog = modal(tr("settings"), "Linka");
   const pickerLabel = make("label", "linka-field");
@@ -821,10 +884,10 @@ function showSettings() {
   dialog.panel.append(pickerLabel);
 
   const preferenceLabels = ({
-    en: { accent: "Accent color", density: "Interface density", compact: "Compact", standard: "Standard", spacious: "Spacious", effects: "Visual effects", quiet: "Quiet", balanced: "Balanced", atmosphere: "Atmosphere", forest: "Forest", oled: "OLED black", cloud: "Cloud sync", backdrop: "Atmosphere & music", agreement: "User agreement" },
-    ru: { accent: "Акцентный цвет", density: "Плотность интерфейса", compact: "Компактная", standard: "Стандартная", spacious: "Просторная", effects: "Визуальные эффекты", quiet: "Минимальные", balanced: "Сбалансированные", atmosphere: "Атмосфера", forest: "Лес", oled: "OLED-чёрная", cloud: "Облачная синхронизация", backdrop: "Атмосфера и музыка", agreement: "Пользовательское соглашение" },
-    az: { accent: "Vurğu rəngi", density: "İnterfeys sıxlığı", compact: "Yığcam", standard: "Standart", spacious: "Geniş", effects: "Vizual effektlər", quiet: "Sakit", balanced: "Balanslı", atmosphere: "Atmosfer", forest: "Meşə", oled: "OLED qara", cloud: "Bulud sinxronizasiyası", backdrop: "Atmosfer və musiqi", agreement: "İstifadəçi razılaşması" },
-    tr: { accent: "Vurgu rengi", density: "Arayüz yoğunluğu", compact: "Kompakt", standard: "Standart", spacious: "Geniş", effects: "Görsel efektler", quiet: "Sakin", balanced: "Dengeli", atmosphere: "Atmosfer", forest: "Orman", oled: "OLED siyahı", cloud: "Bulut eşitleme", backdrop: "Atmosfer ve müzik", agreement: "Kullanıcı sözleşmesi" }
+    en: { shortcuts: "Keyboard shortcuts", accent: "Accent color", density: "Interface density", compact: "Compact", standard: "Standard", spacious: "Spacious", effects: "Visual effects", quiet: "Quiet", balanced: "Balanced", atmosphere: "Atmosphere", forest: "Forest", oled: "OLED black", cloud: "Cloud sync", backdrop: "Atmosphere & music", agreement: "User agreement" },
+    ru: { shortcuts: "Горячие клавиши", accent: "Акцентный цвет", density: "Плотность интерфейса", compact: "Компактная", standard: "Стандартная", spacious: "Просторная", effects: "Визуальные эффекты", quiet: "Минимальные", balanced: "Сбалансированные", atmosphere: "Атмосфера", forest: "Лес", oled: "OLED-чёрная", cloud: "Облачная синхронизация", backdrop: "Атмосфера и музыка", agreement: "Пользовательское соглашение" },
+    az: { shortcuts: "Klaviatura qısayolları", accent: "Vurğu rəngi", density: "İnterfeys sıxlığı", compact: "Yığcam", standard: "Standart", spacious: "Geniş", effects: "Vizual effektlər", quiet: "Sakit", balanced: "Balanslı", atmosphere: "Atmosfer", forest: "Meşə", oled: "OLED qara", cloud: "Bulud sinxronizasiyası", backdrop: "Atmosfer və musiqi", agreement: "İstifadəçi razılaşması" },
+    tr: { shortcuts: "Klavye kısayolları", accent: "Vurgu rengi", density: "Arayüz yoğunluğu", compact: "Kompakt", standard: "Standart", spacious: "Geniş", effects: "Görsel efektler", quiet: "Sakin", balanced: "Dengeli", atmosphere: "Atmosfer", forest: "Orman", oled: "OLED siyahı", cloud: "Bulut eşitleme", backdrop: "Atmosfer ve müzik", agreement: "Kullanıcı sözleşmesi" }
   })[langCode()] || {};
   const addPreference = (label, options, selected, apply) => {
     const field = make("label", "linka-field");
@@ -905,13 +968,15 @@ function showSettings() {
   dialog.panel.append(actions);
 
   const utilityActions = make("div", "linka-actions");
+  const shortcutSettings = button(preferenceLabels.shortcuts || "Keyboard shortcuts", "linka-button linka-button-secondary");
+  shortcutSettings.addEventListener("click", () => { dialog.close(); setTimeout(showKeyboardShortcuts, 190); });
   const cloudSettings = button(preferenceLabels.cloud || "Cloud sync", "linka-button linka-button-secondary");
   cloudSettings.addEventListener("click", () => { dialog.close(); window.dispatchEvent(new Event("linka:open-cloud-settings")); });
   const atmosphereSettings = button(preferenceLabels.backdrop || "Atmosphere & music", "linka-button linka-button-secondary");
   atmosphereSettings.addEventListener("click", () => { dialog.close(); window.dispatchEvent(new Event("linka:open-atmosphere-settings")); });
   const agreementSettings = button(preferenceLabels.agreement || "User agreement", "linka-button linka-button-secondary");
   agreementSettings.addEventListener("click", () => { dialog.close(); window.dispatchEvent(new Event("linka:open-agreement")); });
-  utilityActions.append(cloudSettings, atmosphereSettings, agreementSettings);
+  utilityActions.append(shortcutSettings, cloudSettings, atmosphereSettings, agreementSettings);
   dialog.panel.append(utilityActions);
 
   showNotificationSettings(dialog.panel);
