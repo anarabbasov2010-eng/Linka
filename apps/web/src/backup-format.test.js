@@ -21,6 +21,7 @@ test("portable backup round-trips captures, documents, deletion markers and safe
       "linka.accent": "violet",
       "linka.language.v1": "az",
       "linka.sortOrder.v1": "title",
+      "linka.closeToTray": "false",
       "linka.cloud.session.v1": "must-not-be-exported",
       unknownSetting: "must-not-be-exported"
     },
@@ -36,7 +37,8 @@ test("portable backup round-trips captures, documents, deletion markers and safe
     "linka.theme": "light",
     "linka.accent": "violet",
     "linka.language.v1": "az",
-    "linka.sortOrder.v1": "title"
+    "linka.sortOrder.v1": "title",
+    "linka.closeToTray": "false"
   });
   assert.deepEqual(parseLinkaBackup(backup), backup);
 });
@@ -47,6 +49,7 @@ test("backup preference import rejects invalid values and private session keys",
     "linka.effects": "atmosphere",
     "linka.reduceMotion": "false",
     "linka.sortOrder.v1": "invalid",
+    "linka.closeToTray": "maybe",
     "linka.cloud.session.v1": "secret"
   }), {
     "linka.effects": "atmosphere",
