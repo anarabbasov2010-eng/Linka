@@ -247,7 +247,8 @@ function formatDate(value) {
   catch { return "Saved"; }
 }
 function persist() {
-  if (!getCaptureRecovery()) {
+  const recoveryState = getCaptureRecovery();
+  if (!recoveryState || recoveryState.acknowledged) {
     const previousState = persistedCaptures.map(item => ({ ...item, tags: [...(item.tags || [])] }));
     void saveAutomaticBackupSnapshot(previousState).catch(error => {
       console.warn("Automatic Linka backup snapshot was not saved", error);
@@ -1212,13 +1213,15 @@ async function storeBackupHistorySnapshot(captureSnapshot = captures, reason = "
     let lastAttempt = 0;
     try { lastAttempt = Number(localStorage.getItem(BACKUP_HISTORY_LAST_ATTEMPT_KEY) || 0); } catch {}
     if (lastAttempt && now - lastAttempt < BACKUP_HISTORY_INTERVAL_MS) return { saved: false, reason: "not-due" };
-    try { localStorage.setItem(BACKUP_HISTORY_LAST_ATTEMPT_KEY, String(now)); } catch {}
   }
 
   backupHistoryBusy = true;
   try {
     const backup = await buildLinkaBackup(captureSnapshot);
     if (!backup.captures.length && !backup.documents.length) return { saved: false, reason: "empty" };
+    if (automatic) {
+      try { localStorage.setItem(BACKUP_HISTORY_LAST_ATTEMPT_KEY, String(now)); } catch {}
+    }
     const bytes = new Blob([JSON.stringify(backup)]).size;
     if (bytes > MAX_AUTOMATIC_SNAPSHOT_BYTES) return { saved: false, reason: "too-large", bytes };
     const snapshot = {
@@ -1245,7 +1248,7 @@ async function saveAutomaticBackupSnapshot(previousCaptures) {
 }
 
 function downloadBackupPayload(backup, filename = "linka-backup.json") {
-  const blob = new Blob([JSON.stringify(backup, null, 2) + "\\n"], { type: "application/json;charset=utf-8" });
+  const blob = new Blob([JSON.stringify(backup, null, 2) + "\n"], { type: "application/json;charset=utf-8" });
   const objectUrl = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = objectUrl;
@@ -1617,6 +1620,7 @@ list.addEventListener("click",async event=>{
   else if(action==="edit"){editingId=id;draft.value=item.text;tagsDraft.value=(item.tags||[]).join(", ");collectionDraft.value=item.collection||"";previewTitleDraft.value=item.previewTitle||"";previewDescriptionDraft.value=item.previewDescription||"";previewImageDraft.value=item.previewImageUrl||"";const previewDetails=document.querySelector(".capture-preview-details");if(previewDetails)previewDetails.open=Boolean(item.previewTitle||item.previewDescription||item.previewImageUrl);composeLabel.textContent="Edit capture";saveButton.textContent="Save changes ↗";saveButton.disabled=false;saveCaptureMetadataDraft();draft.focus();window.scrollTo({top:0,behavior:"smooth"});}
   else if(action==="copy"){try{await navigator.clipboard.writeText(item.text);say("Скопировано");}catch{draft.value=item.text;draft.focus();draft.select();say("Text selected for manual copying");}}
 });
+$("#backup-history-button").addEventListener("click", () => { void showBackupHistory(); });
 $("#export-button").addEventListener("click", async () => {
   if (($("#export-format")?.value || "json") === "json") {
     await downloadLinkaBackup();
