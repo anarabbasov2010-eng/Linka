@@ -200,7 +200,7 @@ function showCaptureRecoveryNotice() {
   const copy = ({
     ru: {
       title: "Не удалось прочитать библиотеку Linka",
-      body: "Исходные данные не заменены. Запись новых изменений заблокирована, чтобы не перезаписать библиотеку. Сначала экспортируй повреждённые данные для восстановления.",
+      body: "Исходные данные не заменены. Запись новых изменений заблокирована, чтобы не перезаписать библиотеку. Экспортируй повреждённые данные или восстанови локальную резервную копию; исходник останется сохранён отдельно.",
       export: "Экспортировать исходные данные", restoreLatest: "Восстановить последнюю резервную копию", fresh: "Начать с пустой библиотекой",
       confirmRestoreLatest: "Восстановить последнюю локальную резервную копию? Повреждённые исходные данные останутся сохранены на этом устройстве.",
       restoreLatestDone: "Локальная резервная копия восстановлена. Повреждённые исходные данные сохранены отдельно.",
@@ -213,7 +213,7 @@ function showCaptureRecoveryNotice() {
     },
     en: {
       title: "Linka could not read the library",
-      body: "The original data has not been replaced. Writes are paused to prevent overwriting the library. Export the damaged data before continuing.",
+      body: "The original data has not been replaced. Writes are paused to prevent overwriting the library. Export the damaged data or restore a local backup; the original remains preserved separately.",
       export: "Export original data", restoreLatest: "Restore latest local backup", fresh: "Start with an empty library",
       confirmRestoreLatest: "Restore the newest local backup? The damaged original will remain preserved on this device.",
       restoreLatestDone: "Local backup restored. The damaged original remains preserved separately.",
@@ -226,7 +226,7 @@ function showCaptureRecoveryNotice() {
     },
     az: {
       title: "Linka kitabxananı oxuya bilmədi",
-      body: "Orijinal məlumatlar dəyişdirilməyib. Kitabxananın üzərinə yazılmaması üçün yeni yazılar dayandırılıb. Davam etməzdən əvvəl zədələnmiş məlumatları ixrac et.",
+      body: "Orijinal məlumatlar dəyişdirilməyib. Kitabxananın üzərinə yazılmaması üçün yeni yazılar dayandırılıb. Zədələnmiş məlumatları ixrac et və ya yerli ehtiyat nüsxəni bərpa et; orijinal ayrıca saxlanacaq.",
       export: "Orijinal məlumatları ixrac et", restoreLatest: "Son ehtiyat nüsxəni bərpa et", fresh: "Boş kitabxana yarat",
       confirmRestoreLatest: "Ən son yerli ehtiyat nüsxə bərpa edilsin? Zədələnmiş orijinal məlumatlar bu cihazda ayrıca saxlanılacaq.",
       restoreLatestDone: "Yerli ehtiyat nüsxə bərpa edildi. Zədələnmiş orijinal məlumatlar ayrıca saxlanıldı.",
@@ -239,7 +239,7 @@ function showCaptureRecoveryNotice() {
     },
     tr: {
       title: "Linka kitaplığı okuyamadı",
-      body: "Özgün veriler değiştirilmedi. Kitaplığın üzerine yazılmasını önlemek için yeni kayıtlar duraklatıldı. Devam etmeden önce bozuk verileri dışa aktar.",
+      body: "Özgün veriler değiştirilmedi. Kitaplığın üzerine yazılmasını önlemek için yeni kayıtlar duraklatıldı. Bozuk verileri dışa aktar veya yerel yedeği geri yükle; özgün veriler ayrı olarak korunacak.",
       export: "Özgün verileri dışa aktar", restoreLatest: "En son yerel yedeği geri yükle", fresh: "Boş kitaplık oluştur",
       confirmRestoreLatest: "En yeni yerel yedek geri yüklensin mi? Bozuk özgün veriler bu cihazda ayrı olarak korunacak.",
       restoreLatestDone: "Yerel yedek geri yüklendi. Bozuk özgün veriler ayrı olarak korundu.",
@@ -252,7 +252,7 @@ function showCaptureRecoveryNotice() {
     }
   })[language] || {
     title: "Linka could not read the library",
-    body: "The original data has not been replaced. Writes are paused to prevent overwriting the library. Export the damaged data before continuing.",
+    body: "The original data has not been replaced. Writes are paused to prevent overwriting the library. Export the damaged data or restore a local backup; the original remains preserved separately.",
     export: "Export original data", restoreLatest: "Restore latest local backup", fresh: "Start with an empty library",
       confirmRestoreLatest: "Restore the newest local backup? The damaged original will remain preserved on this device.",
       restoreLatestDone: "Local backup restored. The damaged original remains preserved separately.",
@@ -329,7 +329,7 @@ function showCaptureRecoveryNotice() {
       say((result.partial ? captureUiText("backupPartial") : copy.restoreLatestDone) + detail);
     } catch (error) {
       console.error("Could not restore latest backup after capture-store corruption", error);
-      say(error?.message || copy.restoreLatestFailed);
+      say(copy.restoreLatestFailed);
     } finally {
       restoreLatestButton.disabled = false;
     }
