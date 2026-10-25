@@ -76,6 +76,14 @@ export function writeEmergencyDocumentDraft(storage, document, now = Date.now())
   }
 }
 
+export function clearEmergencyDocumentDraftIfMatches(storage = globalThis.localStorage, document) {
+  const pending = readEmergencyDocumentDraft(storage);
+  if (!pending || !document || typeof document.id !== "string" || typeof document.text !== "string") return false;
+  const title = String(document.title || "").trim().slice(0, 180);
+  if (pending.id !== document.id || pending.title !== title || pending.text !== document.text) return false;
+  return clearEmergencyDocumentDraft(storage, document.id);
+}
+
 export function clearEmergencyDocumentDraft(storage = globalThis.localStorage, expectedDocumentId = "") {
   try {
     const raw = storage?.getItem(EMERGENCY_DOCUMENT_DRAFT_KEY);
