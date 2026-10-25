@@ -452,7 +452,7 @@ function render() {
       selectItem.setAttribute("aria-pressed", String(selectedIds.has(item.id)));
       head.append(kind, selectItem, makeAction(captureUiText(item.pinned ? "unpin" : "pin"), "pin", item.id));
     } else {
-      head.append(kind, makeAction(item.pinned ? "Unpin" : "Pin", "pin", item.id));
+      head.append(kind, makeAction(captureUiText(item.pinned ? "unpin" : "pin"), "pin", item.id));
     }
     const body = document.createElement("p");
     body.className = "item-text" + (isLink(item.text) ? " link" : "");
