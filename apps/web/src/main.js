@@ -1182,7 +1182,7 @@ function backupHistoryText(key) {
       deleted: "Snapshot deleted.", failed: "Could not save or read backup history. Use Export to create a full JSON backup.",
       tooLarge: "This library is too large for the local snapshot history. Export a full JSON backup instead.",
       unavailable: "Local backup history requires IndexedDB in this browser or app.",
-      busy: "A backup snapshot is already being written."
+      busy: "A backup snapshot is already being written.", safetySnapshotFailed: "Restore cancelled: Linka could not save the current state first. Export a full JSON backup or free storage, then retry."
     },
     ru: {
       title: "История локальных копий", subtitle: "Снимки хранятся на этом устройстве. Для дополнительной защиты сохраняй полную JSON-копию.",
@@ -1194,7 +1194,7 @@ function backupHistoryText(key) {
       deleted: "Снимок удалён.", failed: "Не удалось сохранить или прочитать историю копий. Используй «Экспорт» для полной JSON-копии.",
       tooLarge: "Библиотека слишком велика для истории локальных снимков. Экспортируй полную JSON-копию.",
       unavailable: "История локальных копий требует IndexedDB в браузере или приложении.",
-      busy: "Сейчас уже сохраняется резервный снимок."
+      busy: "Сейчас уже сохраняется резервный снимок.", safetySnapshotFailed: "Восстановление отменено: сначала не удалось сохранить текущее состояние. Экспортируй полную JSON-копию или освободи место и повтори попытку."
     },
     az: {
       title: "Yerli ehtiyat nüsxə tarixçəsi", subtitle: "Sənədlər bu cihazda saxlanılır. Əlavə təhlükəsizlik üçün tam JSON ehtiyat nüsxəsi yarat.",
@@ -1206,7 +1206,7 @@ function backupHistoryText(key) {
       deleted: "Snapshot silindi.", failed: "Ehtiyat nüsxə tarixçəsini saxlamaq və ya oxumaq olmadı. Tam JSON nüsxəsi üçün ixracdan istifadə et.",
       tooLarge: "Kitabxana yerli snapshot tarixçəsi üçün çox böyükdür. Tam JSON nüsxəsini ixrac et.",
       unavailable: "Yerli ehtiyat nüsxə tarixçəsi IndexedDB tələb edir.",
-      busy: "Hazırda başqa ehtiyat snapshot yazılır."
+      busy: "Hazırda başqa ehtiyat snapshot yazılır.", safetySnapshotFailed: "Bərpa ləğv edildi: əvvəlcə cari vəziyyəti saxlamaq mümkün olmadı. Tam JSON nüsxəsini ixrac et və ya yaddaşda yer boşalt."
     },
     tr: {
       title: "Yerel yedek geçmişi", subtitle: "Anlık görüntüler bu cihazda kalır. Ek güvenlik için tam JSON yedeği indir.",
@@ -1218,7 +1218,7 @@ function backupHistoryText(key) {
       deleted: "Görüntü silindi.", failed: "Yedek geçmişi okunamadı veya kaydedilemedi. Tam JSON yedeği için Dışa Aktar'ı kullan.",
       tooLarge: "Kitaplık yerel yedek geçmişi için çok büyük. Tam JSON yedeğini dışa aktar.",
       unavailable: "Yerel yedek geçmişi IndexedDB gerektirir.",
-      busy: "Başka bir yedek görüntüsü şu anda kaydediliyor."
+      busy: "Başka bir yedek görüntüsü şu anda kaydediliyor.", safetySnapshotFailed: "Geri yükleme iptal edildi: önce mevcut durum kaydedilemedi. Tam JSON yedeğini dışa aktar veya depolama alanı açıp yeniden dene."
     }
   };
   return (copy[language] || copy.en)[key] || copy.en[key] || key;
@@ -1295,6 +1295,10 @@ function downloadBackupPayload(backup, filename = "linka-backup.json") {
 }
 
 async function restoreBackupHistorySnapshot(backup) {
+  const safetySnapshot = await storeBackupHistorySnapshot(captures, "before-restore", false);
+  if (!safetySnapshot.saved && safetySnapshot.reason !== "empty") {
+    throw new Error(backupHistoryText("safetySnapshotFailed"));
+  }
   const validated = parseLinkaBackup(backup);
   if (!validated) throw new Error("Invalid Linka backup snapshot.");
   const normalized = validated.captures
