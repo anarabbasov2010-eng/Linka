@@ -1402,9 +1402,13 @@ async function inspectLinkaStorage() {
   const duplicateKeys = new Map();
   let duplicateCaptures = 0;
   for (const item of captures) {
-    if (!item || !String(item.text || "").trim()) { blankTexts += 1; continue; }
-    if (ids.has(item.id)) duplicateIds += 1;
-    ids.add(item.id);
+    if (!item) { blankTexts += 1; continue; }
+    const id = item.id == null ? "" : String(item.id).trim();
+    if (id) {
+      if (ids.has(id)) duplicateIds += 1;
+      ids.add(id);
+    }
+    if (!String(item.text || "").trim()) { blankTexts += 1; continue; }
     if (item.trashedAt) continue;
     const key = normalizeDuplicateKey(item.text);
     if (!key) continue;
