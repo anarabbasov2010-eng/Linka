@@ -1,5 +1,6 @@
 import { loadCaptures, saveCaptures, makeCapture, normalizeCapture, normalizePreviewImageUrl, visibleCaptures, sortCaptures, findDuplicateCapture, normalizeDuplicateKey, parseSearchQuery, getCaptureRecovery, startFreshCaptureLibrary, reopenCaptureRecovery } from "./store.js";
 import { splitSearchHighlights } from "./search-highlight.js";
+import { appendClipboardText } from "./clipboard-capture.js";
 import { filterPaletteCommands } from "./command-palette.js";
 import { initLinkaExperience, setLanguage } from "./experience.js";
 import { initVisualSystem, setLinkaTheme, setLinkaAccent, setLinkaDensity, setLinkaEffects } from "./visual-system.js";
@@ -32,6 +33,13 @@ const previewTitleDraft = $("#capture-preview-title");
 const previewDescriptionDraft = $("#capture-preview-description");
 const previewImageDraft = $("#capture-preview-image");
 const saveButton = $("#save-button");
+const clipboardPasteButton = document.createElement("button");
+clipboardPasteButton.type = "button";
+clipboardPasteButton.className = "ghost paste-clipboard-button";
+clipboardPasteButton.textContent = clipboardCaptureUiText("paste");
+clipboardPasteButton.setAttribute("aria-label", clipboardCaptureUiText("paste"));
+clipboardPasteButton.title = clipboardCaptureUiText("pasteHelp");
+saveButton.insertAdjacentElement("beforebegin", clipboardPasteButton);
 const list = $("#capture-list");
 const search = $("#search");
 const sortOrder = $("#sort-order");
@@ -92,6 +100,52 @@ const QUICK_DRAFT_COLLECTION_KEY = "linka.captureDraft.collection.v1";
 const QUICK_DRAFT_PREVIEW_TITLE_KEY = "linka.captureDraft.previewTitle.v1";
 const QUICK_DRAFT_PREVIEW_DESCRIPTION_KEY = "linka.captureDraft.previewDescription.v1";
 const QUICK_DRAFT_PREVIEW_IMAGE_KEY = "linka.captureDraft.previewImage.v1";
+function clipboardCaptureUiText(key) {
+  const language = (() => {
+    try { return (localStorage.getItem("linka.language.v1") || "en").toLowerCase().slice(0, 2); }
+    catch { return "en"; }
+  })();
+  const copy = {
+    en: {
+      paste: "Paste clipboard",
+      pasteHelp: "Read the clipboard only after you press this button; Linka does not monitor it.",
+      clipboardEmpty: "The clipboard has no text to add.",
+      clipboardAccessFailed: "Clipboard access failed. You can paste directly into the capture field instead.",
+      clipboardPasted: "Clipboard text added to the draft. Review it before saving.",
+      clipboardTruncated: "Clipboard text was shortened to fit the 100,000-character limit.",
+      clipboardLimit: "This draft is already at the 100,000-character limit."
+    },
+    ru: {
+      paste: "Вставить из буфера",
+      pasteHelp: "Буфер читается только после нажатия. Linka не отслеживает его в фоне.",
+      clipboardEmpty: "В буфере нет текста для добавления.",
+      clipboardAccessFailed: "Не удалось прочитать буфер. Можно вставить текст прямо в поле сохранения.",
+      clipboardPasted: "Текст из буфера добавлен в черновик. Проверь его перед сохранением.",
+      clipboardTruncated: "Текст из буфера сокращён до лимита в 100 000 символов.",
+      clipboardLimit: "Черновик уже достиг лимита в 100 000 символов."
+    },
+    az: {
+      paste: "Mübadilə buferindən əlavə et",
+      pasteHelp: "Bufer yalnız düyməni basdıqda oxunur; Linka onu arxa planda izləmir.",
+      clipboardEmpty: "Buferdə əlavə ediləcək mətn yoxdur.",
+      clipboardAccessFailed: "Buferi oxumaq olmadı. Mətni birbaşa saxlama sahəsinə yapışdıra bilərsən.",
+      clipboardPasted: "Buferdəki mətn qaralamaya əlavə edildi. Saxlamazdan əvvəl yoxla.",
+      clipboardTruncated: "Mətn 100 000 simvol limitinə uyğun qısaldıldı.",
+      clipboardLimit: "Qaralama artıq 100 000 simvol limitinə çatıb."
+    },
+    tr: {
+      paste: "Panodan ekle",
+      pasteHelp: "Pano yalnızca bu düğmeye bastığında okunur; Linka arka planda pano takibi yapmaz.",
+      clipboardEmpty: "Panoda eklenecek metin yok.",
+      clipboardAccessFailed: "Panoya erişilemedi. Metni doğrudan kayıt alanına yapıştırabilirsin.",
+      clipboardPasted: "Pano metni taslağa eklendi. Kaydetmeden önce gözden geçir.",
+      clipboardTruncated: "Metin, 100.000 karakter sınırına uyacak şekilde kısaltıldı.",
+      clipboardLimit: "Bu taslak zaten 100.000 karakter sınırında."
+    }
+  };
+  return (copy[language] || copy.en)[key] || copy.en[key] || key;
+}
+
 function parseTagInput(value) {
   return String(value || "").split(/[,;\n]+/).map(tag => tag.trim().replace(/^#+/, "").replace(/\s+/g, " ").slice(0, 40)).filter(Boolean).slice(0, 24);
 }
@@ -1211,6 +1265,32 @@ async function checkWindowsInstaller(statusLine, downloadLink) {
     statusLine.textContent = error?.message || "Не удалось проверить обновления Windows.";
   }
 }
+
+clipboardPasteButton.addEventListener("click", async () => {
+  if (typeof navigator.clipboard?.readText !== "function") {
+    say(clipboardCaptureUiText("clipboardAccessFailed"));
+    return;
+  }
+  clipboardPasteButton.disabled = true;
+  try {
+    const clipboardText = await navigator.clipboard.readText();
+    const result = appendClipboardText(draft.value, clipboardText, Number(draft.maxLength) || 100000);
+    if (!result.ok) {
+      say(clipboardCaptureUiText(result.reason === "empty" ? "clipboardEmpty" : "clipboardLimit"));
+      return;
+    }
+    draft.value = result.text;
+    draft.dispatchEvent(new Event("input", { bubbles: true }));
+    draft.focus();
+    draft.setSelectionRange(draft.value.length, draft.value.length);
+    say(clipboardCaptureUiText(result.truncated ? "clipboardTruncated" : "clipboardPasted"));
+  } catch (error) {
+    console.warn("Linka clipboard paste was unavailable", error);
+    say(clipboardCaptureUiText("clipboardAccessFailed"));
+  } finally {
+    clipboardPasteButton.disabled = false;
+  }
+});
 
 draft.addEventListener("input",()=>{
   saveButton.disabled=!draft.value.trim();
