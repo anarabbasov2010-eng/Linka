@@ -122,7 +122,7 @@ This file is the persistent project checklist for the Linka improvements audit. 
 
 - [~] Provide global search across captures and local text documents.
 - [~] Support filters and operators such as type, tag, collection, read-later, pinned, domain and date.
-- [x] Highlight matches in capture text, preview titles and descriptions using safe text nodes; literal markup is never injected as HTML.
+- [x] Highlight matches in capture cards and global-search results (titles, descriptions and document excerpts) using safe text nodes; literal markup is never injected as HTML.
 - [ ] Add fuzzy matching and language-aware morphology.
 - [ ] Search extracted PDF text and offline snapshots.
 - [~] Keep named saved searches and a bounded local search history.
