@@ -1,4 +1,4 @@
-import { loadCaptures, saveCaptures, makeCapture, normalizeCapture, visibleCaptures, sortCaptures, findDuplicateCapture, getCaptureRecovery, startFreshCaptureLibrary } from "./store.js";
+import { loadCaptures, saveCaptures, makeCapture, normalizeCapture, normalizePreviewImageUrl, visibleCaptures, sortCaptures, findDuplicateCapture, getCaptureRecovery, startFreshCaptureLibrary } from "./store.js";
 import { initLinkaExperience, setLanguage } from "./experience.js";
 import { initVisualSystem, setLinkaTheme, setLinkaAccent, setLinkaDensity, setLinkaEffects } from "./visual-system.js";
 import { initLinkaAtmosphere, openAtmosphereSettings } from "./atmosphere.js";
@@ -86,18 +86,6 @@ const QUICK_DRAFT_PREVIEW_DESCRIPTION_KEY = "linka.captureDraft.previewDescripti
 const QUICK_DRAFT_PREVIEW_IMAGE_KEY = "linka.captureDraft.previewImage.v1";
 function parseTagInput(value) {
   return String(value || "").split(/[,;\n]+/).map(tag => tag.trim().replace(/^#+/, "").replace(/\s+/g, " ").slice(0, 40)).filter(Boolean).slice(0, 24);
-}
-function normalizePreviewImageUrl(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  if (raw.length > 2048) return null;
-  try {
-    const url = new URL(raw);
-    if (url.protocol !== "https:" || url.username || url.password) return null;
-    return url.href;
-  } catch {
-    return null;
-  }
 }
 function saveCaptureMetadataDraft() {
   try {
