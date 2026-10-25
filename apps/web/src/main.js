@@ -155,7 +155,27 @@ async function registerNativeDesktopEvents() {
   try {
     await Promise.all([
       listenTauriEvent("linka-global-capture", () => focusQuickCaptureFromNative()),
-      listenTauriEvent("linka-tray-quick-capture", () => focusQuickCaptureFromNative())
+      listenTauriEvent("linka-tray-quick-capture", () => focusQuickCaptureFromNative()),
+      listenTauriEvent("linka-menu-action", event => {
+        const action = String(event.payload || "");
+        if (action === "quick-capture") {
+          focusQuickCaptureFromNative();
+        } else if (action === "new-document") {
+          document.dispatchEvent(new Event("linka:open-documents"));
+        } else if (action === "export-backup") {
+          const format = $("#export-format");
+          if (format) format.value = "json";
+          $("#export-button")?.click();
+        } else if (action === "search") {
+          $("#search-space-button")?.click();
+        } else if (action === "backup-history") {
+          $("#backup-history-button")?.click();
+        } else if (action === "settings") {
+          $("#settings-button")?.click();
+        } else if (action === "shortcuts") {
+          window.dispatchEvent(new Event("linka:open-keyboard-shortcuts"));
+        }
+      })
     ]);
   } catch (error) {
     console.warn("Could not register Linka native desktop event listeners", error);
