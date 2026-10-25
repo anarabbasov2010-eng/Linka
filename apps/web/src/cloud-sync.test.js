@@ -46,6 +46,70 @@ test("cloud sync reports an actionable message when the server rejects an oversi
   }
 });
 
+test("cloud sync retries a stale write and merges the concurrent device's newer records", async () => {
+  const hadStorage = Object.prototype.hasOwnProperty.call(globalThis, "localStorage");
+  const previousStorage = globalThis.localStorage;
+  const previousFetch = globalThis.fetch;
+  const storage = memoryStorage();
+  storage.setItem("linka.cloud.config.v1", JSON.stringify({
+    url: "https://example.supabase.co",
+    key: "public-test-key"
+  }));
+  storage.setItem("linka.cloud.session.v1", JSON.stringify({
+    userId: "user-test",
+    email: "test@example.com",
+    accessToken: "test-access-token",
+    refreshToken: "test-refresh-token",
+    expiresAt: Date.now() + 60 * 60 * 1000
+  }));
+  globalThis.localStorage = storage;
+
+  const firstRevision = "2026-10-25T08:00:00+00:00";
+  const secondRevision = "2026-10-25T08:00:01+00:00";
+  const remoteBase = { id: "remote-base", text: "Remote base", createdAt: 1, updatedAt: 1 };
+  const concurrent = { id: "concurrent", text: "Added on another device", createdAt: 2, updatedAt: 2 };
+  let reads = 0;
+  let patches = 0;
+  let finalPatchBody = null;
+  globalThis.fetch = async (url, options = {}) => {
+    if (options.method === "PATCH") {
+      patches += 1;
+      if (patches === 1) {
+        return new Response("[]", { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      finalPatchBody = JSON.parse(options.body);
+      assert.match(String(url), /updated_at=eq\./);
+      return new Response(JSON.stringify([{ user_id: "user-test", updated_at: secondRevision }]), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    if (options.method === "GET" || !options.method) {
+      reads += 1;
+      const captures = reads === 1 ? [remoteBase] : [remoteBase, concurrent];
+      return new Response(JSON.stringify([{
+        data: { captures, deletedIds: [] },
+        updated_at: reads === 1 ? firstRevision : secondRevision
+      }]), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    throw new Error("Unexpected cloud request method: " + options.method);
+  };
+
+  try {
+    const local = [{ id: "local", text: "Local thought", createdAt: 3, updatedAt: 3 }];
+    const result = await syncCloudCaptures(local, new Set(), null);
+    assert.equal(reads, 2);
+    assert.equal(patches, 2);
+    assert.deepEqual(new Set(result.captures.map(item => item.id)), new Set(["local", "remote-base", "concurrent"]));
+    assert.deepEqual(new Set(finalPatchBody.data.captures.map(item => item.id)), new Set(["local", "remote-base", "concurrent"]));
+    assert.equal(finalPatchBody.data.deletedIds.length, 0);
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (hadStorage) globalThis.localStorage = previousStorage;
+    else delete globalThis.localStorage;
+  }
+});
+
 test("cloud merge picks the newest copy, keeps pins, and orders newest first", () => {
   const remote = [
     { id: "same", text: "old", createdAt: 1, updatedAt: 10, pinned: false },
