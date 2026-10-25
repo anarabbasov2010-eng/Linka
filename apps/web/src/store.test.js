@@ -69,6 +69,20 @@ test("recovery gate can only be re-opened when preserved source exists and stora
   assert.equal(reopenCaptureRecovery(blocked), false);
 });
 
+test("malformed records inside a valid JSON array are preserved instead of silently dropped", () => {
+  const storage = memoryStorage();
+  const raw = JSON.stringify([
+    { id: "good", text: "valid record", createdAt: 1 },
+    { id: "broken", text: "   ", createdAt: 2 }
+  ]);
+  storage.setItem(STORAGE_KEY, raw);
+
+  assert.deepEqual(loadCaptures(storage), []);
+  assert.equal(storage.getItem(STORAGE_KEY), raw);
+  assert.equal(getCaptureRecovery(storage).raw, raw);
+  assert.equal(saveCaptures([makeCapture("replacement")], storage), false);
+});
+
 test("a stale acknowledged recovery record cannot mask a newer storage corruption", () => {
   const storage = memoryStorage();
   storage.setItem(STORAGE_KEY, "{first damaged source");
