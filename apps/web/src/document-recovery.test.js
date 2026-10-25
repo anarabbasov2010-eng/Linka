@@ -5,7 +5,8 @@ import {
   MAX_EMERGENCY_DOCUMENT_DRAFT_CHARS,
   readEmergencyDocumentDraft,
   writeEmergencyDocumentDraft,
-  clearEmergencyDocumentDraft
+  clearEmergencyDocumentDraft,
+  clearEmergencyDocumentDraftIfMatches
 } from "./document-recovery.js";
 
 function memoryStorage(initial = {}) {
@@ -54,6 +55,17 @@ test("clearing a recovery draft requires a matching document id when specified",
   assert.equal(clearEmergencyDocumentDraft(storage, "doc-2"), false);
   assert.equal(readEmergencyDocumentDraft(storage)?.text, "keep");
   assert.equal(clearEmergencyDocumentDraft(storage, "doc-1"), true);
+  assert.equal(readEmergencyDocumentDraft(storage), null);
+});
+
+test("emergency draft clears only after the matching text has actually been saved", () => {
+  const storage = memoryStorage();
+  writeEmergencyDocumentDraft(storage, { id: "doc-1", title: "Draft", text: "unsaved text", updatedAt: 1 }, 2);
+  assert.equal(clearEmergencyDocumentDraftIfMatches(storage, { id: "doc-1", title: "Draft", text: "saved old text" }), false);
+  assert.equal(readEmergencyDocumentDraft(storage)?.text, "unsaved text");
+  assert.equal(clearEmergencyDocumentDraftIfMatches(storage, { id: "doc-2", title: "Draft", text: "unsaved text" }), false);
+  assert.equal(readEmergencyDocumentDraft(storage)?.id, "doc-1");
+  assert.equal(clearEmergencyDocumentDraftIfMatches(storage, { id: "doc-1", title: "Draft", text: "unsaved text" }), true);
   assert.equal(readEmergencyDocumentDraft(storage), null);
 });
 
