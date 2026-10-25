@@ -5,6 +5,7 @@ import {
   MAX_AUTOMATIC_SNAPSHOT_BYTES,
   trimBackupSnapshots,
   findLatestUsableBackupSnapshot,
+  findUsableBackupSnapshots,
   isBackupHistoryAvailable,
   saveBackupSnapshot
 } from "./backup-history.js";
@@ -25,7 +26,7 @@ test("backup history retention keeps only the newest valid snapshots without mut
   assert.equal(MAX_AUTOMATIC_SNAPSHOT_BYTES, 12 * 1024 * 1024);
 });
 
-test("latest recoverable backup skips empty snapshots and prefers newest data", () => {
+test("recoverable backup candidates are newest-first and skip empty or invalid metadata", () => {
   const snapshots = [
     { id: "empty-newest", createdAt: 50, captureCount: 0, documentCount: 0 },
     { id: "older-captures", createdAt: 40, captureCount: 12, documentCount: 0 },
@@ -33,8 +34,9 @@ test("latest recoverable backup skips empty snapshots and prefers newest data", 
     { id: "invalid-date", createdAt: "invalid", captureCount: 100, documentCount: 0 },
     { createdAt: 60, captureCount: 100, documentCount: 0 }
   ];
+  assert.deepEqual(findUsableBackupSnapshots(snapshots).map(item => item.id), ["newer-documents", "older-captures"]);
   assert.equal(findLatestUsableBackupSnapshot(snapshots)?.id, "newer-documents");
-  assert.equal(findLatestUsableBackupSnapshot([{ id: "empty", createdAt: 10, captureCount: 0, documentCount: 0 }]), null);
+  assert.deepEqual(findUsableBackupSnapshots([{ id: "empty", createdAt: 10, captureCount: 0, documentCount: 0 }]), []);
   assert.equal(findLatestUsableBackupSnapshot(null), null);
 });
 
