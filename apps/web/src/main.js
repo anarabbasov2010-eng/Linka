@@ -1,4 +1,4 @@
-import { loadCaptures, saveCaptures, makeCapture, normalizeCapture, normalizePreviewImageUrl, visibleCaptures, sortCaptures, findDuplicateCapture, getCaptureRecovery, startFreshCaptureLibrary } from "./store.js";
+import { loadCaptures, saveCaptures, makeCapture, normalizeCapture, normalizePreviewImageUrl, visibleCaptures, sortCaptures, findDuplicateCapture, normalizeDuplicateKey, getCaptureRecovery, startFreshCaptureLibrary } from "./store.js";
 import { initLinkaExperience, setLanguage } from "./experience.js";
 import { initVisualSystem, setLinkaTheme, setLinkaAccent, setLinkaDensity, setLinkaEffects } from "./visual-system.js";
 import { initLinkaAtmosphere, openAtmosphereSettings } from "./atmosphere.js";
@@ -1207,7 +1207,7 @@ function backupHistoryText(key) {
       created: "Local backup snapshot created.", restored: "Snapshot restored", partial: "Snapshot restored with some items skipped; check available storage.",
       deleted: "Snapshot deleted.", failed: "Could not save or read backup history. Use Export to create a full JSON backup.",
       tooLarge: "This library is too large for the local snapshot history. Export a full JSON backup instead.",
-      unavailable: "Local backup history requires IndexedDB in this browser or app.",
+      unavailable: "Local backup history requires IndexedDB in this browser or app.", storageTitle: "Storage & library health", storageSubtitle: "Local usage estimates and non-destructive integrity checks.", refreshStorage: "Refresh report", analyzeStorage: "Check library", storageBackup: "Export full backup", openHistory: "Backup history", closeStorage: "Close", captureCount: "Captures", documentCountLabel: "Text documents", archivedCount: "Archived", trashCount: "In Trash", duplicateCount: "Potential duplicates", uniqueTags: "Unique tags", localBytes: "Local storage estimate", originUsage: "Browser/app storage usage", noQuota: "Not reported by this browser", checksOk: "No duplicate IDs or blank capture texts found.", checksWarn: "Review potential duplicate links/text before removing anything.", storageReportFailed: "Could not inspect all storage areas. Export a full backup before cleanup." ,
       busy: "A backup snapshot is already being written.", safetySnapshotFailed: "Restore cancelled: Linka could not save the current state first. Export a full JSON backup or free storage, then retry."
     },
     ru: {
@@ -1219,7 +1219,7 @@ function backupHistoryText(key) {
       created: "Локальный снимок создан.", restored: "Снимок восстановлен", partial: "Снимок восстановлен частично. Проверь свободное место.",
       deleted: "Снимок удалён.", failed: "Не удалось сохранить или прочитать историю копий. Используй «Экспорт» для полной JSON-копии.",
       tooLarge: "Библиотека слишком велика для истории локальных снимков. Экспортируй полную JSON-копию.",
-      unavailable: "История локальных копий требует IndexedDB в браузере или приложении.",
+      unavailable: "История локальных копий требует IndexedDB в браузере или приложении.", storageTitle: "Хранилище и состояние библиотеки", storageSubtitle: "Приблизительный объём данных и безопасная проверка целостности.", refreshStorage: "Обновить отчёт", analyzeStorage: "Проверить библиотеку", storageBackup: "Экспорт полной копии", openHistory: "История копий", closeStorage: "Закрыть", captureCount: "Записи", documentCountLabel: "Текстовые документы", archivedCount: "В архиве", trashCount: "В корзине", duplicateCount: "Возможные дубликаты", uniqueTags: "Уникальные теги", localBytes: "Оценка локального хранилища", originUsage: "Использование хранилища браузера/приложения", noQuota: "Браузер не сообщает объём", checksOk: "Дубликаты ID и пустые записи не найдены.", checksWarn: "Проверь возможные дубликаты ссылок/текста перед удалением.", storageReportFailed: "Не удалось проверить все области хранения. Перед очисткой экспортируй полную резервную копию.",
       busy: "Сейчас уже сохраняется резервный снимок.", safetySnapshotFailed: "Восстановление отменено: сначала не удалось сохранить текущее состояние. Экспортируй полную JSON-копию или освободи место и повтори попытку."
     },
     az: {
@@ -1231,7 +1231,7 @@ function backupHistoryText(key) {
       created: "Yerli snapshot yaradıldı.", restored: "Snapshot bərpa edildi", partial: "Snapshot qismən bərpa edildi. Yaddaş yerini yoxla.",
       deleted: "Snapshot silindi.", failed: "Ehtiyat nüsxə tarixçəsini saxlamaq və ya oxumaq olmadı. Tam JSON nüsxəsi üçün ixracdan istifadə et.",
       tooLarge: "Kitabxana yerli snapshot tarixçəsi üçün çox böyükdür. Tam JSON nüsxəsini ixrac et.",
-      unavailable: "Yerli ehtiyat nüsxə tarixçəsi IndexedDB tələb edir.",
+      unavailable: "Yerli ehtiyat nüsxə tarixçəsi IndexedDB tələb edir.", storageTitle: "Yaddaş və kitabxana vəziyyəti", storageSubtitle: "Yerli yaddaşın təxmini ölçüsü və təhlükəsiz bütövlük yoxlaması.", refreshStorage: "Hesabatı yenilə", analyzeStorage: "Kitabxananı yoxla", storageBackup: "Tam ehtiyat nüsxəni ixrac et", openHistory: "Ehtiyat nüsxə tarixçəsi", closeStorage: "Bağla", captureCount: "Qeydlər", documentCountLabel: "Mətn sənədləri", archivedCount: "Arxivdə", trashCount: "Zibil qutusunda", duplicateCount: "Mümkün dublikatlar", uniqueTags: "Unikal teqlər", localBytes: "Yerli yaddaşın təxmini ölçüsü", originUsage: "Brauzer/tətbiq yaddaş istifadəsi", noQuota: "Brauzer məlumat vermir", checksOk: "Təkrarlanan ID və boş qeydlər tapılmadı.", checksWarn: "Silməzdən əvvəl mümkün təkrar keçidləri/mətni yoxla.", storageReportFailed: "Bütün yaddaş sahələrini yoxlamaq olmadı. Təmizləməzdən əvvəl tam ehtiyat nüsxə yarat.",
       busy: "Hazırda başqa ehtiyat snapshot yazılır.", safetySnapshotFailed: "Bərpa ləğv edildi: əvvəlcə cari vəziyyəti saxlamaq mümkün olmadı. Tam JSON nüsxəsini ixrac et və ya yaddaşda yer boşalt."
     },
     tr: {
@@ -1243,7 +1243,7 @@ function backupHistoryText(key) {
       created: "Yerel yedek görüntüsü oluşturuldu.", restored: "Görüntü geri yüklendi", partial: "Görüntü kısmen geri yüklendi. Depolama alanını kontrol et.",
       deleted: "Görüntü silindi.", failed: "Yedek geçmişi okunamadı veya kaydedilemedi. Tam JSON yedeği için Dışa Aktar'ı kullan.",
       tooLarge: "Kitaplık yerel yedek geçmişi için çok büyük. Tam JSON yedeğini dışa aktar.",
-      unavailable: "Yerel yedek geçmişi IndexedDB gerektirir.",
+      unavailable: "Yerel yedek geçmişi IndexedDB gerektirir.", storageTitle: "Depolama ve kitaplık durumu", storageSubtitle: "Yerel kullanım tahminleri ve veri silmeyen bütünlük kontrolleri.", refreshStorage: "Raporu yenile", analyzeStorage: "Kitaplığı denetle", storageBackup: "Tam yedeği dışa aktar", openHistory: "Yedek geçmişi", closeStorage: "Kapat", captureCount: "Kayıtlar", documentCountLabel: "Metin belgeleri", archivedCount: "Arşivde", trashCount: "Çöp kutusunda", duplicateCount: "Olası kopyalar", uniqueTags: "Benzersiz etiketler", localBytes: "Yerel depolama tahmini", originUsage: "Tarayıcı/uygulama depolama kullanımı", noQuota: "Tarayıcı bilgi vermiyor", checksOk: "Yinelenen kimlik veya boş kayıt bulunmadı.", checksWarn: "Silmeden önce olası yinelenen bağlantıları/metni gözden geçir.", storageReportFailed: "Tüm depolama alanları incelenemedi. Temizlemeden önce tam yedek dışa aktar.",
       busy: "Başka bir yedek görüntüsü şu anda kaydediliyor.", safetySnapshotFailed: "Geri yükleme iptal edildi: önce mevcut durum kaydedilemedi. Tam JSON yedeğini dışa aktar veya depolama alanı açıp yeniden dene."
     }
   };
@@ -1367,6 +1367,134 @@ async function restoreBackupHistorySnapshot(backup) {
     documents: documentResult.imported,
     partial: documentFailed || !preferencesApplied || documentResult.skipped > 0
   };
+}
+
+function formatBytes(bytes) {
+  const value = Number(bytes);
+  if (!Number.isFinite(value) || value < 0) return "—";
+  if (value < 1024) return value + " B";
+  if (value < 1024 * 1024) return (value / 1024).toFixed(1) + " KB";
+  if (value < 1024 * 1024 * 1024) return (value / (1024 * 1024)).toFixed(2) + " MB";
+  return (value / (1024 * 1024 * 1024)).toFixed(2) + " GB";
+}
+async function inspectLinkaStorage() {
+  const docs = await exportLinkaDocuments();
+  const captureJson = JSON.stringify(captures);
+  const documentJson = JSON.stringify(docs);
+  let localStorageBytes = 0;
+  let localStorageKeys = 0;
+  try {
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+      localStorageKeys += 1;
+      localStorageBytes += new Blob([key, localStorage.getItem(key) || ""]).size;
+    }
+  } catch {}
+  let usage = null, quota = null;
+  try {
+    const estimate = await navigator.storage?.estimate?.();
+    if (Number.isFinite(estimate?.usage)) usage = estimate.usage;
+    if (Number.isFinite(estimate?.quota)) quota = estimate.quota;
+  } catch {}
+  const ids = new Set();
+  let duplicateIds = 0, blankTexts = 0;
+  const duplicateKeys = new Map();
+  let duplicateCaptures = 0;
+  for (const item of captures) {
+    if (!item || !String(item.text || "").trim()) { blankTexts += 1; continue; }
+    if (ids.has(item.id)) duplicateIds += 1;
+    ids.add(item.id);
+    if (item.trashedAt) continue;
+    const key = normalizeDuplicateKey(item.text);
+    if (!key) continue;
+    if (duplicateKeys.has(key)) {
+      duplicateCaptures += 1;
+      duplicateKeys.set(key, duplicateKeys.get(key) + 1);
+    } else duplicateKeys.set(key, 1);
+  }
+  return {
+    captures: captures.length,
+    documents: docs.length,
+    archived: captures.filter(item => item.archivedAt && !item.trashedAt).length,
+    trashed: captures.filter(item => item.trashedAt).length,
+    uniqueTags: new Set(captures.flatMap(item => item.tags || [])).size,
+    duplicateUrlsOrTexts: duplicateCaptures,
+    duplicateIds,
+    blankTexts,
+    localStorageKeys,
+    localStorageBytes,
+    captureBytes: new Blob([captureJson]).size,
+    documentBytes: new Blob([documentJson]).size,
+    usage,
+    quota
+  };
+}
+async function showStorageHealth() {
+  const content = document.createElement("div");
+  content.className = "storage-health-panel";
+  const heading = document.createElement("h2"); heading.textContent = backupHistoryText("storageTitle");
+  const subtitle = document.createElement("p"); subtitle.className = "storage-health-subtitle"; subtitle.textContent = backupHistoryText("storageSubtitle");
+  const controls = document.createElement("div"); controls.className = "storage-health-controls";
+  const refresh = document.createElement("button"); refresh.type = "button"; refresh.className = "ghost"; refresh.textContent = backupHistoryText("refreshStorage");
+  const analyze = document.createElement("button"); analyze.type = "button"; analyze.className = "ghost"; analyze.textContent = backupHistoryText("analyzeStorage");
+  const backup = document.createElement("button"); backup.type = "button"; backup.className = "ghost"; backup.textContent = backupHistoryText("storageBackup");
+  const history = document.createElement("button"); history.type = "button"; history.className = "ghost"; history.textContent = backupHistoryText("openHistory");
+  const close = document.createElement("button"); close.type = "button"; close.className = "ghost"; close.textContent = backupHistoryText("closeStorage");
+  controls.append(refresh, analyze, backup, history, close);
+  const statusLine = document.createElement("p"); statusLine.className = "storage-health-status"; statusLine.setAttribute("role", "status");
+  const metrics = document.createElement("div"); metrics.className = "storage-health-metrics";
+  const diagnostics = document.createElement("div"); diagnostics.className = "storage-health-diagnostics";
+  content.append(heading, subtitle, controls, statusLine, metrics, diagnostics);
+  const layer = modalShell(content, { dismissable: true });
+  close.addEventListener("click", () => layer.remove());
+  backup.addEventListener("click", async () => {
+    $("#export-format").value = "json";
+    await downloadLinkaBackup();
+  });
+  history.addEventListener("click", async () => {
+    layer.remove();
+    await showBackupHistory();
+  });
+  const refreshReport = async (runIntegrityCheck = false) => {
+    refresh.disabled = true; analyze.disabled = true;
+    statusLine.textContent = "";
+    try {
+      const report = await inspectLinkaStorage();
+      const items = [
+        [backupHistoryText("captureCount"), report.captures],
+        [backupHistoryText("documentCountLabel"), report.documents],
+        [backupHistoryText("archivedCount"), report.archived],
+        [backupHistoryText("trashCount"), report.trashed],
+        [backupHistoryText("uniqueTags"), report.uniqueTags],
+        [backupHistoryText("localBytes"), formatBytes(report.localStorageBytes) + " · " + report.localStorageKeys + " keys"],
+        ["Captures JSON", formatBytes(report.captureBytes)],
+        ["Documents JSON", formatBytes(report.documentBytes)],
+        [backupHistoryText("originUsage"), report.usage == null ? backupHistoryText("noQuota") : formatBytes(report.usage) + (report.quota == null ? "" : " / " + formatBytes(report.quota))]
+      ];
+      metrics.replaceChildren(...items.map(([label, value]) => {
+        const card = document.createElement("div"); card.className = "storage-health-metric";
+        const name = document.createElement("span"); name.textContent = label;
+        const amount = document.createElement("strong"); amount.textContent = String(value);
+        card.append(name, amount); return card;
+      }));
+      diagnostics.replaceChildren();
+      if (runIntegrityCheck) {
+        const found = report.duplicateIds + report.blankTexts + report.duplicateUrlsOrTexts;
+        const result = document.createElement("p"); result.className = found ? "storage-health-warning" : "storage-health-ok";
+        result.textContent = found
+          ? backupHistoryText("checksWarn") + " IDs: " + report.duplicateIds + ", blank: " + report.blankTexts + ", URL/text duplicates: " + report.duplicateUrlsOrTexts + "."
+          : backupHistoryText("checksOk");
+        diagnostics.append(result);
+      }
+    } catch (error) {
+      console.error("Linka storage inspection failed", error);
+      statusLine.textContent = backupHistoryText("storageReportFailed");
+    } finally { refresh.disabled = false; analyze.disabled = false; }
+  };
+  refresh.addEventListener("click", () => { void refreshReport(false); });
+  analyze.addEventListener("click", () => { void refreshReport(true); });
+  await refreshReport(false);
 }
 
 async function showBackupHistory() {
