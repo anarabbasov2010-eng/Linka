@@ -37,5 +37,7 @@ If the Supabase Data API is configured to restrict exposed tables, confirm `publ
 - The web client and Windows desktop client share the same web storage and Cloud Sync module.
 - Android Cloud Sync uses its own encrypted refresh-token store in Android Keystore; the web/Windows session is stored by the browser/WebView in local storage. They are separate sessions under the same account.
 - Items are merged by capture ID and the newest `updatedAt`; deletion tombstones prevent previously deleted copies from being merged back.
+- The current schema stores the entire capture array and tombstones in one JSONB `data` field per user. PostgREST row pagination therefore does **not** paginate individual captures; each sync reads and writes the user library as one payload.
+- If the sync service rejects a request with HTTP 413 or a recognized payload-size error, Linka reports that the cloud payload is too large instead of showing a generic HTTP error. Large-library chunking would require a separate schema and migration design; export a backup before reducing or reorganizing synced data.
 - Keep regular JSON backups for important information. Cloud Sync is a convenience feature, not a guaranteed backup or a substitute for a separate export.
 - Free service limits and availability can change; check the provider dashboard for current quotas.
