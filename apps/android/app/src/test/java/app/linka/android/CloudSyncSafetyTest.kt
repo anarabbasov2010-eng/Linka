@@ -3,6 +3,9 @@ package app.linka.android
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
+import java.util.concurrent.TimeUnit
 
 class CloudSyncSafetyTest {
     private fun capture(id: String, updatedAt: Long = 1L, pinned: Boolean = false) = Capture(
@@ -12,6 +15,70 @@ class CloudSyncSafetyTest {
         updatedAt = updatedAt,
         pinned = pinned
     )
+
+    @Test
+    fun conditionalPatchUsesPatchCapableHttpClientAndSendsRevisionHeaders() {
+        val server = MockWebServer()
+        val response = """[{"user_id":"user-test","updated_at":"2026-10-25T08:00:01+00:00"}]"""
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(response)
+        )
+        server.start()
+        try {
+            val body = """{"data":{"captures":[],"deletedIds":[]},"updated_at":"2026-10-25T08:00:01+00:00"}"""
+            val result = requestJson(
+                server.url("/rest/v1/linka_sync?user_id=eq.user-test&updated_at=eq.2026-10-25T08%3A00%3A00%2B00%3A00").toString(),
+                "PATCH",
+                "public-test-key",
+                "access-token",
+                body,
+                "return=representation"
+            )
+            assertEquals(response, result)
+
+            val recorded = server.takeRequest(2, TimeUnit.SECONDS)
+                ?: throw AssertionError("Android did not send the conditional PATCH request.")
+            assertEquals("PATCH", recorded.method)
+            assertEquals("public-test-key", recorded.getHeader("apikey"))
+            assertEquals("Bearer access-token", recorded.getHeader("Authorization"))
+            assertEquals("return=representation", recorded.getHeader("Prefer"))
+            assertEquals(body, recorded.body.readUtf8())
+            assertTrue(recorded.path.orEmpty().contains("updated_at=eq."))
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    @Test
+    fun conditionalPatchReportsPayloadLimitAsActionableError() {
+        val server = MockWebServer()
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(413)
+                .setHeader("Content-Type", "application/json")
+                .setBody("""{"message":"Payload too large"}""")
+        )
+        server.start()
+        try {
+            val error = org.junit.Assert.assertThrows(IllegalStateException::class.java) {
+                requestJson(
+                    server.url("/rest/v1/linka_sync").toString(),
+                    "PATCH",
+                    "public-test-key",
+                    "access-token",
+                    """{"data":{"captures":[],"deletedIds":[]}}""",
+                    "return=representation"
+                )
+            }
+            assertTrue(error.message.orEmpty().contains("payload is too large", ignoreCase = true))
+            assertTrue(error.message.orEmpty().contains("export a backup", ignoreCase = true))
+        } finally {
+            server.shutdown()
+        }
+    }
 
     @Test
     fun mergeWithinLimitKeepsDistinctCapturesAndDropsTombstonedItems() {
