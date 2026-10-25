@@ -880,9 +880,19 @@ function showKeyboardShortcuts() {
     }
   };
   const copy = variants[langCode()] || variants.en;
+  const shortcutRows = copy.rows.slice();
+  if (isDesktopShell() && /Windows/i.test(navigator.userAgent)) {
+    const labels = {
+      en: ["Ctrl + Alt + Space", "Quick capture from anywhere", "Bring Linka to the front and focus the capture field."],
+      ru: ["Ctrl + Alt + Space", "Быстрое сохранение из любого приложения", "Открывает Linka поверх других окон и переводит фокус в поле записи."],
+      az: ["Ctrl + Alt + Space", "İstənilən tətbiqdən sürətli qeyd", "Linka-nı önə gətirir və qeyd sahəsinə fokus verir."],
+      tr: ["Ctrl + Alt + Space", "Her uygulamadan hızlı kayıt", "Linka'yı öne getirir ve kayıt alanına odaklanır."]
+    };
+    shortcutRows.unshift((labels[langCode()] || labels.en));
+  }
   const dialog = modal(copy.title, copy.subtitle);
   const rows = make("div", "linka-shortcuts-list");
-  copy.rows.forEach(([keys, title, detail]) => {
+  shortcutRows.forEach(([keys, title, detail]) => {
     const row = make("div", "linka-shortcut-row");
     const description = make("div", "linka-shortcut-description");
     description.append(make("strong", "", title), make("p", "", detail));
