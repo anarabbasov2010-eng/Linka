@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addDeletedIds, completeGoogleOAuthCallback, getOtpCooldown, mergeCloudCaptures, readDeletedIds, removeDeletedIds, readLinkaProfile, saveLinkaProfile, DELETED_IDS_KEY } from "./cloud-sync.js";
+import { addDeletedIds, completeGoogleOAuthCallback, getOtpCooldown, mergeCloudCaptures, readDeletedIds, removeDeletedIds, setDeletedIds, readLinkaProfile, saveLinkaProfile, DELETED_IDS_KEY } from "./cloud-sync.js";
 
 test("cloud merge picks the newest copy, keeps pins, and orders newest first", () => {
   const remote = [
@@ -50,6 +50,18 @@ function memoryStorage() {
     removeItem(key) { values.delete(key); }
   };
 }
+
+test("backup restore replaces the deletion-marker set atomically without duplicate or malformed IDs", () => {
+  const storage = memoryStorage();
+  assert.equal(setDeletedIds(["old", "old", "", 4, "remote"], storage), true);
+  assert.deepEqual([...readDeletedIds(storage)].sort(), ["old", "remote"]);
+  const failing = {
+    getItem(key) { return key === DELETED_IDS_KEY ? JSON.stringify(["preserve-me"]) : null; },
+    setItem() { throw new Error("quota exceeded"); }
+  };
+  assert.equal(setDeletedIds(["new"], failing), false);
+  assert.deepEqual([...readDeletedIds(failing)], ["preserve-me"]);
+});
 
 test("bulk deletion markers are written atomically and can be removed for undo/import", () => {
   const storage = memoryStorage();
