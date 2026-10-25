@@ -167,15 +167,15 @@ test("Today filter includes only captures created during the current local day",
 
 test("library sorting supports activity, creation date, title and domain orders without mutating the source array", () => {
   const items = [
-    makeCapture("https://z.example.com/z", { id: "z", createdAt: 20, updatedAt: 50, previewTitle: "Zebra" }),
-    makeCapture("Alpha note", { id: "a", createdAt: 10, updatedAt: 60, previewTitle: "Alpha" }),
-    makeCapture("https://a.example.com/a", { id: "a-url", createdAt: 30, updatedAt: 40, previewTitle: "A Page" })
+    { id: "z", text: "https://z.example.com/z", createdAt: 20, updatedAt: 50, previewTitle: "Zebra", pinned: false },
+    { id: "a", text: "Alpha note", createdAt: 10, updatedAt: 60, previewTitle: "Alpha", pinned: false },
+    { id: "a-url", text: "https://a.example.com/a", createdAt: 30, updatedAt: 40, previewTitle: "A Page", pinned: false }
   ];
   const originalIds = items.map(item => item.id);
   assert.deepEqual(sortCaptures(items, "updated").map(item => item.id), ["a", "z", "a-url"]);
   assert.deepEqual(sortCaptures(items, "newest").map(item => item.id), ["a-url", "z", "a"]);
   assert.deepEqual(sortCaptures(items, "oldest").map(item => item.id), ["a", "z", "a-url"]);
-  assert.deepEqual(sortCaptures(items, "title").map(item => item.id), ["a", "a-url", "z"]);
+  assert.deepEqual(sortCaptures(items, "title").map(item => item.id), ["a-url", "a", "z"]);
   assert.deepEqual(sortCaptures(items, "domain").map(item => item.id), ["a-url", "z", "a"]);
   assert.deepEqual(items.map(item => item.id), originalIds);
   assert.deepEqual(sortCaptures(items, "unknown").map(item => item.id), sortCaptures(items, "updated").map(item => item.id));
