@@ -24,7 +24,7 @@ This file is the persistent project checklist for the Linka improvements audit. 
 - [~] Keep local-only mode usable when cloud credentials are not configured.
 - [~] Audit all storage reads/writes for silent parse, quota and permission failures.
 - [x] On malformed local JSON, preserve the raw source instead of replacing it with an empty library; block writes until the user exports the source or explicitly starts a new library.
-- [ ] Offer recovery from a known-good snapshot after storage corruption.
+- [x] Offer one-click restore from the newest usable local snapshot directly in the malformed-store recovery notice; the original damaged source remains preserved separately.
 - [~] Maintain automatic local backup snapshots and explicit backup-history recovery.
 - [ ] Add crash-recovery tests for interrupted save, import, migration and restore.
 - [ ] Verify backup compatibility across older and newer Linka versions.
