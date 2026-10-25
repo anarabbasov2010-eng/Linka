@@ -136,7 +136,7 @@ This file is the persistent project checklist for the Linka improvements audit. 
 - [~] Provide separate local text documents and portable .linka files.
 - [~] Autosave documents locally.
 - [x] Show an explicit unsaved-changes state and the time of the latest successful local document save.
-- [ ] Add explicit draft recovery after a crash or forced close.
+- [~] Save a bounded local emergency draft (up to 200,000 characters) on edits and expose explicit restore/discard controls after reload; very large drafts still rely on the regular IndexedDB autosave.
 - [ ] Add Markdown preview, formatting tools and document outline.
 - [ ] Add reusable templates.
 - [ ] Add document version history, diff and restore.
@@ -214,7 +214,7 @@ This file is the persistent project checklist for the Linka improvements audit. 
 - [ ] Make startup-on-login opt-in.
 - [ ] Use native Windows notifications for relevant status changes.
 - [ ] Restore window placement and size safely across monitor changes.
-- [~] Keep the document editor open when a final local save fails and block switching to another document after a failed save; crash/update recovery still needs work.
+- [~] Keep the document editor open when a final local save fails, block switching after failed saves, and offer bounded emergency-draft recovery; update/forced-shutdown recovery and very large emergency drafts still need work.
 - [ ] Add a diagnostics panel for WebView2, logs and environment details.
 
 ## Quality, reliability and release readiness
