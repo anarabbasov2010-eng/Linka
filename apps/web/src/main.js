@@ -158,7 +158,13 @@ async function registerNativeDesktopEvents() {
       listenTauriEvent("linka-tray-quick-capture", () => focusQuickCaptureFromNative()),
       listenTauriEvent("linka-menu-action", event => {
         const action = String(event.payload || "");
-        if (action === "quick-capture") {
+        if (action === "undo" || action === "redo") {
+          const active = document.activeElement;
+          if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || active?.isContentEditable) {
+            active.focus();
+            document.execCommand(action);
+          }
+        } else if (action === "quick-capture") {
           focusQuickCaptureFromNative();
         } else if (action === "new-document") {
           document.dispatchEvent(new Event("linka:open-documents"));
