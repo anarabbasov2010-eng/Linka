@@ -119,8 +119,8 @@ pub fn run() {
                 let app_quit = MenuItem::with_id(app, "app-quit", "Quit Linka", true, None::<&str>)?;
                 let file_menu = Submenu::with_items(app, "File", true, &[&app_capture, &app_document, &app_export, &separator, &app_quit])?;
 
-                let undo = PredefinedMenuItem::undo(app, None)?;
-                let redo = PredefinedMenuItem::redo(app, None)?;
+                let undo = MenuItem::with_id(app, "app-undo", "Undo", true, None::<&str>)?;
+                let redo = MenuItem::with_id(app, "app-redo", "Redo", true, None::<&str>)?;
                 let cut = PredefinedMenuItem::cut(app, None)?;
                 let copy = PredefinedMenuItem::copy(app, None)?;
                 let paste = PredefinedMenuItem::paste(app, None)?;
@@ -144,6 +144,8 @@ pub fn run() {
                         "app-new-document" => Some("new-document"),
                         "app-export-backup" => Some("export-backup"),
                         "app-search" => Some("search"),
+                        "app-undo" => Some("undo"),
+                        "app-redo" => Some("redo"),
                         "app-backup-history" => Some("backup-history"),
                         "app-settings" => Some("settings"),
                         "app-shortcuts" => Some("shortcuts"),
