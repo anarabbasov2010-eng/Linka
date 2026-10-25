@@ -4,7 +4,7 @@ export const MAX_BACKUP_SNAPSHOTS = 5;
 export const MAX_AUTOMATIC_SNAPSHOT_BYTES = 12 * 1024 * 1024;
 
 export function trimBackupSnapshots(snapshots, maxCount = MAX_BACKUP_SNAPSHOTS) {
-  const limit = Math.max(0, Math.min(50, Math.floor(Number(maxCount) || 0));
+  const limit = Math.max(0, Math.min(50, Math.floor(Number(maxCount) || 0)));
   return [...(Array.isArray(snapshots) ? snapshots : [])]
     .filter(item => item && typeof item.id === "string" && Number.isFinite(Number(item.createdAt)))
     .sort((a, b) => Number(b.createdAt) - Number(a.createdAt))
