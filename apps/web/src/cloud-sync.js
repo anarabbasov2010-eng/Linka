@@ -311,6 +311,45 @@ export async function claimQrPairing({ id, secret, url, key }) {
   return { session, config };
 }
 
+const RETRYABLE_CLOUD_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
+const MAX_CLOUD_REQUEST_ATTEMPTS = 3;
+
+function cloudRetryDelay(response, attempt) {
+  const retryAfter = response?.headers?.get?.("Retry-After");
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    const requested = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(retryAfter) - Date.now();
+    if (Number.isFinite(requested) && requested > 0) return Math.min(2000, requested);
+  }
+  return Math.min(800, 150 * (2 ** attempt));
+}
+
+/**
+ * Retry only transient cloud failures. Conditional writes make a retried PATCH
+ * safe: if the first request committed but its response was lost, its revision
+ * no longer matches and the outer sync loop re-reads and merges the new row.
+ */
+async function fetchCloudWithRetry(url, options) {
+  let lastError = null;
+  for (let attempt = 0; attempt < MAX_CLOUD_REQUEST_ATTEMPTS; attempt += 1) {
+    let response;
+    try {
+      response = await fetch(url, options);
+    } catch (error) {
+      lastError = error;
+      if (attempt + 1 >= MAX_CLOUD_REQUEST_ATTEMPTS) throw error;
+      await new Promise(resolve => setTimeout(resolve, cloudRetryDelay(null, attempt)));
+      continue;
+    }
+    if (!RETRYABLE_CLOUD_STATUSES.has(response.status) || attempt + 1 >= MAX_CLOUD_REQUEST_ATTEMPTS) {
+      return response;
+    }
+    await new Promise(resolve => setTimeout(resolve, cloudRetryDelay(response, attempt)));
+  }
+  if (lastError) throw lastError;
+  throw new Error("Cloud request failed after retries.");
+}
+
 export async function syncCloudCaptures(localCaptures, localDeletedIds = readDeletedIds(), profile = readLinkaProfile()) {
   const config = getCloudConfig();
   if (!config.url || !config.key) throw new Error("Set the shared sync project URL and public key in Linka settings.");
@@ -333,7 +372,7 @@ export async function syncCloudCaptures(localCaptures, localDeletedIds = readDel
   // its newer captures or deletion tombstones.
   for (let attempt = 0; attempt < maxWriteAttempts; attempt += 1) {
     const query = new URLSearchParams({ user_id: `eq.${session.userId}`, select: "data,updated_at" });
-    const getResponse = await fetch(`${config.url}/rest/v1/linka_sync?${query}`, { headers });
+    const getResponse = await fetchCloudWithRetry(`${config.url}/rest/v1/linka_sync?${query}`, { headers });
     const remoteRows = await readResponse(getResponse);
     if (!Array.isArray(remoteRows) || remoteRows.length > 1) {
       throw new Error("Linka received an unexpected cloud library response. No cloud changes were written.");
@@ -366,14 +405,14 @@ export async function syncCloudCaptures(localCaptures, localDeletedIds = readDel
         updated_at: `eq.${remoteRow.updated_at}`,
         select: "user_id,updated_at"
       });
-      writeResponse = await fetch(`${config.url}/rest/v1/linka_sync?${condition}`, {
+      writeResponse = await fetchCloudWithRetry(`${config.url}/rest/v1/linka_sync?${condition}`, {
         method: "PATCH",
         headers: { ...headers, "Content-Type": "application/json", Prefer: "return=representation" },
         body: JSON.stringify({ data: nextData, updated_at: nextUpdatedAt })
       });
     } else {
       // Ignore a competing first insert, then re-read the row and merge with it.
-      writeResponse = await fetch(`${config.url}/rest/v1/linka_sync?on_conflict=user_id`, {
+      writeResponse = await fetchCloudWithRetry(`${config.url}/rest/v1/linka_sync?on_conflict=user_id`, {
         method: "POST",
         headers: { ...headers, "Content-Type": "application/json", Prefer: "resolution=ignore-duplicates,return=representation" },
         body: JSON.stringify({ user_id: session.userId, data: nextData, updated_at: nextUpdatedAt })
