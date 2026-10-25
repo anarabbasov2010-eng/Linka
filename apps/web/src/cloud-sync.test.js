@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addDeletedIds, completeGoogleOAuthCallback, getOtpCooldown, mergeCloudCaptures, readDeletedIds, removeDeletedIds, setDeletedIds, readLinkaProfile, saveLinkaProfile, DELETED_IDS_KEY } from "./cloud-sync.js";
+import { addDeletedIds, completeGoogleOAuthCallback, excludeDeletedCaptures, getOtpCooldown, mergeCloudCaptures, readDeletedIds, removeDeletedIds, setDeletedIds, readLinkaProfile, saveLinkaProfile, DELETED_IDS_KEY } from "./cloud-sync.js";
 
 test("cloud merge picks the newest copy, keeps pins, and orders newest first", () => {
   const remote = [
@@ -22,6 +22,16 @@ test("cloud merge respects deletion tombstones so removed data cannot reappear",
   const local = [{ id: "kept", text: "keep me", createdAt: 2, updatedAt: 2 }];
   const merged = mergeCloudCaptures(local, remote, new Set(["deleted"]));
   assert.deepEqual(merged.map(item => item.id), ["kept"]);
+});
+
+test("sync result excludes records deleted while a request was in flight", () => {
+  const merged = [
+    { id: "keep", text: "keep me" },
+    { id: "deleted-local", text: "stale local copy" },
+    { id: "deleted-remote", text: "stale remote copy" }
+  ];
+  const safe = excludeDeletedCaptures(merged, new Set(["deleted-local", "deleted-remote"]));
+  assert.deepEqual(safe.map(item => item.id), ["keep"]);
 });
 
 test("cloud merge prefers the local copy when update timestamps are equal", () => {
