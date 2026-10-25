@@ -18,7 +18,7 @@ import {
 } from "./backup-format.js";
 import {
   saveBackupSnapshot, listBackupSnapshots, getBackupSnapshot, deleteBackupSnapshot,
-  isBackupHistoryAvailable, MAX_AUTOMATIC_SNAPSHOT_BYTES
+  isBackupHistoryAvailable, findLatestUsableBackupSnapshot, MAX_AUTOMATIC_SNAPSHOT_BYTES
 } from "./backup-history.js";
 
 const $ = selector => document.querySelector(selector);
@@ -201,7 +201,11 @@ function showCaptureRecoveryNotice() {
     ru: {
       title: "Не удалось прочитать библиотеку Linka",
       body: "Исходные данные не заменены. Запись новых изменений заблокирована, чтобы не перезаписать библиотеку. Сначала экспортируй повреждённые данные для восстановления.",
-      export: "Экспортировать исходные данные", fresh: "Начать с пустой библиотекой",
+      export: "Экспортировать исходные данные", restoreLatest: "Восстановить последнюю резервную копию", fresh: "Начать с пустой библиотекой",
+      confirmRestoreLatest: "Восстановить последнюю локальную резервную копию? Повреждённые исходные данные останутся сохранены на этом устройстве.",
+      restoreLatestDone: "Локальная резервная копия восстановлена. Повреждённые исходные данные сохранены отдельно.",
+      restoreLatestUnavailable: "Не найдена подходящая локальная резервная копия с данными.",
+      restoreLatestFailed: "Не удалось восстановить резервную копию. Исходные данные по-прежнему сохранены.",
       exportDone: "Исходные данные экспортированы. Сохрани файл до продолжения работы.",
       confirmFresh: "Сначала экспортируй исходные данные. Linka сохранит их локально для диагностики, но создаст новую пустую библиотеку. Продолжить?",
       freshFailed: "Не удалось безопасно сохранить исходные данные. Экспортируй их и проверь свободное место в хранилище.",
@@ -210,7 +214,11 @@ function showCaptureRecoveryNotice() {
     en: {
       title: "Linka could not read the library",
       body: "The original data has not been replaced. Writes are paused to prevent overwriting the library. Export the damaged data before continuing.",
-      export: "Export original data", fresh: "Start with an empty library",
+      export: "Export original data", restoreLatest: "Restore latest local backup", fresh: "Start with an empty library",
+      confirmRestoreLatest: "Restore the newest local backup? The damaged original will remain preserved on this device.",
+      restoreLatestDone: "Local backup restored. The damaged original remains preserved separately.",
+      restoreLatestUnavailable: "No usable local backup with saved data was found.",
+      restoreLatestFailed: "Could not restore a local backup. The original data remains preserved.",
       exportDone: "Original data exported. Keep the file before continuing.",
       confirmFresh: "Export the original data first. Linka will retain it locally for recovery and create a new empty library. Continue?",
       freshFailed: "Could not safely preserve the original data. Export it and check available storage.",
@@ -219,7 +227,11 @@ function showCaptureRecoveryNotice() {
     az: {
       title: "Linka kitabxananı oxuya bilmədi",
       body: "Orijinal məlumatlar dəyişdirilməyib. Kitabxananın üzərinə yazılmaması üçün yeni yazılar dayandırılıb. Davam etməzdən əvvəl zədələnmiş məlumatları ixrac et.",
-      export: "Orijinal məlumatları ixrac et", fresh: "Boş kitabxana yarat",
+      export: "Orijinal məlumatları ixrac et", restoreLatest: "Son ehtiyat nüsxəni bərpa et", fresh: "Boş kitabxana yarat",
+      confirmRestoreLatest: "Ən son yerli ehtiyat nüsxə bərpa edilsin? Zədələnmiş orijinal məlumatlar bu cihazda ayrıca saxlanılacaq.",
+      restoreLatestDone: "Yerli ehtiyat nüsxə bərpa edildi. Zədələnmiş orijinal məlumatlar ayrıca saxlanıldı.",
+      restoreLatestUnavailable: "Məlumatları olan uyğun yerli ehtiyat nüsxə tapılmadı.",
+      restoreLatestFailed: "Ehtiyat nüsxəni bərpa etmək mümkün olmadı. Orijinal məlumatlar saxlanılır.",
       exportDone: "Orijinal məlumatlar ixrac edildi. Davam etməzdən əvvəl faylı saxla.",
       confirmFresh: "Əvvəlcə orijinal məlumatları ixrac et. Linka onları bərpa üçün cihazda saxlayacaq və yeni boş kitabxana yaradacaq. Davam edilsin?",
       freshFailed: "Orijinal məlumatları təhlükəsiz saxlamaq mümkün olmadı. Onları ixrac et və yaddaş yerini yoxla.",
@@ -228,7 +240,11 @@ function showCaptureRecoveryNotice() {
     tr: {
       title: "Linka kitaplığı okuyamadı",
       body: "Özgün veriler değiştirilmedi. Kitaplığın üzerine yazılmasını önlemek için yeni kayıtlar duraklatıldı. Devam etmeden önce bozuk verileri dışa aktar.",
-      export: "Özgün verileri dışa aktar", fresh: "Boş kitaplık oluştur",
+      export: "Özgün verileri dışa aktar", restoreLatest: "En son yerel yedeği geri yükle", fresh: "Boş kitaplık oluştur",
+      confirmRestoreLatest: "En yeni yerel yedek geri yüklensin mi? Bozuk özgün veriler bu cihazda ayrı olarak korunacak.",
+      restoreLatestDone: "Yerel yedek geri yüklendi. Bozuk özgün veriler ayrı olarak korundu.",
+      restoreLatestUnavailable: "Kayıtlı verisi olan uygun bir yerel yedek bulunamadı.",
+      restoreLatestFailed: "Yerel yedek geri yüklenemedi. Özgün veriler korunuyor.",
       exportDone: "Özgün veriler dışa aktarıldı. Devam etmeden önce dosyayı sakla.",
       confirmFresh: "Önce özgün verileri dışa aktar. Linka bunları kurtarma için cihazda saklayıp yeni boş bir kitaplık oluşturacak. Devam edilsin mi?",
       freshFailed: "Özgün veriler güvenli biçimde korunamadı. Verileri dışa aktar ve kullanılabilir alanı kontrol et.",
@@ -237,7 +253,11 @@ function showCaptureRecoveryNotice() {
   })[language] || {
     title: "Linka could not read the library",
     body: "The original data has not been replaced. Writes are paused to prevent overwriting the library. Export the damaged data before continuing.",
-    export: "Export original data", fresh: "Start with an empty library",
+    export: "Export original data", restoreLatest: "Restore latest local backup", fresh: "Start with an empty library",
+      confirmRestoreLatest: "Restore the newest local backup? The damaged original will remain preserved on this device.",
+      restoreLatestDone: "Local backup restored. The damaged original remains preserved separately.",
+      restoreLatestUnavailable: "No usable local backup with saved data was found.",
+      restoreLatestFailed: "Could not restore a local backup. The original data remains preserved.",
     exportDone: "Original data exported. Keep the file before continuing.",
     confirmFresh: "Export the original data first. Linka will retain it locally for recovery and create a new empty library. Continue?",
     freshFailed: "Could not safely preserve the original data. Export it and check available storage.",
@@ -277,6 +297,42 @@ function showCaptureRecoveryNotice() {
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
     say(copy.exportDone);
+  });
+  const restoreLatestButton = button(copy.restoreLatest);
+  restoreLatestButton.addEventListener("click", async () => {
+    if (!window.confirm(copy.confirmRestoreLatest)) return;
+    restoreLatestButton.disabled = true;
+    try {
+      const snapshots = await listBackupSnapshots();
+      const snapshot = findLatestUsableBackupSnapshot(snapshots);
+      if (!snapshot) {
+        say(copy.restoreLatestUnavailable);
+        return;
+      }
+      const stored = await getBackupSnapshot(snapshot.id);
+      if (!stored?.backup || !parseLinkaBackup(stored.backup)) {
+        throw new Error(copy.restoreLatestFailed);
+      }
+
+      // Keep the malformed source in RECOVERY_KEY, acknowledge it and open a
+      // safe empty target before restoring. This is required because normal
+      // writes are intentionally blocked while corruption is unacknowledged.
+      const recoveryState = getCaptureRecovery();
+      if (recoveryState && !recoveryState.acknowledged && !startFreshCaptureLibrary()) {
+        throw new Error(copy.restoreLatestFailed);
+      }
+      captures = [];
+      persistedCaptures = [];
+      const result = await restoreBackupHistorySnapshot(stored.backup);
+      panel.remove();
+      const detail = " · " + result.captures + " captures, " + result.documents + " documents";
+      say((result.partial ? captureUiText("backupPartial") : copy.restoreLatestDone) + detail);
+    } catch (error) {
+      console.error("Could not restore latest backup after capture-store corruption", error);
+      say(error?.message || copy.restoreLatestFailed);
+    } finally {
+      restoreLatestButton.disabled = false;
+    }
   });
   const freshButton = button(copy.fresh);
   freshButton.addEventListener("click", () => {
