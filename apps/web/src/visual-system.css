@@ -447,3 +447,19 @@ body { text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; 
 }
 .export-format:focus-visible { outline: 2px solid color-mix(in srgb,var(--accent) 35%,transparent); outline-offset: 2px; }
 @media (max-width: 680px) { .export-format { flex: 1 1 100px; max-width: none; } }
+
+
+.sort-order {
+  min-height: 34px;
+  max-width: 154px;
+  min-width: 120px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel-solid);
+  color: var(--text);
+  font: inherit;
+  font-size: 10px;
+}
+.sort-order:focus-visible { outline: 2px solid color-mix(in srgb,var(--accent) 35%,transparent); outline-offset: 2px; }
+@media (max-width: 680px) { .sort-order { flex: 1 1 135px; max-width: none; } }
