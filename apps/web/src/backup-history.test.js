@@ -4,6 +4,7 @@ import {
   MAX_BACKUP_SNAPSHOTS,
   MAX_AUTOMATIC_SNAPSHOT_BYTES,
   trimBackupSnapshots,
+  findLatestUsableBackupSnapshot,
   isBackupHistoryAvailable,
   saveBackupSnapshot
 } from "./backup-history.js";
@@ -22,6 +23,19 @@ test("backup history retention keeps only the newest valid snapshots without mut
   assert.deepEqual(input, before);
   assert.equal(MAX_BACKUP_SNAPSHOTS, 5);
   assert.equal(MAX_AUTOMATIC_SNAPSHOT_BYTES, 12 * 1024 * 1024);
+});
+
+test("latest recoverable backup skips empty snapshots and prefers newest data", () => {
+  const snapshots = [
+    { id: "empty-newest", createdAt: 50, captureCount: 0, documentCount: 0 },
+    { id: "older-captures", createdAt: 40, captureCount: 12, documentCount: 0 },
+    { id: "newer-documents", createdAt: 45, captureCount: 0, documentCount: 2 },
+    { id: "invalid-date", createdAt: "invalid", captureCount: 100, documentCount: 0 },
+    { id: "no-id", createdAt: 60, captureCount: 100, documentCount: 0 }
+  ];
+  assert.equal(findLatestUsableBackupSnapshot(snapshots)?.id, "newer-documents");
+  assert.equal(findLatestUsableBackupSnapshot([{ id: "empty", createdAt: 10, captureCount: 0, documentCount: 0 }]), null);
+  assert.equal(findLatestUsableBackupSnapshot(null), null);
 });
 
 test("backup history refuses malformed snapshots before touching IndexedDB", async () => {
