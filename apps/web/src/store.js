@@ -1,6 +1,18 @@
 export const STORAGE_KEY = "linka.captures.v1";
 export const RECOVERY_KEY = "linka.captures.recovery.v1";
 
+export function normalizePreviewImageUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw || raw.length > 2048) return "";
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:" || url.username || url.password) return "";
+    return url.href;
+  } catch {
+    return "";
+  }
+}
+
 function normalizeTags(value) {
   const source = Array.isArray(value) ? value : (typeof value === "string" ? value.split(/[,;\n]+/) : []);
   const tags = new Map();
@@ -29,7 +41,7 @@ export function normalizeCapture(item) {
     collection: String(item.collection || "").trim().slice(0, 80),
     previewTitle: String(item.previewTitle || "").slice(0, 180),
     previewDescription: String(item.previewDescription || "").slice(0, 320),
-    previewImageUrl: String(item.previewImageUrl || "").slice(0, 2048),
+    previewImageUrl: normalizePreviewImageUrl(item.previewImageUrl),
   };
 }
 
