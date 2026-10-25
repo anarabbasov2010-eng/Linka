@@ -1,4 +1,4 @@
-import { loadCaptures, saveCaptures, makeCapture, normalizeCapture, visibleCaptures, findDuplicateCapture, getCaptureRecovery, startFreshCaptureLibrary } from "./store.js";
+import { loadCaptures, saveCaptures, makeCapture, normalizeCapture, visibleCaptures, sortCaptures, findDuplicateCapture, getCaptureRecovery, startFreshCaptureLibrary } from "./store.js";
 import { initLinkaExperience, setLanguage } from "./experience.js";
 import { initVisualSystem, setLinkaTheme, setLinkaAccent, setLinkaDensity, setLinkaEffects } from "./visual-system.js";
 import { initLinkaAtmosphere, openAtmosphereSettings } from "./atmosphere.js";
@@ -23,6 +23,11 @@ const collectionDraft = $("#capture-collection");
 const saveButton = $("#save-button");
 const list = $("#capture-list");
 const search = $("#search");
+const sortOrder = $("#sort-order");
+const SORT_ORDERS = new Set(["updated", "newest", "oldest", "title", "domain"]);
+let sortMode = localStorage.getItem("linka.sortOrder.v1") || "updated";
+if (!SORT_ORDERS.has(sortMode)) sortMode = "updated";
+if (sortOrder) sortOrder.value = sortMode;
 const count = $("#capture-count");
 const status = $("#status");
 const composeLabel = $("#compose-label");
@@ -291,7 +296,7 @@ function compareVersions(a, b) {
 }
 function render() {
   for (const id of selectedIds) if (!captures.some(item => item.id === id)) selectedIds.delete(id);
-  const shown = visibleCaptures(captures, activeFilter, search.value);
+  const shown = sortCaptures(visibleCaptures(captures, activeFilter, search.value), sortMode);
   const tagOptions = $("#linka-tag-options");
   if (tagOptions) {
     const tags = [...new Map(captures.flatMap(item => item.tags || []).map(tag => [tag.toLocaleLowerCase(), tag])).values()].sort((a, b) => a.localeCompare(b));
@@ -988,6 +993,11 @@ form.addEventListener("submit",event=>{
   render();
 });
 search.addEventListener("input",render);
+sortOrder?.addEventListener("change", () => {
+  sortMode = SORT_ORDERS.has(sortOrder.value) ? sortOrder.value : "updated";
+  try { localStorage.setItem("linka.sortOrder.v1", sortMode); } catch {}
+  render();
+});
 filters.forEach(button=>button.addEventListener("click",()=>{
   activeFilter=button.dataset.filter;filters.forEach(item=>item.classList.toggle("active",item===button));render();
 }));
@@ -1007,7 +1017,7 @@ function captureExportTitle(item) {
 }
 const BACKUP_PREFERENCE_KEYS = [
   "linka.theme", "linka.accent", "linka.density", "linka.effects",
-  "linka.language.v1", "linka.reduceMotion"
+  "linka.language.v1", "linka.reduceMotion", "linka.sortOrder.v1"
 ];
 function readLocalJson(key, fallback) {
   try {
@@ -1065,6 +1075,10 @@ function applyBackupPreferences(backup) {
   if (preferences["linka.accent"]) setLinkaAccent(preferences["linka.accent"]);
   if (preferences["linka.density"]) setLinkaDensity(preferences["linka.density"]);
   if (preferences["linka.effects"]) setLinkaEffects(preferences["linka.effects"]);
+  if (preferences["linka.sortOrder.v1"] && SORT_ORDERS.has(preferences["linka.sortOrder.v1"])) {
+    sortMode = preferences["linka.sortOrder.v1"];
+    if (sortOrder) sortOrder.value = sortMode;
+  }
   if (preferences["linka.reduceMotion"]) {
     const reduced = preferences["linka.reduceMotion"] === "true";
     document.documentElement.classList.toggle("reduced-motion", reduced);
