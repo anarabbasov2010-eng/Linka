@@ -247,6 +247,12 @@ function formatDate(value) {
   catch { return "Saved"; }
 }
 function persist() {
+  if (!getCaptureRecovery()) {
+    const previousState = persistedCaptures.map(item => ({ ...item, tags: [...(item.tags || [])] }));
+    void saveAutomaticBackupSnapshot(previousState).catch(error => {
+      console.warn("Automatic Linka backup snapshot was not saved", error);
+    });
+  }
   if (!saveCaptures(captures)) {
     // Roll back the in-memory mutation to the last state known to be on disk.
     // This prevents the UI from presenting an unsaved edit/delete as durable.
