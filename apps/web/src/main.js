@@ -1133,6 +1133,271 @@ function applyBackupPreferences(backup) {
   if (preferences["linka.language.v1"]) setLanguage(preferences["linka.language.v1"]);
   return true;
 }
+const BACKUP_HISTORY_LAST_ATTEMPT_KEY = "linka.backupHistory.lastAttemptAt.v1";
+const BACKUP_HISTORY_INTERVAL_MS = 24 * 60 * 60 * 1000;
+let backupHistoryBusy = false;
+
+function backupHistoryText(key) {
+  const language = (() => { try { return localStorage.getItem("linka.language.v1") || "en"; } catch { return "en"; } })();
+  const copy = {
+    en: {
+      title: "Local backup history", subtitle: "Snapshots stay on this device. Keep an exported JSON backup for extra safety.",
+      create: "Create snapshot now", close: "Close", empty: "No snapshots yet. Linka will attempt a snapshot before a library change, at most once a day.",
+      auto: "Automatic before-change snapshot", manual: "Manual snapshot", beforeRestore: "Before restore",
+      download: "Download", restore: "Restore", remove: "Delete snapshot", confirmRestore: "Merge this snapshot into the current library? Matching records will return to the saved version; unrelated records will remain.",
+      confirmDelete: "Delete this local snapshot? This does not delete your captures or documents.",
+      created: "Local backup snapshot created.", restored: "Snapshot restored", partial: "Snapshot restored with some items skipped; check available storage.",
+      deleted: "Snapshot deleted.", failed: "Could not save or read backup history. Use Export to create a full JSON backup.",
+      tooLarge: "This library is too large for the local snapshot history. Export a full JSON backup instead.",
+      unavailable: "Local backup history requires IndexedDB in this browser or app.",
+      busy: "A backup snapshot is already being written."
+    },
+    ru: {
+      title: "История локальных копий", subtitle: "Снимки хранятся на этом устройстве. Для дополнительной защиты сохраняй полную JSON-копию.",
+      create: "Создать снимок сейчас", close: "Закрыть", empty: "Снимков пока нет. Linka попытается создать снимок перед изменением библиотеки, не чаще раза в сутки.",
+      auto: "Автоматически перед изменением", manual: "Создан вручную", beforeRestore: "Перед восстановлением",
+      download: "Скачать", restore: "Восстановить", remove: "Удалить снимок", confirmRestore: "Объединить этот снимок с текущей библиотекой? Записи с совпадающими ID вернутся к сохранённой версии, остальные записи останутся.",
+      confirmDelete: "Удалить этот локальный снимок? Записи и документы приложения не удалятся.",
+      created: "Локальный снимок создан.", restored: "Снимок восстановлен", partial: "Снимок восстановлен частично. Проверь свободное место.",
+      deleted: "Снимок удалён.", failed: "Не удалось сохранить или прочитать историю копий. Используй «Экспорт» для полной JSON-копии.",
+      tooLarge: "Библиотека слишком велика для истории локальных снимков. Экспортируй полную JSON-копию.",
+      unavailable: "История локальных копий требует IndexedDB в браузере или приложении.",
+      busy: "Сейчас уже сохраняется резервный снимок."
+    },
+    az: {
+      title: "Yerli ehtiyat nüsxə tarixçəsi", subtitle: "Sənədlər bu cihazda saxlanılır. Əlavə təhlükəsizlik üçün tam JSON ehtiyat nüsxəsi yarat.",
+      create: "İndi snapshot yarat", close: "Bağla", empty: "Hələ snapshot yoxdur. Linka kitabxana dəyişməzdən əvvəl gündə ən çox bir dəfə snapshot yaratmağa çalışacaq.",
+      auto: "Dəyişiklikdən əvvəl avtomatik", manual: "Əl ilə yaradılıb", beforeRestore: "Bərpadan əvvəl",
+      download: "Endir", restore: "Bərpa et", remove: "Snapshot-u sil", confirmRestore: "Bu snapshot cari kitabxanaya birləşdirilsin? Eyni ID-li qeydlər saxlanmış versiyaya qayıdacaq, digər qeydlər qalacaq.",
+      confirmDelete: "Bu yerli snapshot silinsin? Qeydlərin və sənədlərin özü silinməyəcək.",
+      created: "Yerli snapshot yaradıldı.", restored: "Snapshot bərpa edildi", partial: "Snapshot qismən bərpa edildi. Yaddaş yerini yoxla.",
+      deleted: "Snapshot silindi.", failed: "Ehtiyat nüsxə tarixçəsini saxlamaq və ya oxumaq olmadı. Tam JSON nüsxəsi üçün ixracdan istifadə et.",
+      tooLarge: "Kitabxana yerli snapshot tarixçəsi üçün çox böyükdür. Tam JSON nüsxəsini ixrac et.",
+      unavailable: "Yerli ehtiyat nüsxə tarixçəsi IndexedDB tələb edir.",
+      busy: "Hazırda başqa ehtiyat snapshot yazılır."
+    },
+    tr: {
+      title: "Yerel yedek geçmişi", subtitle: "Anlık görüntüler bu cihazda kalır. Ek güvenlik için tam JSON yedeği indir.",
+      create: "Şimdi anlık görüntü oluştur", close: "Kapat", empty: "Henüz anlık görüntü yok. Linka, kitaplık değişmeden önce günde en fazla bir kez görüntü oluşturmaya çalışır.",
+      auto: "Değişiklik öncesi otomatik", manual: "Manuel anlık görüntü", beforeRestore: "Geri yükleme öncesi",
+      download: "İndir", restore: "Geri yükle", remove: "Anlık görüntüyü sil", confirmRestore: "Bu görüntü geçerli kitaplıkla birleştirilsin mi? Eşleşen kayıtlar kaydedilmiş sürüme döner, diğer kayıtlar kalır.",
+      confirmDelete: "Bu yerel görüntü silinsin mi? Kayıtların ve belgelerin kendisi silinmez.",
+      created: "Yerel yedek görüntüsü oluşturuldu.", restored: "Görüntü geri yüklendi", partial: "Görüntü kısmen geri yüklendi. Depolama alanını kontrol et.",
+      deleted: "Görüntü silindi.", failed: "Yedek geçmişi okunamadı veya kaydedilemedi. Tam JSON yedeği için Dışa Aktar'ı kullan.",
+      tooLarge: "Kitaplık yerel yedek geçmişi için çok büyük. Tam JSON yedeğini dışa aktar.",
+      unavailable: "Yerel yedek geçmişi IndexedDB gerektirir.",
+      busy: "Başka bir yedek görüntüsü şu anda kaydediliyor."
+    }
+  };
+  return (copy[language] || copy.en)[key] || copy.en[key] || key;
+}
+
+async function buildLinkaBackup(captureSnapshot = captures) {
+  const documents = await exportLinkaDocuments();
+  return createLinkaBackup({
+    exportedAt: new Date().toISOString(),
+    captures: captureSnapshot.map(item => ({ ...item, tags: [...(item.tags || [])] })),
+    documents,
+    deletedIds: [...readDeletedIds()],
+    preferences: readBackupPreferences(),
+    savedSearches: readLocalJson("linka.savedSearches.v1", []),
+    recentSearches: readLocalJson("linka.recentSearches.v1", [])
+  });
+}
+
+async function storeBackupHistorySnapshot(captureSnapshot = captures, reason = "manual", automatic = false) {
+  if (backupHistoryBusy) return { saved: false, reason: "busy" };
+  const now = Date.now();
+  if (automatic) {
+    let lastAttempt = 0;
+    try { lastAttempt = Number(localStorage.getItem(BACKUP_HISTORY_LAST_ATTEMPT_KEY) || 0); } catch {}
+    if (lastAttempt && now - lastAttempt < BACKUP_HISTORY_INTERVAL_MS) return { saved: false, reason: "not-due" };
+    try { localStorage.setItem(BACKUP_HISTORY_LAST_ATTEMPT_KEY, String(now)); } catch {}
+  }
+
+  backupHistoryBusy = true;
+  try {
+    const backup = await buildLinkaBackup(captureSnapshot);
+    if (!backup.captures.length && !backup.documents.length) return { saved: false, reason: "empty" };
+    const bytes = new Blob([JSON.stringify(backup)]).size;
+    if (bytes > MAX_AUTOMATIC_SNAPSHOT_BYTES) return { saved: false, reason: "too-large", bytes };
+    const snapshot = {
+      id: "snapshot-" + now.toString(36) + "-" + Math.random().toString(36).slice(2, 8),
+      createdAt: now,
+      reason,
+      captureCount: backup.captures.length,
+      documentCount: backup.documents.length,
+      bytes,
+      backup
+    };
+    const result = await saveBackupSnapshot(snapshot);
+    if (result.saved && automatic) {
+      try { localStorage.setItem(BACKUP_HISTORY_LAST_ATTEMPT_KEY, String(now)); } catch {}
+    }
+    return { ...result, snapshot, bytes };
+  } finally {
+    backupHistoryBusy = false;
+  }
+}
+
+async function saveAutomaticBackupSnapshot(previousCaptures) {
+  return storeBackupHistorySnapshot(previousCaptures, "automatic-before-change", true);
+}
+
+function downloadBackupPayload(backup, filename = "linka-backup.json") {
+  const blob = new Blob([JSON.stringify(backup, null, 2) + "\\n"], { type: "application/json;charset=utf-8" });
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = filename;
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
+}
+
+async function restoreBackupHistorySnapshot(backup) {
+  const validated = parseLinkaBackup(backup);
+  if (!validated) throw new Error("Invalid Linka backup snapshot.");
+  const normalized = validated.captures
+    .filter(item => item && typeof item === "object" && typeof item.text === "string")
+    .map(item => normalizeCapture(item))
+    .filter(Boolean);
+  const importedIds = new Set(normalized.map(item => item.id));
+  const previous = captures.map(item => ({ ...item, tags: [...(item.tags || [])] }));
+  const map = new Map(captures.map(item => [item.id, item]));
+  normalized.forEach(item => map.set(item.id, item));
+  const next = [...map.values()].sort((a, b) =>
+    Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) ||
+    Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0)
+  );
+  if (!saveCaptures(next)) throw new Error("Could not save restored captures; the current library was kept.");
+
+  const deleted = new Set(readDeletedIds());
+  validated.deletedIds.forEach(id => deleted.add(id));
+  importedIds.forEach(id => deleted.delete(id));
+  if (!setDeletedIds([...deleted])) {
+    const rolledBack = saveCaptures(previous);
+    if (!rolledBack) throw new Error("Restore rollback failed. Export the current library immediately.");
+    throw new Error("Restore cancelled because cloud deletion markers could not be saved.");
+  }
+
+  captures = next;
+  persistedCaptures = captures.map(item => ({ ...item, tags: [...(item.tags || [])] }));
+  localDataRevision += 1;
+  let documentResult = { imported: 0, skipped: 0 };
+  let documentFailed = false;
+  if (validated.documents.length) {
+    try { documentResult = await importLinkaDocuments(validated.documents); }
+    catch (error) { console.error("Backup history document restore failed", error); documentFailed = true; }
+  }
+  const preferencesApplied = applyBackupPreferences(validated);
+  scheduleCloudSync();
+  render();
+  return {
+    captures: normalized.length,
+    documents: documentResult.imported,
+    partial: documentFailed || !preferencesApplied || documentResult.skipped > 0
+  };
+}
+
+async function showBackupHistory() {
+  const content = document.createElement("div");
+  content.className = "backup-history-panel";
+  const heading = document.createElement("h2"); heading.textContent = backupHistoryText("title");
+  const subtitle = document.createElement("p"); subtitle.className = "backup-history-subtitle"; subtitle.textContent = backupHistoryText("subtitle");
+  const controls = document.createElement("div"); controls.className = "backup-history-controls";
+  const createButton = document.createElement("button"); createButton.type = "button"; createButton.className = "ghost"; createButton.textContent = backupHistoryText("create");
+  const closeButton = document.createElement("button"); closeButton.type = "button"; closeButton.className = "ghost"; closeButton.textContent = backupHistoryText("close");
+  controls.append(createButton, closeButton);
+  const statusLine = document.createElement("p"); statusLine.className = "backup-history-status"; statusLine.setAttribute("role", "status");
+  const rows = document.createElement("div"); rows.className = "backup-history-rows";
+  content.append(heading, subtitle, controls, statusLine, rows);
+  const layer = modalShell(content, { dismissable: true });
+  closeButton.addEventListener("click", () => layer.remove());
+
+  const refreshRows = async () => {
+    rows.replaceChildren();
+    let snapshots;
+    try { snapshots = await listBackupSnapshots(); }
+    catch (error) { console.error("Could not list backup history", error); statusLine.textContent = backupHistoryText("failed"); return; }
+    if (!snapshots.length) {
+      const empty = document.createElement("p"); empty.className = "backup-history-empty"; empty.textContent = backupHistoryText("empty"); rows.append(empty); return;
+    }
+    snapshots.forEach(snapshot => {
+      const row = document.createElement("article"); row.className = "backup-history-row";
+      const copy = document.createElement("div"); copy.className = "backup-history-copy";
+      const title = document.createElement("strong");
+      title.textContent = snapshot.reason === "manual" ? backupHistoryText("manual") :
+        snapshot.reason === "before-restore" ? backupHistoryText("beforeRestore") : backupHistoryText("auto");
+      const date = document.createElement("span"); date.textContent = formatDate(snapshot.createdAt);
+      const details = document.createElement("small");
+      details.textContent = snapshot.captureCount + " captures · " + snapshot.documentCount + " documents · " +
+        Math.max(1, Math.round(Number(snapshot.bytes || 0) / 1024)) + " KB";
+      copy.append(title, date, details);
+      const actions = document.createElement("div"); actions.className = "backup-history-row-actions";
+      const download = document.createElement("button"); download.type = "button"; download.className = "action"; download.textContent = backupHistoryText("download");
+      const restore = document.createElement("button"); restore.type = "button"; restore.className = "action"; restore.textContent = backupHistoryText("restore");
+      const remove = document.createElement("button"); remove.type = "button"; remove.className = "action danger"; remove.textContent = backupHistoryText("remove");
+      download.addEventListener("click", async () => {
+        try {
+          const stored = await getBackupSnapshot(snapshot.id);
+          if (!stored?.backup) throw new Error("Snapshot payload is missing.");
+          const datePart = new Date(stored.createdAt).toISOString().slice(0, 10);
+          downloadBackupPayload(stored.backup, "linka-snapshot-" + datePart + ".json");
+        } catch (error) { console.error(error); statusLine.textContent = backupHistoryText("failed"); }
+      });
+      restore.addEventListener("click", async () => {
+        if (!window.confirm(backupHistoryText("confirmRestore"))) return;
+        restore.disabled = true;
+        try {
+          const stored = await getBackupSnapshot(snapshot.id);
+          if (!stored?.backup) throw new Error("Snapshot payload is missing.");
+          const result = await restoreBackupHistorySnapshot(stored.backup);
+          layer.remove();
+          say((result.partial ? backupHistoryText("partial") : backupHistoryText("restored")) +
+            " · " + result.captures + " captures, " + result.documents + " documents");
+        } catch (error) {
+          console.error("Could not restore backup history snapshot", error);
+          statusLine.textContent = error?.message || backupHistoryText("failed");
+        } finally { restore.disabled = false; }
+      });
+      remove.addEventListener("click", async () => {
+        if (!window.confirm(backupHistoryText("confirmDelete"))) return;
+        remove.disabled = true;
+        try {
+          await deleteBackupSnapshot(snapshot.id);
+          statusLine.textContent = backupHistoryText("deleted");
+          await refreshRows();
+        } catch (error) {
+          console.error(error);
+          statusLine.textContent = backupHistoryText("failed");
+        } finally { remove.disabled = false; }
+      });
+      actions.append(download, restore, remove);
+      row.append(copy, actions);
+      rows.append(row);
+    });
+  };
+
+  createButton.addEventListener("click", async () => {
+    createButton.disabled = true;
+    statusLine.textContent = "";
+    try {
+      const result = await storeBackupHistorySnapshot(captures, "manual", false);
+      if (!result.saved) {
+        statusLine.textContent = result.reason === "too-large" ? backupHistoryText("tooLarge") :
+          result.reason === "busy" ? backupHistoryText("busy") : backupHistoryText("unavailable");
+      } else {
+        statusLine.textContent = backupHistoryText("created");
+        await refreshRows();
+      }
+    } catch (error) {
+      console.error("Could not create manual backup snapshot", error);
+      statusLine.textContent = backupHistoryText("failed");
+    } finally { createButton.disabled = false; }
+  });
+  await refreshRows();
+}
+
 function exportCaptureItems(items, baseName = "linka-inbox") {
   const format = $("#export-format")?.value || "json";
   let content = "", mime = "application/json;charset=utf-8", extension = format, statusKey = "exportedJson";
