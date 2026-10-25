@@ -1697,7 +1697,7 @@ private fun LinkaApp(
             val ids = linkedSetOf<String>()
             for (i in 0 until stored.length()) stored.optString(i).takeIf { it.isNotBlank() }?.let(ids::add)
             ids.addAll(goneIds)
-            prefs.edit().putString(DELETED_IDS_KEY, JSONArray().apply { ids.toList().takeLast(5000).forEach { put(it) } }.toString()).apply()
+            prefs.edit().putString(DELETED_IDS_KEY, JSONArray().apply { ids.forEach { put(it) } }.toString()).apply()
         }
         captures = normalized
         save(captures)
