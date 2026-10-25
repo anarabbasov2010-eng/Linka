@@ -4,10 +4,10 @@ const DB_NAME = "linka-documents-v1";
 const STORE_NAME = "documents";
 const MAX_RECENT = 8;
 const labels = {
-  ru: { documents: "Текстовые документы", newDoc: "Новый документ", open: "Открыть .linka", save: "Сохранить .linka", saved: "Черновик сохранён на этом устройстве", saving: "Сохраняем…", failed: "Не удалось сохранить черновик", untitled: "Новый документ", placeholder: "Начни писать…", close: "Закрыть", recent: "Недавние документы", local: "Локально · не отправляется в облако", openFailed: "Не удалось открыть файл .linka", fileSaved: "Файл .linka подготовлен", content: "Текст документа", title: "Название документа", help: "Файл можно открыть в Linka на другом устройстве.", },
-  en: { documents: "Text documents", newDoc: "New document", open: "Open .linka", save: "Save .linka", saved: "Draft saved on this device", saving: "Saving…", failed: "Could not save draft", untitled: "New document", placeholder: "Start writing…", close: "Close", recent: "Recent documents", local: "Local only · not sent to cloud sync", openFailed: "Could not open this .linka file", fileSaved: ".linka file prepared", content: "Document text", title: "Document title", help: "Open this file in Linka on another device.", },
-  az: { documents: "Mətn sənədləri", newDoc: "Yeni sənəd", open: ".linka aç", save: ".linka saxla", saved: "Qaralama bu cihazda saxlanıldı", saving: "Saxlanılır…", failed: "Qaralamanı saxlamaq olmadı", untitled: "Yeni sənəd", placeholder: "Yazmağa başla…", close: "Bağla", recent: "Son sənədlər", local: "Yalnız cihazda · buludla paylaşılmır", openFailed: ".linka faylını açmaq olmadı", fileSaved: ".linka faylı hazırdır", content: "Sənədin mətni", title: "Sənədin adı", help: "Bu faylı başqa cihazda Linka ilə aça bilərsən.", },
-  tr: { documents: "Metin belgeleri", newDoc: "Yeni belge", open: ".linka aç", save: ".linka kaydet", saved: "Taslak bu cihazda kaydedildi", saving: "Kaydediliyor…", failed: "Taslak kaydedilemedi", untitled: "Yeni belge", placeholder: "Yazmaya başla…", close: "Kapat", recent: "Son belgeler", local: "Yalnızca cihazda · bulut eşitlemesine gönderilmez", openFailed: ".linka dosyası açılamadı", fileSaved: ".linka dosyası hazır", content: "Belge metni", title: "Belge başlığı", help: "Bu dosyayı başka bir cihazda Linka ile açabilirsin.", }
+  ru: { documents: "Текстовые документы", newDoc: "Новый документ", open: "Открыть .linka", save: "Сохранить .linka", saved: "Черновик сохранён на этом устройстве", unsaved: "Есть несохранённые изменения", saving: "Сохраняем…", savedAt: "Сохранено в {time}", failed: "Не удалось сохранить черновик", untitled: "Новый документ", placeholder: "Начни писать…", close: "Закрыть", recent: "Недавние документы", local: "Локально · не отправляется в облако", openFailed: "Не удалось открыть файл .linka", fileSaved: "Файл .linka подготовлен", content: "Текст документа", title: "Название документа", help: "Файл можно открыть в Linka на другом устройстве.", },
+  en: { documents: "Text documents", newDoc: "New document", open: "Open .linka", save: "Save .linka", saved: "Draft saved on this device", unsaved: "Unsaved changes", saving: "Saving…", savedAt: "Saved at {time}", failed: "Could not save draft", untitled: "New document", placeholder: "Start writing…", close: "Close", recent: "Recent documents", local: "Local only · not sent to cloud sync", openFailed: "Could not open this .linka file", fileSaved: ".linka file prepared", content: "Document text", title: "Document title", help: "Open this file in Linka on another device.", },
+  az: { documents: "Mətn sənədləri", newDoc: "Yeni sənəd", open: ".linka aç", save: ".linka saxla", saved: "Qaralama bu cihazda saxlanıldı", unsaved: "Saxlanmamış dəyişikliklər var", saving: "Saxlanılır…", savedAt: "{time} vaxtı saxlanıldı", failed: "Qaralamanı saxlamaq olmadı", untitled: "Yeni sənəd", placeholder: "Yazmağa başla…", close: "Bağla", recent: "Son sənədlər", local: "Yalnız cihazda · buludla paylaşılmır", openFailed: ".linka faylını açmaq olmadı", fileSaved: ".linka faylı hazırdır", content: "Sənədin mətni", title: "Sənədin adı", help: "Bu faylı başqa cihazda Linka ilə aça bilərsən.", },
+  tr: { documents: "Metin belgeleri", newDoc: "Yeni belge", open: ".linka aç", save: ".linka kaydet", saved: "Taslak bu cihazda kaydedildi", unsaved: "Kaydedilmemiş değişiklikler", saving: "Kaydediliyor…", savedAt: "Kaydedildi · {time}", failed: "Taslak kaydedilemedi", untitled: "Yeni belge", placeholder: "Yazmaya başla…", close: "Kapat", recent: "Son belgeler", local: "Yalnızca cihazda · bulut eşitlemesine gönderilmez", openFailed: ".linka dosyası açılamadı", fileSaved: ".linka dosyası hazır", content: "Belge metni", title: "Belge başlığı", help: "Bu dosyayı başka bir cihazda Linka ile açabilirsin.", }
 };
 let initialized = false;
 let dbPromise = null;
@@ -19,6 +19,8 @@ let statusLine = null;
 let recentList = null;
 let saveTimer = 0;
 let animationTimer = 0;
+let editRevision = 0;
+let lastSavedAt = 0;
 let previousFocus = null;
 let inputPicker = null;
 const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches || document.documentElement.classList.contains("reduced-motion");
@@ -264,6 +266,15 @@ function setStatus(message, isError = false) {
   statusLine.textContent = message;
   statusLine.classList.toggle("linka-doc-error", isError);
 }
+function savedStatusText(timestamp = Date.now()) {
+  let time;
+  try {
+    time = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(new Date(timestamp));
+  } catch {
+    time = new Date(timestamp).toLocaleTimeString();
+  }
+  return t("savedAt").replace("{time}", time);
+}
 function createMirrorAnimation(textarea, mirror) {
   const computed = getComputedStyle(textarea);
   ["fontFamily","fontSize","fontWeight","fontStyle","lineHeight","letterSpacing","textAlign","textIndent","paddingTop","paddingRight","paddingBottom","paddingLeft","boxSizing","tabSize"].forEach(key => { mirror.style[key] = computed[key]; });
@@ -336,12 +347,17 @@ function downloadDocument(document) {
   setTimeout(() => URL.revokeObjectURL(url), 5000);
   setStatus(t("fileSaved"));
 }
-function closeEditor() {
-  clearTimeout(saveTimer);
+async function closeEditor() {
+  // Do not dismiss the editor while a final save fails: the user must be able
+  // to retry or copy the text instead of losing the only visible draft.
   if (bodyField && currentDocument) {
-    currentDocument = normalizeLinkaDocument({ ...currentDocument, title: titleField?.value || currentDocument.title, text: bodyField.value, updatedAt: Date.now() });
-    void storeDocument(currentDocument).catch(() => {});
+    const saved = await persistCurrent(true);
+    if (!saved) {
+      setStatus(t("failed"), true);
+      return;
+    }
   }
+  clearTimeout(saveTimer);
   overlay?.classList.remove("is-open");
   const old = overlay;
   overlay = null;
@@ -356,27 +372,40 @@ function handleKeyDown(event) {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s" && overlay) { event.preventDefault(); persistCurrent(true); }
 }
 async function persistCurrent(showSaved = false) {
-  if (!currentDocument || !bodyField) return;
+  if (!currentDocument || !bodyField) return false;
   clearTimeout(saveTimer);
+  const saveRevision = editRevision;
   const snapshot = normalizeLinkaDocument({
     ...currentDocument,
     title: titleField?.value || t("untitled"),
     text: bodyField.value,
     updatedAt: Date.now()
   });
+  const documentId = snapshot.id;
   currentDocument = snapshot;
   if (statusLine) setStatus(t("saving"));
   try {
     await storeDocument(snapshot);
-    if (showSaved && statusLine) setStatus(t("saved"));
+    if (currentDocument?.id === documentId) {
+      lastSavedAt = snapshot.updatedAt;
+      if (saveRevision === editRevision) {
+        setStatus(savedStatusText(lastSavedAt));
+      } else {
+        setStatus(t("unsaved"));
+        if (!saveTimer) saveTimer = setTimeout(() => void persistCurrent(true), 120);
+      }
+    }
     await refreshRecentList();
+    return true;
   } catch {
-    setStatus(t("failed"), true);
+    if (currentDocument?.id === documentId) setStatus(t("failed"), true);
+    return false;
   }
 }
 function scheduleSave() {
   if (!currentDocument || !bodyField) return;
-  setStatus(t("saving"));
+  editRevision += 1;
+  setStatus(t("unsaved"));
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => void persistCurrent(true), 460);
 }
