@@ -1,4 +1,5 @@
-import { loadCaptures, saveCaptures, makeCapture, normalizeCapture, normalizePreviewImageUrl, visibleCaptures, sortCaptures, findDuplicateCapture, normalizeDuplicateKey, getCaptureRecovery, startFreshCaptureLibrary, reopenCaptureRecovery } from "./store.js";
+import { loadCaptures, saveCaptures, makeCapture, normalizeCapture, normalizePreviewImageUrl, visibleCaptures, sortCaptures, findDuplicateCapture, normalizeDuplicateKey, parseSearchQuery, getCaptureRecovery, startFreshCaptureLibrary, reopenCaptureRecovery } from "./store.js";
+import { splitSearchHighlights } from "./search-highlight.js";
 import { initLinkaExperience, setLanguage } from "./experience.js";
 import { initVisualSystem, setLinkaTheme, setLinkaAccent, setLinkaDensity, setLinkaEffects } from "./visual-system.js";
 import { initLinkaAtmosphere, openAtmosphereSettings } from "./atmosphere.js";
@@ -442,7 +443,19 @@ function compareVersions(a, b) {
   }
   return 0;
 }
+function appendSearchHighlights(target, value, query) {
+  const parts = splitSearchHighlights(value, query);
+  target.replaceChildren(...parts.map(part => {
+    if (!part.highlighted) return document.createTextNode(part.text);
+    const mark = document.createElement("mark");
+    mark.className = "search-highlight";
+    mark.textContent = part.text;
+    return mark;
+  }));
+}
+
 function render() {
+  const highlightQuery = parseSearchQuery(search.value).text;
   for (const id of selectedIds) if (!captures.some(item => item.id === id)) selectedIds.delete(id);
   const shown = sortCaptures(visibleCaptures(captures, activeFilter, search.value), sortMode);
   const tagOptions = $("#linka-tag-options");
@@ -521,7 +534,7 @@ function render() {
     }
     const body = document.createElement("p");
     body.className = "item-text" + (isLink(item.text) ? " link" : "");
-    body.textContent = item.text;
+    appendSearchHighlights(body, item.text, highlightQuery);
     const previewBits = [];
     if (isLink(item.text) && /^https:\/\//i.test(item.previewImageUrl || "")) {
       const frame = document.createElement("div"); frame.className = "item-cover-frame";
@@ -530,8 +543,8 @@ function render() {
       cover.addEventListener("load", () => cover.classList.add("loaded"), { once: true });
       cover.addEventListener("error", () => frame.remove(), { once: true }); frame.append(cover); previewBits.push(frame);
     }
-    if (isLink(item.text) && item.previewTitle) { const title = document.createElement("p"); title.className = "item-title"; title.textContent = item.previewTitle; previewBits.push(title); }
-    if (isLink(item.text) && item.previewDescription) { const description = document.createElement("p"); description.className = "item-description"; description.textContent = item.previewDescription; previewBits.push(description); }
+    if (isLink(item.text) && item.previewTitle) { const title = document.createElement("p"); title.className = "item-title"; appendSearchHighlights(title, item.previewTitle, highlightQuery); previewBits.push(title); }
+    if (isLink(item.text) && item.previewDescription) { const description = document.createElement("p"); description.className = "item-description"; appendSearchHighlights(description, item.previewDescription, highlightQuery); previewBits.push(description); }
     if (isLink(item.text)) {
       const url = document.createElement("a");
       url.href = item.text.trim(); url.target = "_blank"; url.rel = "noopener noreferrer";
