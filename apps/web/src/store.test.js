@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { loadCaptures, saveCaptures, makeCapture, normalizeCapture, normalizePreviewImageUrl, visibleCaptures, sortCaptures, normalizeDuplicateKey, findDuplicateCapture, STORAGE_KEY, RECOVERY_KEY, getCaptureRecovery, startFreshCaptureLibrary } from "./store.js";
+import { loadCaptures, saveCaptures, makeCapture, normalizeCapture, normalizePreviewImageUrl, visibleCaptures, sortCaptures, normalizeDuplicateKey, findDuplicateCapture, STORAGE_KEY, RECOVERY_KEY, getCaptureRecovery, startFreshCaptureLibrary, reopenCaptureRecovery } from "./store.js";
 
 function memoryStorage() {
   const data = new Map();
@@ -32,6 +32,20 @@ test("invalid stored JSON is preserved and blocks writes until the user chooses 
   assert.equal(getCaptureRecovery(storage).acknowledged, true);
   assert.equal(saveCaptures([makeCapture("new data")], storage), true);
   assert.equal(loadCaptures(storage)[0].text, "new data");
+});
+
+test("failed restore can re-open recovery and continue blocking writes", () => {
+  const storage = memoryStorage();
+  storage.setItem(STORAGE_KEY, "{broken source");
+  loadCaptures(storage);
+  assert.equal(startFreshCaptureLibrary(storage), true);
+  assert.equal(getCaptureRecovery(storage).acknowledged, true);
+  assert.equal(reopenCaptureRecovery(storage), true);
+  const recovery = getCaptureRecovery(storage);
+  assert.equal(recovery.raw, "{broken source");
+  assert.equal(recovery.acknowledged, false);
+  assert.equal(saveCaptures([makeCapture("must not overwrite recovery")], storage), false);
+  assert.equal(storage.getItem(STORAGE_KEY), "[]");
 });
 
 test("malformed recovery metadata does not prevent recovery of the original capture JSON", () => {
