@@ -42,7 +42,7 @@ This file is the persistent project checklist for the Linka improvements audit. 
 - [ ] Debounce search and expensive filtering.
 - [ ] Virtualize long library and search-result lists where measurements justify it.
 - [ ] Lazy-load cover images and add bounded caching.
-- [ ] Respect reduced-motion preferences across every animation system.
+- [~] Respect reduced-motion preferences across animation systems; fixed atmosphere text-erasing animation for OS-level reduced motion, but remaining UI animation paths still need an audit.
 - [ ] Add a clear non-animated mode for very large documents and bulk edits.
 - [ ] Add performance tests or benchmarks for 1k, 5k and 10k captures.
 
