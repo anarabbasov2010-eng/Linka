@@ -558,3 +558,13 @@ body { text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; 
   .backup-history-row { align-items: stretch; flex-direction: column; }
   .backup-history-row-actions { justify-content: flex-start; }
 }
+
+/* Search matches use native text marks; their contents remain inert text. */
+mark.search-highlight {
+  background: color-mix(in srgb, var(--accent) 32%, transparent);
+  color: var(--text);
+  border-radius: 3px;
+  padding-inline: 1px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
