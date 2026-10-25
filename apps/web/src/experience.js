@@ -1,4 +1,5 @@
 import QRCode from "qrcode";
+import { invoke as invokeTauri } from "@tauri-apps/api/core";
 import {
   approveQrPairing, beginQrPairing, claimQrPairing, disconnectCloud,
   getCloudConfig, getCloudSession, getOtpCooldown, readLinkaProfile,
@@ -906,10 +907,10 @@ function showSettings() {
   dialog.panel.append(pickerLabel);
 
   const preferenceLabels = ({
-    en: { shortcuts: "Keyboard shortcuts", accent: "Accent color", density: "Interface density", compact: "Compact", standard: "Standard", spacious: "Spacious", effects: "Visual effects", quiet: "Quiet", balanced: "Balanced", atmosphere: "Atmosphere", forest: "Forest", oled: "OLED black", cloud: "Cloud sync", backdrop: "Atmosphere & music", agreement: "User agreement" },
-    ru: { shortcuts: "Горячие клавиши", accent: "Акцентный цвет", density: "Плотность интерфейса", compact: "Компактная", standard: "Стандартная", spacious: "Просторная", effects: "Визуальные эффекты", quiet: "Минимальные", balanced: "Сбалансированные", atmosphere: "Атмосфера", forest: "Лес", oled: "OLED-чёрная", cloud: "Облачная синхронизация", backdrop: "Атмосфера и музыка", agreement: "Пользовательское соглашение" },
-    az: { shortcuts: "Klaviatura qısayolları", accent: "Vurğu rəngi", density: "İnterfeys sıxlığı", compact: "Yığcam", standard: "Standart", spacious: "Geniş", effects: "Vizual effektlər", quiet: "Sakit", balanced: "Balanslı", atmosphere: "Atmosfer", forest: "Meşə", oled: "OLED qara", cloud: "Bulud sinxronizasiyası", backdrop: "Atmosfer və musiqi", agreement: "İstifadəçi razılaşması" },
-    tr: { shortcuts: "Klavye kısayolları", accent: "Vurgu rengi", density: "Arayüz yoğunluğu", compact: "Kompakt", standard: "Standart", spacious: "Geniş", effects: "Görsel efektler", quiet: "Sakin", balanced: "Dengeli", atmosphere: "Atmosfer", forest: "Orman", oled: "OLED siyahı", cloud: "Bulut eşitleme", backdrop: "Atmosfer ve müzik", agreement: "Kullanıcı sözleşmesi" }
+    en: { shortcuts: "Keyboard shortcuts", accent: "Accent color", density: "Interface density", compact: "Compact", standard: "Standard", spacious: "Spacious", effects: "Visual effects", quiet: "Quiet", balanced: "Balanced", atmosphere: "Atmosphere", forest: "Forest", oled: "OLED black", cloud: "Cloud sync", backdrop: "Atmosphere & music", agreement: "User agreement", closeToTray: "Close to tray", closeToTrayBody: "Closing the window hides Linka in the system tray. Use the tray menu to exit completely." },
+    ru: { shortcuts: "Горячие клавиши", accent: "Акцентный цвет", density: "Плотность интерфейса", compact: "Компактная", standard: "Стандартная", spacious: "Просторная", effects: "Визуальные эффекты", quiet: "Минимальные", balanced: "Сбалансированные", atmosphere: "Атмосфера", forest: "Лес", oled: "OLED-чёрная", cloud: "Облачная синхронизация", backdrop: "Атмосфера и музыка", agreement: "Пользовательское соглашение", closeToTray: "Сворачивать в трей при закрытии", closeToTrayBody: "При закрытии окна Linka останется в системном трее. Для полного выхода используй меню трея." },
+    az: { shortcuts: "Klaviatura qısayolları", accent: "Vurğu rəngi", density: "İnterfeys sıxlığı", compact: "Yığcam", standard: "Standart", spacious: "Geniş", effects: "Vizual effektlər", quiet: "Sakit", balanced: "Balanslı", atmosphere: "Atmosfer", forest: "Meşə", oled: "OLED qara", cloud: "Bulud sinxronizasiyası", backdrop: "Atmosfer və musiqi", agreement: "İstifadəçi razılaşması", closeToTray: "Bağlayanda sistem treyinə gizlət", closeToTrayBody: "Pəncərəni bağladıqda Linka sistem treyində qalır. Tam çıxış üçün trey menyusundan istifadə et." },
+    tr: { shortcuts: "Klavye kısayolları", accent: "Vurgu rengi", density: "Arayüz yoğunluğu", compact: "Kompakt", standard: "Standart", spacious: "Geniş", effects: "Görsel efektler", quiet: "Sakin", balanced: "Dengeli", atmosphere: "Atmosfer", forest: "Orman", oled: "OLED siyahı", cloud: "Bulut eşitleme", backdrop: "Atmosfer ve müzik", agreement: "Kullanıcı sözleşmesi", closeToTray: "Kapatınca sistem tepsisine küçült", closeToTrayBody: "Pencere kapatıldığında Linka sistem tepsisinde kalır. Tamamen çıkmak için tepsi menüsünü kullan." }
   })[langCode()] || {};
   const addPreference = (label, options, selected, apply) => {
     const field = make("label", "linka-field");
@@ -963,6 +964,38 @@ function showSettings() {
     finally { soundToggle.disabled = false; }
   });
   soundSection.append(soundToggle); dialog.panel.append(soundSection);
+
+  if (isDesktopShell() && /Windows/i.test(navigator.userAgent)) {
+    const closeTraySection = make("div", "linka-settings-block");
+    closeTraySection.append(
+      make("h3", "", preferenceLabels.closeToTray || "Close to tray"),
+      make("p", "linka-muted", preferenceLabels.closeToTrayBody || "Closing the window hides Linka in the system tray.")
+    );
+    const closeTrayToggle = button("", "linka-button linka-button-secondary");
+    const isCloseToTrayEnabled = () => localStorage.getItem("linka.closeToTray") !== "false";
+    const refreshCloseTrayLabel = () => {
+      closeTrayToggle.textContent = (isCloseToTrayEnabled() ? "✓ " : "") + (preferenceLabels.closeToTray || "Close to tray");
+      closeTrayToggle.setAttribute("aria-pressed", String(isCloseToTrayEnabled()));
+    };
+    refreshCloseTrayLabel();
+    closeTrayToggle.addEventListener("click", async () => {
+      const previous = isCloseToTrayEnabled();
+      const next = !previous;
+      closeTrayToggle.disabled = true;
+      try {
+        await invokeTauri("set_close_to_tray", { enabled: next });
+        localStorage.setItem("linka.closeToTray", String(next));
+        refreshCloseTrayLabel();
+      } catch (error) {
+        localStorage.setItem("linka.closeToTray", String(previous));
+        closeTraySection.append(make("p", "linka-muted", String(error?.message || "Could not update this setting.")));
+      } finally {
+        closeTrayToggle.disabled = false;
+      }
+    });
+    closeTraySection.append(closeTrayToggle);
+    dialog.panel.append(closeTraySection);
+  }
 
   const motionSection = make("div", "linka-settings-block");
   motionSection.append(make("h3", "", tr("reducedMotion")), make("p", "linka-muted", tr("reducedMotionBody")));
