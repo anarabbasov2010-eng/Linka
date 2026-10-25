@@ -1,3 +1,5 @@
+import { getCaptureRecovery } from "./store.js";
+
 const CONFIG_KEY = "linka.cloud.config.v1";
 const SESSION_KEY = "linka.cloud.session.v1";
 export const DELETED_IDS_KEY = "linka.deletedIds.v1";
@@ -351,6 +353,10 @@ async function fetchCloudWithRetry(url, options) {
 }
 
 export async function syncCloudCaptures(localCaptures, localDeletedIds = readDeletedIds(), profile = readLinkaProfile()) {
+  const recovery = getCaptureRecovery();
+  if (recovery && !recovery.acknowledged) {
+    throw new Error("Local capture storage needs recovery. Export the damaged data or restore a local backup before syncing; no cloud changes were made.");
+  }
   const config = getCloudConfig();
   if (!config.url || !config.key) throw new Error("Set the shared sync project URL and public key in Linka settings.");
   const initial = getCloudSession();
