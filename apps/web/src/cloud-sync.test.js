@@ -22,8 +22,11 @@ test("cloud sync reports an actionable message when the server rejects an oversi
   let requests = 0;
   globalThis.fetch = async (_url, options = {}) => {
     requests += 1;
-    if (options.method !== "POST") {
-      return new Response(JSON.stringify([{ data: { captures: [], deletedIds: [] } }]), {
+    if (options.method !== "PATCH" && options.method !== "POST") {
+      return new Response(JSON.stringify([{
+        data: { captures: [], deletedIds: [] },
+        updated_at: "2026-10-25T08:00:00+00:00"
+      }]), {
         status: 200,
         headers: { "Content-Type": "application/json" }
       });
@@ -38,7 +41,7 @@ test("cloud sync reports an actionable message when the server rejects an oversi
       syncCloudCaptures([{ id: "capture-1", text: "A saved thought", createdAt: 1, updatedAt: 1 }], new Set()),
       /payload is too large.*export a backup.*retrying/i
     );
-    assert.equal(requests, 2, "the sync should read remote state, attempt one upsert, and report the server rejection");
+    assert.equal(requests, 2, "the sync should read the revision, attempt one conditional write, and report the server rejection");
   } finally {
     globalThis.fetch = previousFetch;
     if (hadStorage) globalThis.localStorage = previousStorage;
