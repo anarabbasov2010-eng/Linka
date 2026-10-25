@@ -47,12 +47,16 @@ export async function saveBackupSnapshot(snapshot, maxCount = MAX_BACKUP_SNAPSHO
     const tx = db.transaction(BACKUP_HISTORY_STORE, "readwrite");
     const store = tx.objectStore(BACKUP_HISTORY_STORE);
     store.put(snapshot);
-    const request = store.getAll();
+    // Walk the createdAt index newest-first to prune older snapshots without
+    // loading every large backup payload into memory at once.
+    const request = store.index("createdAt").openCursor(null, "prev");
+    let seen = 0;
     request.onsuccess = () => {
-      const keep = new Set(trimBackupSnapshots(request.result || [], limit).map(item => item.id));
-      for (const item of request.result || []) {
-        if (!keep.has(item.id)) store.delete(item.id);
-      }
+      const cursor = request.result;
+      if (!cursor) return;
+      seen += 1;
+      if (seen > limit) cursor.delete();
+      cursor.continue();
     };
     request.onerror = () => {
       try { tx.abort(); } catch {}
@@ -67,8 +71,22 @@ export async function listBackupSnapshots() {
   const db = await database();
   if (!db) return [];
   const records = await new Promise((resolve, reject) => {
-    const request = db.transaction(BACKUP_HISTORY_STORE, "readonly").objectStore(BACKUP_HISTORY_STORE).getAll();
-    request.onsuccess = () => resolve(request.result || []);
+    const results = [];
+    const request = db.transaction(BACKUP_HISTORY_STORE, "readonly").objectStore(BACKUP_HISTORY_STORE).index("createdAt").openCursor(null, "prev");
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) { resolve(results); return; }
+      const item = cursor.value || {};
+      results.push({
+        id: item.id,
+        createdAt: item.createdAt,
+        reason: item.reason,
+        captureCount: item.captureCount,
+        documentCount: item.documentCount,
+        bytes: item.bytes
+      });
+      cursor.continue();
+    };
     request.onerror = () => reject(request.error || new Error("Could not read backup history."));
   });
   return trimBackupSnapshots(records);
