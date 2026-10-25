@@ -15,10 +15,14 @@ export function trimBackupSnapshots(snapshots, maxCount = MAX_BACKUP_SNAPSHOTS) 
  * Pick the newest snapshot that has at least one recoverable capture or document.
  * Empty snapshots are useful for history but cannot recover a corrupted library.
  */
-export function findLatestUsableBackupSnapshot(snapshots) {
-  return trimBackupSnapshots(snapshots).find(snapshot =>
+export function findUsableBackupSnapshots(snapshots) {
+  return trimBackupSnapshots(snapshots).filter(snapshot =>
     Number(snapshot.captureCount || 0) > 0 || Number(snapshot.documentCount || 0) > 0
-  ) || null;
+  );
+}
+
+export function findLatestUsableBackupSnapshot(snapshots) {
+  return findUsableBackupSnapshots(snapshots)[0] || null;
 }
 
 function openBackupHistoryDatabase() {
