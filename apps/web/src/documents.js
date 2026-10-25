@@ -1,5 +1,5 @@
 import { linkaFilename, normalizeLinkaDocument, parseLinkaDocument, serializeLinkaDocument } from "./linka-format.js";
-import { readEmergencyDocumentDraft, writeEmergencyDocumentDraft, clearEmergencyDocumentDraft } from "./document-recovery.js";
+import { readEmergencyDocumentDraft, writeEmergencyDocumentDraft, clearEmergencyDocumentDraft, clearEmergencyDocumentDraftIfMatches } from "./document-recovery.js";
 
 const DB_NAME = "linka-documents-v1";
 const STORE_NAME = "documents";
@@ -399,8 +399,10 @@ async function persistCurrent(showSaved = false) {
     if (currentDocument?.id === documentId) {
       lastSavedAt = snapshot.updatedAt;
       if (saveRevision === editRevision) {
-        clearEmergencyDocumentDraft(localStorage, documentId);
-        if (recoveryDraftCandidate?.id === documentId) {
+        clearEmergencyDocumentDraftIfMatches(localStorage, snapshot);
+        if (recoveryDraftCandidate?.id === documentId &&
+            recoveryDraftCandidate.title === snapshot.title &&
+            recoveryDraftCandidate.text === snapshot.text) {
           recoveryDraftCandidate = null;
           if (recoveryBanner) recoveryBanner.hidden = true;
         }
