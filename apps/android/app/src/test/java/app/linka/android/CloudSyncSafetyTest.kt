@@ -2,7 +2,6 @@ package app.linka.android
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.Test
 
 class CloudSyncSafetyTest {
@@ -31,12 +30,8 @@ class CloudSyncSafetyTest {
         val local = (0 until 3).map { capture("local-$it", it.toLong()) }
         val remote = (0 until 3).map { capture("remote-$it", (10 + it).toLong()) }
 
-        val error = try {
+        val error = org.junit.Assert.assertThrows(IllegalStateException::class.java) {
             mergeCloudCapturesSafely(local, remote, emptySet(), maxCaptures = 5)
-            fail("Expected oversized sync to be rejected")
-            return
-        } catch (expected: IllegalStateException) {
-            expected
         }
 
         assertTrue(error.message.orEmpty().contains("cloud merge contains 6"))
