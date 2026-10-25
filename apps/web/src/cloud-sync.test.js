@@ -1,6 +1,50 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { addDeletedIds, completeGoogleOAuthCallback, excludeDeletedCaptures, getOtpCooldown, mergeCloudCaptures, readDeletedIds, removeDeletedIds, setDeletedIds, readLinkaProfile, saveLinkaProfile, syncCloudCaptures, DELETED_IDS_KEY } from "./cloud-sync.js";
+import { STORAGE_KEY, RECOVERY_KEY } from "./store.js";
+
+test("cloud sync refuses to run while malformed local capture data awaits recovery", async () => {
+  const hadStorage = Object.prototype.hasOwnProperty.call(globalThis, "localStorage");
+  const previousStorage = globalThis.localStorage;
+  const previousFetch = globalThis.fetch;
+  const storage = memoryStorage();
+  storage.setItem("linka.cloud.config.v1", JSON.stringify({
+    url: "https://example.supabase.co",
+    key: "public-test-key"
+  }));
+  storage.setItem("linka.cloud.session.v1", JSON.stringify({
+    userId: "user-test",
+    email: "test@example.com",
+    accessToken: "test-access-token",
+    refreshToken: "test-refresh-token",
+    expiresAt: Date.now() + 60 * 60 * 1000
+  }));
+  storage.setItem(STORAGE_KEY, "{malformed local capture data");
+  storage.setItem(RECOVERY_KEY, JSON.stringify({
+    raw: "{malformed local capture data",
+    reason: "capture-store-parse-error",
+    createdAt: Date.now(),
+    acknowledged: false
+  }));
+  globalThis.localStorage = storage;
+  let requests = 0;
+  globalThis.fetch = async () => {
+    requests += 1;
+    throw new Error("Cloud request must not start before local recovery");
+  };
+  try {
+    await assert.rejects(
+      syncCloudCaptures([], new Set()),
+      /Local capture storage needs recovery.*restore a local backup.*no cloud changes were made/i
+    );
+    assert.equal(requests, 0, "recovery guard must run before any network request");
+    assert.equal(storage.getItem(STORAGE_KEY), "{malformed local capture data");
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (hadStorage) globalThis.localStorage = previousStorage;
+    else delete globalThis.localStorage;
+  }
+});
 
 test("cloud sync reports an actionable message when the server rejects an oversized sync payload", async () => {
   const hadStorage = Object.prototype.hasOwnProperty.call(globalThis, "localStorage");
