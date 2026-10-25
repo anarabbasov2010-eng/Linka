@@ -22,7 +22,7 @@ This file is the persistent project checklist for the Linka improvements audit. 
 - [ ] Add a server-side atomic merge/RPC or migration path to protect against legacy clients that still issue unconditional upserts.
 - [~] Re-read and re-merge when updated clients detect a concurrent cloud write; a dedicated user-facing conflict review and cross-version protection remain open.
 - [ ] Surface sync state: last success, pending changes, retrying, and actionable errors.
-- [ ] Add safe retry with bounded backoff for transient network failures.
+- [x] Retry transient cloud sync network/HTTP failures with bounded exponential backoff and respect a capped Retry-After header.
 - [ ] Keep deletes as tombstones until every relevant device has observed them or a retention policy expires.
 - [ ] Add sync diagnostics that redact session tokens and private capture content.
 - [~] Keep local-only mode usable when cloud credentials are not configured.
