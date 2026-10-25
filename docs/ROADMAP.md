@@ -122,7 +122,7 @@ This file is the persistent project checklist for the Linka improvements audit. 
 
 - [~] Provide global search across captures and local text documents.
 - [~] Support filters and operators such as type, tag, collection, read-later, pinned, domain and date.
-- [~] Highlight matching text in search results.
+- [x] Highlight matches in capture text, preview titles and descriptions using safe text nodes; literal markup is never injected as HTML.
 - [ ] Add fuzzy matching and language-aware morphology.
 - [ ] Search extracted PDF text and offline snapshots.
 - [~] Keep named saved searches and a bounded local search history.
@@ -135,7 +135,7 @@ This file is the persistent project checklist for the Linka improvements audit. 
 
 - [~] Provide separate local text documents and portable .linka files.
 - [~] Autosave documents locally.
-- [ ] Show unsaved/dirty state and the last successful save time.
+- [x] Show an explicit unsaved-changes state and the time of the latest successful local document save.
 - [ ] Add explicit draft recovery after a crash or forced close.
 - [ ] Add Markdown preview, formatting tools and document outline.
 - [ ] Add reusable templates.
@@ -214,13 +214,13 @@ This file is the persistent project checklist for the Linka improvements audit. 
 - [ ] Make startup-on-login opt-in.
 - [ ] Use native Windows notifications for relevant status changes.
 - [ ] Restore window placement and size safely across monitor changes.
-- [ ] Prevent data loss on close, update, crash and forced shutdown.
+- [~] Keep the document editor open when a final local save fails and block switching to another document after a failed save; crash/update recovery still needs work.
 - [ ] Add a diagnostics panel for WebView2, logs and environment details.
 
 ## Quality, reliability and release readiness
 
 - [~] Run web unit tests and build checks in GitHub Actions.
-- [ ] Run Windows-specific tests and installer validation on relevant pull requests.
+- [~] Windows installer validation is configured for relevant pull requests; keep this open until the latest build completes successfully.
 - [ ] Add Tauri command and platform integration tests.
 - [ ] Test sync conflict, tombstone, retry, offline and partial-failure cases.
 - [ ] Test large libraries, large documents, quota failures and invalid JSON.
