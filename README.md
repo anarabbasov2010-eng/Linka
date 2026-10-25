@@ -36,6 +36,8 @@ Download artifacts from a successful workflow run. CI artifacts are temporary do
 
 ## Development
 
+See [the tracked Linka implementation roadmap](docs/ROADMAP.md) for the persistent checklist and current status of planned improvements.
+
 ### Web
 From `apps/web`: `npm install`, `npm run dev`, `npm test`, or `npm run build`.
 
