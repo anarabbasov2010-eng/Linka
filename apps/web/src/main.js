@@ -667,7 +667,7 @@ function showSearchSpace(initial = "") {
   const searchWrap = document.createElement("label"); searchWrap.className = "search-space-input-wrap";
   searchWrap.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.5"/><path d="m16 16 4 4"/></svg>';
   const input = document.createElement("input"); input.className = "search-space-input"; input.type = "search";
-  input.placeholder = "Search everything you’ve saved…"; input.value = initial; input.autocomplete = "off"; input.setAttribute("aria-label", "Search your Linka library");
+  input.placeholder = initial.trim().startsWith(">") ? "Commands · try > today" : "Search everything you’ve saved…"; input.value = initial; input.autocomplete = "off"; input.setAttribute("aria-label", "Search your Linka library");
   const hint = document.createElement("span"); hint.className = "search-hint"; hint.textContent = "Esc to close";
   searchWrap.append(input, hint);
   const info = document.createElement("div"); info.className = "search-space-meta";
@@ -2246,6 +2246,11 @@ document.addEventListener("keydown",event=>{
   const command = event.ctrlKey || event.metaKey;
   const key = event.key.toLowerCase();
   const typingTarget = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement || event.target?.isContentEditable;
+  if(command && event.shiftKey && key === "p"){
+    event.preventDefault();
+    showSearchSpace(">");
+    return;
+  }
   if(command && key === "k"){
     event.preventDefault();showSearchSpace(search.value);return;
   }
