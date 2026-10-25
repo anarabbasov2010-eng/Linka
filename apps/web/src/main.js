@@ -14,6 +14,10 @@ import QRCode from "qrcode";
 import {
   createLinkaBackup, parseLinkaBackup
 } from "./backup-format.js";
+import {
+  saveBackupSnapshot, listBackupSnapshots, getBackupSnapshot, deleteBackupSnapshot,
+  MAX_AUTOMATIC_SNAPSHOT_BYTES
+} from "./backup-history.js";
 
 const $ = selector => document.querySelector(selector);
 const form = $("#capture-form");
