@@ -15,6 +15,7 @@ This file is the persistent project checklist for the Linka improvements audit. 
 - [x] Prevent cloud merge from resurrecting items represented by deletion tombstones.
 - [x] Verified the current sync schema stores captures and deletion tombstones in one JSONB row per user; REST row pagination does not paginate individual captures.
 - [x] Give actionable errors for HTTP 413 and recognized oversized-payload failures; integration test covers remote read followed by a rejected upsert.
+- [~] Prevent legacy Android sync from truncating Web/Windows libraries over Android's 500-capture limit; reject oversized writes and preserve all deletion tombstones (Android PR CI pending).
 - [ ] Design incremental/chunked sync as a schema migration if very large libraries must exceed the current one-row JSONB payload.
 - [ ] Make sync writes atomic or staged so a failed batch cannot leave a partial library.
 - [ ] Add post-sync integrity checks for record count, IDs and changed content.
