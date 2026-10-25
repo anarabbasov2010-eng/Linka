@@ -11,6 +11,7 @@ import {
   startGoogleOAuth, completeGoogleOAuthCallback
 } from "./cloud-sync.js";
 import QRCode from "qrcode";
+import { listen as listenTauriEvent } from "@tauri-apps/api/event";
 import {
   createLinkaBackup, parseLinkaBackup
 } from "./backup-format.js";
@@ -133,6 +134,27 @@ const expandedCards = new Set();
 const desktopBuildVersion = String(import.meta.env.VITE_LINKA_DESKTOP_VERSION || "").trim();
 let reduceMotion = localStorage.getItem("linka.reduceMotion") === "true" || (localStorage.getItem("linka.reduceMotion") === null && (() => { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } })());
 
+function focusQuickCaptureFromNative() {
+  const input = $("#capture-text");
+  if (!input) return;
+  document.querySelector(".capture-preview-details")?.removeAttribute("open");
+  input.focus({ preventScroll: true });
+  input.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
+  const capturePanel = document.querySelector(".capture");
+  capturePanel?.classList.add("spotlight");
+  setTimeout(() => capturePanel?.classList.remove("spotlight"), 900);
+}
+async function registerNativeDesktopEvents() {
+  if (!(window.__TAURI_INTERNALS__ || window.__TAURI__)) return;
+  try {
+    await Promise.all([
+      listenTauriEvent("linka-global-capture", () => focusQuickCaptureFromNative()),
+      listenTauriEvent("linka-tray-quick-capture", () => focusQuickCaptureFromNative())
+    ]);
+  } catch (error) {
+    console.warn("Could not register Linka native desktop event listeners", error);
+  }
+}
 function say(message) {
   status.textContent = message;
   status.style.opacity = "1";
@@ -1845,6 +1867,7 @@ void completeGoogleOAuthCallback().then(session => {
 window.addEventListener("linka:open-cloud-settings", () => showCloudSyncНастройки());
 window.addEventListener("linka:open-atmosphere-settings", () => openAtmosphereSettings());
 window.addEventListener("linka:open-agreement", () => showAgreement({ mustAccept: false }));
+void registerNativeDesktopEvents();
 initLinkaExperience();
 initLinkaSignature();
 initVisualSystem();
