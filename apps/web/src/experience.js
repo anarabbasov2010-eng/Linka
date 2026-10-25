@@ -1222,6 +1222,7 @@ export function initLinkaExperience() {
     if (status) { status.textContent = String(event.detail || ""); status.style.opacity = "1"; }
   });
   document.addEventListener("linka:request-profile", () => openProfileEditor());
+  window.addEventListener("linka:open-keyboard-shortcuts", () => showKeyboardShortcuts());
   window.addEventListener("linka:capture-saved", notificationForSavedCapture);
   window.addEventListener("linka:profile-saved", () => window.dispatchEvent(new CustomEvent("linka:authenticated")));
   window.addEventListener("linka:oauth-complete", () => {
