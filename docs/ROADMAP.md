@@ -17,9 +17,10 @@ This file is the persistent project checklist for the Linka improvements audit. 
 - [x] Give actionable errors for HTTP 413 and recognized oversized-payload failures; integration test covers remote read followed by a rejected upsert.
 - [~] Prevent legacy Android sync from truncating Web/Windows libraries over Android's 500-capture limit; reject oversized writes and preserve all deletion tombstones (Android PR CI pending).
 - [ ] Design incremental/chunked sync as a schema migration if very large libraries must exceed the current one-row JSONB payload.
-- [ ] Make sync writes atomic or staged so a failed batch cannot leave a partial library.
+- [~] Use optimistic compare-and-set on `updated_at` and bounded retry/re-merge in updated Web/Windows and Android clients; older unconditional-upsert clients can still bypass this protection.
 - [ ] Add post-sync integrity checks for record count, IDs and changed content.
-- [ ] Add explicit conflict resolution for simultaneous edits on multiple devices.
+- [ ] Add a server-side atomic merge/RPC or migration path to protect against legacy clients that still issue unconditional upserts.
+- [~] Re-read and re-merge when updated clients detect a concurrent cloud write; a dedicated user-facing conflict review and cross-version protection remain open.
 - [ ] Surface sync state: last success, pending changes, retrying, and actionable errors.
 - [ ] Add safe retry with bounded backoff for transient network failures.
 - [ ] Keep deletes as tombstones until every relevant device has observed them or a retention policy expires.
