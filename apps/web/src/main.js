@@ -644,6 +644,7 @@ function dismissModalLayer(layer) {
   if (!layer?.isConnected || layer.classList.contains("closing")) return;
   layer.classList.add("closing");
   layer.setAttribute("aria-hidden", "true");
+  layer.inert = true;
   if (modalMotionReduced()) layer.remove();
   else window.setTimeout(() => layer.remove(), 230);
 }
