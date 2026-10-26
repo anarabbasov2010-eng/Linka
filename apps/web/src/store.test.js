@@ -18,6 +18,19 @@ test("saving and loading captures keeps normalized text", () => {
   assert.ok(storage.getItem(STORAGE_KEY));
 });
 
+test("saveCaptures rejects invalid batches without overwriting the last good library", () => {
+  const storage = memoryStorage();
+  const original = [makeCapture("keep this record")];
+  assert.equal(saveCaptures(original, storage), true);
+  const lastGoodRaw = storage.getItem(STORAGE_KEY);
+
+  assert.equal(saveCaptures([makeCapture("valid record"), { id: "broken", text: "   " }], storage), false);
+  assert.equal(storage.getItem(STORAGE_KEY), lastGoodRaw);
+  assert.equal(loadCaptures(storage)[0].text, "keep this record");
+  assert.equal(saveCaptures(null, storage), false);
+  assert.equal(storage.getItem(STORAGE_KEY), lastGoodRaw);
+});
+
 test("invalid stored JSON is preserved and blocks writes until the user chooses recovery", () => {
   const storage = memoryStorage();
   storage.setItem(STORAGE_KEY, "{broken source");
