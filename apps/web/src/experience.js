@@ -604,7 +604,6 @@ function openProfileEditor({ firstRun = false, close = () => {} } = {}) {
       localStorage.setItem(ONBOARDED_KEY, "true");
       setStatus(status, tr("profileSaved"));
       dialog.close();
-      if (firstRun) document.querySelector("#modal-root")?.replaceChildren();
       if (getCloudSession()) window.dispatchEvent(new CustomEvent("linka:profile-saved", { detail: profile }));
     } catch (error) { setStatus(status, error.message || tr("errors"), true); }
   });
