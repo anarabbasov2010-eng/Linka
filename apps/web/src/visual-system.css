@@ -671,7 +671,7 @@ body::after { opacity:.008; }
 .linka-appearance-control small { color:var(--muted); font-size:10px; line-height:1.55; }
 .linka-appearance-reset { width:100%; margin-top:8px; }
 @media (prefers-reduced-transparency: reduce) {
-  :root { --atelier-glass-opacity: .96; --atelier-glass-blur: 0px; }
+  :root { --atelier-glass-opacity: .96 !important; --atelier-glass-blur: 0px !important; }
 }
 @media (prefers-reduced-motion:reduce) {
   .linka-appearance-control input[type="range"] { scroll-behavior:auto; }
