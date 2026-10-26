@@ -627,3 +627,52 @@ body::after { opacity:.008; }
   #linka-atmosphere video,#linka-atmosphere img { animation:none !important; transition:none !important; }
   .item,.capture,.topbar,.linka-appearance-card,.linka-player-dock { transition:none !important; }
 }
+
+
+/* User-tunable Forest Atelier materials. Defaults preserve the current signature look. */
+:root {
+  --atelier-glass-opacity: .78;
+  --atelier-glass-blur: 20px;
+  --atelier-glass-saturation: 115%;
+  --atelier-background-dim: .72;
+}
+.topbar {
+  background: rgba(12,20,13,var(--atelier-glass-opacity));
+  backdrop-filter: blur(var(--atelier-glass-blur)) saturate(var(--atelier-glass-saturation));
+  -webkit-backdrop-filter: blur(var(--atelier-glass-blur)) saturate(var(--atelier-glass-saturation));
+}
+.capture {
+  background: linear-gradient(135deg,rgba(255,248,224,.055),transparent 43%),rgba(14,24,16,var(--atelier-glass-opacity));
+  backdrop-filter: blur(var(--atelier-glass-blur)) saturate(var(--atelier-glass-saturation));
+  -webkit-backdrop-filter: blur(var(--atelier-glass-blur)) saturate(var(--atelier-glass-saturation));
+}
+.item {
+  background: linear-gradient(145deg,rgba(255,248,224,.035),transparent 52%),rgba(13,22,14,var(--atelier-glass-opacity));
+  backdrop-filter: blur(var(--atelier-glass-blur)) saturate(var(--atelier-glass-saturation));
+  -webkit-backdrop-filter: blur(var(--atelier-glass-blur)) saturate(var(--atelier-glass-saturation));
+}
+.modal {
+  background: linear-gradient(145deg,rgba(255,248,224,.04),transparent 58%),rgba(12,20,13,min(1,calc(var(--atelier-glass-opacity) + .18)));
+  backdrop-filter: blur(var(--atelier-glass-blur)) saturate(var(--atelier-glass-saturation));
+  -webkit-backdrop-filter: blur(var(--atelier-glass-blur)) saturate(var(--atelier-glass-saturation));
+}
+.linka-settings-block,.linka-experience-panel {
+  background: linear-gradient(145deg,rgba(255,248,224,.035),transparent 60%),rgba(13,22,14,var(--atelier-glass-opacity));
+}
+#linka-atmosphere .veil { opacity: var(--atelier-background-dim); }
+.linka-appearance-control { display:grid; gap:8px; margin:12px 0; }
+.linka-appearance-control-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+.linka-appearance-control-head label { color:var(--text); font-size:12px; font-weight:650; }
+.linka-appearance-control-head output { color:var(--atelier-brass); font-size:11px; font-variant-numeric:tabular-nums; }
+.linka-appearance-control input[type="range"] {
+  width:100%; min-height:26px; margin:0; accent-color:var(--atelier-brass); cursor:pointer;
+}
+.linka-appearance-control input[type="range"]:focus-visible { outline:2px solid var(--atelier-brass); outline-offset:4px; border-radius:6px; }
+.linka-appearance-control small { color:var(--muted); font-size:10px; line-height:1.55; }
+.linka-appearance-reset { width:100%; margin-top:8px; }
+@media (prefers-reduced-transparency: reduce) {
+  :root { --atelier-glass-opacity: .96; --atelier-glass-blur: 0px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .linka-appearance-control input[type="range"] { scroll-behavior:auto; }
+}
