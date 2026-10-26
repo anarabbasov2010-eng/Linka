@@ -86,3 +86,9 @@
 
 - Local-first inbox capture, pin, edit, delete, copy, filter and export features.
 - Web storage tests and CI build.
+
+## Forest Atelier — adjustable materials
+- Added live, persistent controls for glass transparency, blur strength, glass color saturation, and background-scene dimming in Settings.
+- Added accessible slider labels, live numeric values, localized help text (English, Russian, Azerbaijani, Turkish), and a one-click appearance reset.
+- Centralized appearance values as CSS custom properties so Web and Windows share the same material controls.
+- Respects reduced-transparency preferences with a more opaque, blur-free fallback.
