@@ -1,5 +1,13 @@
 # Changelog
 
+## Next — Navigation and component polish
+
+- Refined the Web sidebar with a warmer moving active state, clearer icon emphasis and a quieter status footer.
+- Reworked the capture canvas, language picker, search field, filter chips, selection state, empty library, bulk-action toolbar and card actions to share the Forest Atelier control language.
+- Added more deliberate keyboard focus halos, themed scrollbars and responsive filter scrolling on narrow windows.
+- Polished hover and press feedback while preserving the reduced-motion and in-app reduced-motion settings.
+- Kept the Windows shell compact; shared component styling follows the same Forest Atelier tokens used by Web.
+
 ## Next — Consistent motion and graceful exits
 
 - Unified modal, settings, atmosphere-player and library-card entrance/exit timing into one restrained Forest Atelier motion system.
