@@ -786,3 +786,28 @@ html.reduced-motion .linka-card-exit {
     animation: none !important;
   }
 }
+
+
+/* The command palette remains mounted long enough to complete its exit motion. */
+.linka-command-root.is-closing {
+  pointer-events: none !important;
+  animation: linka-overlay-exit 180ms var(--ease-linka-exit) both;
+}
+.linka-command-root.is-closing .linka-command-dialog {
+  animation: linka-panel-exit 180ms var(--ease-linka-exit) both;
+}
+.linka-command-root.is-closing .linka-command-backdrop {
+  animation: linka-overlay-exit 180ms var(--ease-linka-exit) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .linka-command-root.is-closing,
+  .linka-command-root.is-closing .linka-command-dialog,
+  .linka-command-root.is-closing .linka-command-backdrop {
+    animation: none !important;
+  }
+}
+html.reduced-motion .linka-command-root.is-closing,
+html.reduced-motion .linka-command-root.is-closing .linka-command-dialog,
+html.reduced-motion .linka-command-root.is-closing .linka-command-backdrop {
+  animation: none !important;
+}
