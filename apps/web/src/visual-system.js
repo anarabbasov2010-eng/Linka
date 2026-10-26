@@ -11,21 +11,6 @@ const THEME_PRESETS = {
     "--bg": "#08100B", "--panel": "rgba(15,26,18,.84)", "--panel-solid": "#101B13", "--panel-raised": "#1A291D",
     "--line": "rgba(232,223,200,.11)", "--line-strong": "rgba(200,173,121,.34)", "--text": "#EEE7D4",
     "--muted": "#ADB5A3", "--soft": "#D9CFB7", "--shadow": "0 28px 88px rgba(0,0,0,.42)", "--surface-top": "rgba(255,248,224,.045)"
-  },
-  dark: {
-    "--bg": "#09090B", "--panel": "rgba(17,17,20,.90)", "--panel-solid": "#111114", "--panel-raised": "#1B1B21",
-    "--line": "rgba(255,255,255,.09)", "--line-strong": "rgba(255,255,255,.16)", "--text": "#EDEDF2",
-    "--muted": "#9696A3", "--soft": "#CFCFD8", "--shadow": "0 22px 80px rgba(0,0,0,.34)", "--surface-top": "rgba(255,255,255,.035)"
-  },
-  light: {
-    "--bg": "#F4F2ED", "--panel": "rgba(255,255,255,.88)", "--panel-solid": "#FFFFFF", "--panel-raised": "#EBE8E1",
-    "--line": "rgba(37,34,28,.10)", "--line-strong": "rgba(37,34,28,.18)", "--text": "#24232A",
-    "--muted": "#74717A", "--soft": "#53515A", "--shadow": "0 22px 70px rgba(42,35,24,.12)", "--surface-top": "rgba(25,20,10,.025)"
-  },
-  oled: {
-    "--bg": "#000000", "--panel": "rgba(6,6,8,.92)", "--panel-solid": "#050506", "--panel-raised": "#101014",
-    "--line": "rgba(255,255,255,.10)", "--line-strong": "rgba(255,255,255,.18)", "--text": "#F5F5F7",
-    "--muted": "#92929D", "--soft": "#D0D0D8", "--shadow": "0 22px 80px rgba(0,0,0,.55)", "--surface-top": "rgba(255,255,255,.025)"
   }
 };
 
