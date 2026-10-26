@@ -28,11 +28,19 @@ export function normalizeCapture(item) {
   const text = typeof item.text === "string" ? item.text.trim() : "";
   if (!text) return null;
   const createdAt = Number(item.createdAt || item.savedAt || Date.now());
+  const safeCreatedAt = Number.isFinite(createdAt) && createdAt > 0 ? createdAt : Date.now();
+  const rawId = item.id;
+  const suppliedId = typeof rawId === "string" || typeof rawId === "number"
+    ? String(rawId).trim().slice(0, 200)
+    : "";
+  const id = suppliedId || `capture-${safeCreatedAt}-${Math.random().toString(36).slice(2, 8)}`;
+  const updatedAt = Number(item.updatedAt || safeCreatedAt);
+  const safeUpdatedAt = Number.isFinite(updatedAt) && updatedAt > 0 ? updatedAt : safeCreatedAt;
   return {
-    id: String(item.id || `capture-${createdAt}-${Math.random().toString(36).slice(2, 8)}`),
+    id,
     text: text.slice(0, 100000),
-    createdAt: Number.isFinite(createdAt) && createdAt > 0 ? createdAt : Date.now(),
-    updatedAt: Number(item.updatedAt || createdAt || Date.now()),
+    createdAt: safeCreatedAt,
+    updatedAt: safeUpdatedAt,
     pinned: Boolean(item.pinned),
     readLater: Boolean(item.readLater),
     archivedAt: Math.max(0, Number(item.archivedAt) || 0),
@@ -205,7 +213,7 @@ export function saveCaptures(items, storage = globalThis.localStorage) {
 }
 export function parseSearchQuery(query = "") {
   const tokens = String(query).match(/"[^"]*"|\S+/g) || [];
-  const parsed = { text: [], type: "", pinned: false, readLater: false, archived: false, trashed: false, tag: "", collection: "", site: "", before: null, after: null };
+  const parsed = { text: [], type: "", pinned: false, readLater: false, archived: false, trashed: false, untagged: false, hasTags: false, hasCover: false, hasDescription: false, tag: "", collection: "", site: "", before: null, after: null };
   for (const raw of tokens) {
     const token = raw.replace(/^"|"$/g, "");
     const lower = token.toLocaleLowerCase();
@@ -213,6 +221,10 @@ export function parseSearchQuery(query = "") {
     if (lower === "is:later" || lower === "is:readlater") { parsed.readLater = true; continue; }
     if (lower === "is:archived") { parsed.archived = true; continue; }
     if (lower === "is:trash" || lower === "is:trashed") { parsed.trashed = true; continue; }
+    if (lower === "is:untagged") { parsed.untagged = true; continue; }
+    if (lower === "has:tags") { parsed.hasTags = true; continue; }
+    if (lower === "has:cover") { parsed.hasCover = true; continue; }
+    if (lower === "has:description") { parsed.hasDescription = true; continue; }
     if (lower.startsWith("tag:") && lower.slice(4).trim()) { parsed.tag = lower.slice(4).trim().replace(/^#+/, ""); continue; }
     if (lower.startsWith("in:") && lower.slice(3).trim()) { parsed.collection = lower.slice(3).trim(); continue; }
     if (lower === "type:link" || lower === "type:note") { parsed.type = lower.slice(5); continue; }
@@ -233,6 +245,42 @@ export function parseSearchQuery(query = "") {
   return { ...parsed, text: parsed.text.join(" ").trim().toLocaleLowerCase() };
 }
 
+function fuzzyWordDistanceWithin(a, b, maxDistance) {
+  if (Math.abs(a.length - b.length) > maxDistance) return false;
+  if (a === b) return true;
+  if (!a || !b) return false;
+  let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= a.length; i += 1) {
+    const current = [i];
+    let rowMinimum = i;
+    for (let j = 1; j <= b.length; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      current[j] = Math.min(current[j - 1] + 1, previous[j] + 1, previous[j - 1] + cost);
+      rowMinimum = Math.min(rowMinimum, current[j]);
+    }
+    if (rowMinimum > maxDistance) return false;
+    previous = current;
+  }
+  return previous[b.length] <= maxDistance;
+}
+
+/**
+ * Conservative typo tolerance for a single search word. Exact substring search
+ * remains the first path; fuzzy matching is bounded to word tokens and never
+ * treats short queries as approximate matches.
+ */
+export function fuzzyTextMatch(searchableText, query) {
+  const needle = String(query || "").trim().toLocaleLowerCase();
+  if (needle.length < 4 || /\s/u.test(needle) || needle.length > 48) return false;
+  const maxDistance = needle.length >= 8 ? 2 : 1;
+  const words = String(searchableText || "").toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
+  for (const rawWord of words.slice(0, 20000)) {
+    if (Math.abs(rawWord.length - needle.length) > maxDistance) continue;
+    if (fuzzyWordDistanceWithin(rawWord, needle, maxDistance)) return true;
+  }
+  return false;
+}
+
 export function visibleCaptures(items, filter = "all", query = "") {
   const parsed = parseSearchQuery(query);
   const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
@@ -249,7 +297,12 @@ export function visibleCaptures(items, filter = "all", query = "") {
     if (filter === "read-later" && !item.readLater) return false;
     if (parsed.pinned && !item.pinned) return false;
     if (parsed.readLater && !item.readLater) return false;
-    if (parsed.tag && !(item.tags || []).some(tag => String(tag).toLocaleLowerCase().includes(parsed.tag))) return false;
+    const itemTags = Array.isArray(item.tags) ? item.tags : [];
+    if (parsed.untagged && itemTags.length > 0) return false;
+    if (parsed.hasTags && itemTags.length === 0) return false;
+    if (parsed.hasCover && !String(item.previewImageUrl || "").trim()) return false;
+    if (parsed.hasDescription && !String(item.previewDescription || "").trim()) return false;
+    if (parsed.tag && !itemTags.some(tag => String(tag).toLocaleLowerCase().includes(parsed.tag))) return false;
     if (parsed.collection && !String(item.collection || "").toLocaleLowerCase().includes(parsed.collection)) return false;
     if (parsed.type === "link" && !isLink) return false;
     if (parsed.type === "note" && isLink) return false;
@@ -261,7 +314,7 @@ export function visibleCaptures(items, filter = "all", query = "") {
     if (parsed.before !== null && !(savedAt < parsed.before)) return false;
     if (parsed.after !== null && !(savedAt >= parsed.after)) return false;
     const searchable = [item.text, item.previewTitle, item.previewDescription, host, ...(item.tags || []), item.collection || ""].join(" ").toLocaleLowerCase();
-    return !parsed.text || searchable.includes(parsed.text);
+    return !parsed.text || searchable.includes(parsed.text) || fuzzyTextMatch(searchable, parsed.text);
   }).sort((a,b) => Number(b.pinned)-Number(a.pinned) || b.updatedAt-a.updatedAt);
 }
 export function sortCaptures(items, mode = "updated") {
