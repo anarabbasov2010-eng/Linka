@@ -21,8 +21,8 @@ test("Markdown outline records heading depth, source line and source offset", ()
   const source = "Intro\n\n# Start\nText\n### [Linked](https://example.com) section\n## End";
   assert.deepEqual(extractMarkdownOutline(source), [
     { level: 1, title: "Start", line: 2, offset: 7 },
-    { level: 3, title: "Linked section", line: 4, offset: 17 },
-    { level: 2, title: "End", line: 5, offset: 57 }
+    { level: 3, title: "Linked section", line: 4, offset: 20 },
+    { level: 2, title: "End", line: 5, offset: 62 }
   ]);
 });
 
