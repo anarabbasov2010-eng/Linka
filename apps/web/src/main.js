@@ -292,7 +292,11 @@ function motionIsReduced() {
 }
 function animateLeavingCards(cards) {
   if (!cards.length || motionIsReduced()) return;
-  for (const { node, rect } of cards) {
+  // Searching a large library must not create hundreds of temporary DOM nodes.
+  // Keep the visible transition, but cap the exit layer to a small, predictable cost.
+  document.querySelectorAll(".linka-card-exit").forEach(ghost => ghost.remove());
+  const maxAnimatedDepartures = 12;
+  for (const { node, rect } of cards.slice(0, maxAnimatedDepartures)) {
     if (!rect || rect.width < 2 || rect.height < 2) continue;
     const ghost = node.cloneNode(true);
     ghost.classList.add("linka-card-exit");
