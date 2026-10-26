@@ -64,7 +64,7 @@ const bulkToolbar = document.createElement("div");
 bulkToolbar.className = "bulk-toolbar";
 bulkToolbar.hidden = true;
 list.parentElement.insertBefore(bulkToolbar, list);
-search.title = "Search operators: type:link, type:note, is:pinned, is:later, tag:design, in:research, site:example.com, before:YYYY-MM-DD, after:YYYY-MM-DD";
+search.title = "Search operators: type:link, type:note, is:pinned, is:later, is:untagged, has:tags, has:cover, has:description, tag:design, in:research, site:example.com, before:YYYY-MM-DD, after:YYYY-MM-DD";
 function captureUiText(key) {
   const language = (() => { try { return localStorage.getItem("linka.language.v1") || "en"; } catch { return "en"; } })();
   const copy = {
