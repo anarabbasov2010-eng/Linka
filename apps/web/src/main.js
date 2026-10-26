@@ -369,6 +369,9 @@ function render() {
     }
   }
   const visibleIds = new Set(shown.map(item => item.id));
+  const previousVisibleIds = new Set(
+    Array.from(list.querySelectorAll(".item[data-item-id]"), node => node.dataset.itemId)
+  );
   const leavingCards = Array.from(list.querySelectorAll(".item[data-item-id]"))
     .filter(node => !visibleIds.has(node.dataset.itemId))
     .map(node => ({ node, rect: node.getBoundingClientRect() }));
@@ -386,10 +389,16 @@ function render() {
     animateLeavingCards(leavingCards);
     return;
   }
+  let animatedArrivals = 0;
+  const maxAnimatedArrivals = motionIsReduced() ? 0 : 12;
   shown.forEach((item, index) => {
     const card = document.createElement("article");
     card.dataset.itemId = item.id;
     card.className = "item" + (item.pinned ? " pinned" : "") + (expandedCards.has(item.id) ? " expanded" : "") + (selectedIds.has(item.id) ? " is-selected" : "");
+    if (!previousVisibleIds.has(item.id) && animatedArrivals < maxAnimatedArrivals) {
+      card.classList.add("linka-card-enter");
+      animatedArrivals++;
+    }
     card.style.setProperty("--index", String(index));
     const head = document.createElement("div"); head.className = "item-head";
     const kind = document.createElement("span"); kind.className = "kind";
