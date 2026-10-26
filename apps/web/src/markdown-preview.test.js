@@ -16,7 +16,8 @@ test("escapes raw HTML instead of executing it", () => {
   const html = renderMarkdownToHtml('<img src=x onerror="alert(1)">\n\n<script>alert(2)</script>');
   assert.match(html, /&lt;img src=x onerror=&quot;alert\(1\)&quot;&gt;/);
   assert.match(html, /&lt;script&gt;alert\(2\)&lt;\/script&gt;/);
-  assert.doesNotMatch(html, /<img\b|<script\b|onerror=/i);
+  assert.doesNotMatch(html, /<img\b|<script\b/i);
+  assert.doesNotMatch(html, /<[^>]*\bonerror=/i);
 });
 
 test("only safe HTTP(S) links become anchors", () => {
