@@ -7,6 +7,9 @@
 - Library cards that leave the active filter or search results animate out without blocking input or retaining interactive ghost controls.
 - Atmosphere settings and player panels now close with a coordinated fade, blur and short movement rather than an abrupt removal.
 - Both the operating-system reduced-motion preference and Linka's in-app reduced-motion setting suppress non-essential animation.
+- The command palette, document editor, settings overlays, and music player disable interaction while exiting and restore keyboard focus to the invoking control.
+- Reduced-transparency preferences now override inline glass-slider values, so the accessibility fallback is respected even after the user customizes the glass.
+- Exit animations for departing library cards are capped to avoid generating large temporary DOM trees during broad searches.
 - Web CI and Windows desktop PR validation are running; builds must finish successfully before this branch is release-ready.
 
 
