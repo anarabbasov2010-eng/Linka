@@ -1298,3 +1298,147 @@ html.reduced-motion .bulk-toolbar {
 .web-nav-item:focus-visible .web-nav-glyph svg { stroke: var(--atelier-brass); }
 @media (prefers-reduced-motion: reduce) { .web-nav-glyph svg { transition: none !important; } }
 html.reduced-motion .web-nav-glyph svg { transition: none !important; }
+
+
+/* Document workspace, player and atmosphere settings: unified controls inside custom panels. */
+.linka-doc-header,.linka-doc-actions,.linka-doc-footer {
+  border-color: var(--atelier-edge-soft) !important;
+}
+.linka-doc-header {
+  background: linear-gradient(100deg,color-mix(in srgb,var(--atelier-brass) 5%,transparent),transparent 72%);
+}
+.linka-doc-headcopy h2,.linka-doc-headcopy strong {
+  font-family: "Palatino Linotype","Book Antiqua","Iowan Old Style",Baskerville,Georgia,serif;
+  letter-spacing: -.035em;
+}
+.linka-doc-mark {
+  background: linear-gradient(145deg,color-mix(in srgb,var(--atelier-brass) 16%,var(--panel-raised)),var(--panel)) !important;
+  box-shadow: 0 1px 0 rgba(255,248,224,.07) inset;
+}
+.linka-doc-fields { gap: 13px; }
+.linka-doc-label { color: var(--atelier-sage) !important; letter-spacing: .12em !important; }
+.linka-doc-title {
+  color: var(--atelier-paper) !important;
+  caret-color: var(--atelier-brass);
+  font-family: "Palatino Linotype","Book Antiqua","Iowan Old Style",Baskerville,Georgia,serif !important;
+  letter-spacing: -.025em;
+  transition: border-color 180ms var(--ease-linka), box-shadow 180ms var(--ease-linka), background 180ms var(--ease-linka);
+}
+.linka-doc-title:hover { border-color: color-mix(in srgb,var(--atelier-brass) 25%,var(--line-strong)) !important; }
+.linka-doc-title:focus-visible,.linka-doc-body:focus-visible {
+  outline: 2px solid var(--atelier-brass) !important; outline-offset: 2px;
+}
+.linka-doc-body-wrap {
+  border-color: var(--atelier-edge-soft) !important;
+  background: linear-gradient(155deg,rgba(255,248,224,.018),transparent 58%),rgba(4,10,6,.22) !important;
+  transition: border-color 200ms var(--ease-linka), box-shadow 200ms var(--ease-linka), background 200ms var(--ease-linka);
+}
+.linka-doc-body-wrap:focus-within {
+  border-color: color-mix(in srgb,var(--atelier-brass) 56%,var(--line-strong)) !important;
+  box-shadow: 0 0 0 3px var(--atelier-focus-halo) !important;
+}
+.linka-doc-body {
+  color: var(--atelier-paper) !important;
+  caret-color: var(--atelier-brass);
+  line-height: 1.9 !important;
+  letter-spacing: .005em;
+  text-rendering: optimizeLegibility;
+}
+.linka-doc-footer {
+  background: color-mix(in srgb,var(--panel) 30%,transparent);
+}
+.linka-doc-footer-status { font-variant-numeric: tabular-nums; }
+.linka-doc-btn {
+  border-color: var(--atelier-edge-soft) !important;
+  border-radius: 11px !important;
+  transition: color 180ms var(--ease-linka),background 180ms var(--ease-linka),border-color 180ms var(--ease-linka),transform 180ms var(--ease-linka),box-shadow 180ms var(--ease-linka) !important;
+}
+.linka-doc-btn:hover { border-color: color-mix(in srgb,var(--atelier-brass) 35%,var(--line-strong)) !important; transform: translateY(-1px); }
+.linka-doc-btn.primary {
+  color: #172014 !important;
+  box-shadow: 0 5px 15px color-mix(in srgb,var(--atelier-brass) 15%,transparent),0 1px 0 rgba(255,255,255,.18) inset;
+}
+.linka-doc-recent-item {
+  border-color: var(--atelier-edge-soft) !important;
+  background: color-mix(in srgb,var(--panel) 65%,transparent) !important;
+  transition: border-color 180ms var(--ease-linka),background 180ms var(--ease-linka),transform 180ms var(--ease-linka) !important;
+}
+.linka-doc-recent-item:hover {
+  border-color: color-mix(in srgb,var(--atelier-brass) 34%,var(--line-strong)) !important;
+  transform: translateY(-1px);
+}
+.linka-doc-error {
+  border-color: color-mix(in srgb,#d48b63 44%,var(--line-strong)) !important;
+  border-radius: 12px;
+}
+.linka-player-track strong,.linka-player-current strong {
+  font-family: "Palatino Linotype","Book Antiqua","Iowan Old Style",Baskerville,Georgia,serif;
+  letter-spacing: -.02em;
+}
+.linka-player-art {
+  background: linear-gradient(145deg,color-mix(in srgb,var(--atelier-brass) 26%,var(--panel-raised)),color-mix(in srgb,var(--atelier-sage) 14%,var(--panel))) !important;
+  color: var(--atelier-brass) !important;
+  border: 1px solid color-mix(in srgb,var(--atelier-brass) 22%,var(--line-strong));
+}
+.linka-player-button {
+  border-color: var(--atelier-edge-soft) !important;
+  transition: transform 180ms var(--ease-linka),background 180ms var(--ease-linka),border-color 180ms var(--ease-linka),box-shadow 180ms var(--ease-linka) !important;
+}
+.linka-player-button:hover {
+  border-color: color-mix(in srgb,var(--atelier-brass) 42%,var(--line-strong)) !important;
+  box-shadow: 0 5px 16px rgba(0,0,0,.12);
+  transform: translateY(-1px);
+}
+.linka-player-button:active { transform: scale(.96); }
+.linka-player-play {
+  box-shadow: 0 6px 18px color-mix(in srgb,var(--atelier-brass) 15%,transparent),0 1px 0 rgba(255,255,255,.18) inset;
+}
+.linka-player-seek,.linka-player-volume input[type="range"] {
+  width: 100%; accent-color: var(--atelier-brass); cursor: pointer;
+}
+.linka-player-seek:focus-visible,.linka-player-volume input[type="range"]:focus-visible {
+  outline: 2px solid var(--atelier-brass); outline-offset: 3px;
+}
+.linka-player-playlist-item {
+  border-color: transparent !important;
+  border-radius: 12px !important;
+  transition: background 180ms var(--ease-linka),border-color 180ms var(--ease-linka),transform 180ms var(--ease-linka) !important;
+}
+.linka-player-playlist-item:hover {
+  border-color: var(--atelier-edge-soft) !important;
+  background: color-mix(in srgb,var(--panel-raised) 82%,transparent) !important;
+}
+.linka-atmosphere-title-row h2 {
+  font-family: "Palatino Linotype","Book Antiqua","Iowan Old Style",Baskerville,Georgia,serif;
+  letter-spacing: -.04em;
+}
+.linka-atmosphere-setting {
+  border-color: var(--atelier-edge-soft) !important;
+  border-radius: 14px !important;
+  transition: background 180ms var(--ease-linka),border-color 180ms var(--ease-linka),transform 180ms var(--ease-linka) !important;
+}
+.linka-atmosphere-setting:hover { border-color: color-mix(in srgb,var(--atelier-brass) 22%,var(--line-strong)) !important; }
+.linka-atmosphere-toggle { transition: background 180ms var(--ease-linka),border-color 180ms var(--ease-linka) !important; }
+.linka-atmosphere-actions button {
+  border-color: var(--atelier-edge-soft) !important;
+  border-radius: 11px !important;
+  transition: border-color 180ms var(--ease-linka),background 180ms var(--ease-linka),transform 180ms var(--ease-linka) !important;
+}
+.linka-atmosphere-actions button:hover { border-color: color-mix(in srgb,var(--atelier-brass) 38%,var(--line-strong)) !important; transform: translateY(-1px); }
+.linka-atmosphere-state { color: var(--atelier-sage) !important; }
+@media (prefers-reduced-motion: reduce) {
+  .linka-doc-title,.linka-doc-body-wrap,.linka-doc-btn,.linka-doc-recent-item,.linka-player-button,.linka-player-playlist-item,.linka-atmosphere-setting,.linka-atmosphere-toggle,.linka-atmosphere-actions button {
+    transition: none !important; animation: none !important;
+  }
+}
+html.reduced-motion .linka-doc-title,
+html.reduced-motion .linka-doc-body-wrap,
+html.reduced-motion .linka-doc-btn,
+html.reduced-motion .linka-doc-recent-item,
+html.reduced-motion .linka-player-button,
+html.reduced-motion .linka-player-playlist-item,
+html.reduced-motion .linka-atmosphere-setting,
+html.reduced-motion .linka-atmosphere-toggle,
+html.reduced-motion .linka-atmosphere-actions button {
+  transition: none !important; animation: none !important;
+}
