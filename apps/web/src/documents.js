@@ -284,7 +284,9 @@ function closeEditor() {
   overlay = null;
   currentDocument = null;
   titleField = null; bodyField = null; statusLine = null; recentList = null; inputPicker = null;
-  setTimeout(() => old?.remove(), reducedMotion() ? 0 : 460);
+  // The window's closing transform/filter transition is 550 ms; keep the
+  // overlay mounted a little longer so the fade completes instead of snapping away.
+  window.setTimeout(() => old?.remove(), reducedMotion() ? 0 : 600);
   document.removeEventListener("keydown", handleKeyDown);
   previousFocus?.focus?.();
 }
