@@ -267,6 +267,8 @@ function modal(titleText, subtitleText, options = {}) {
     for (const previous of Array.from(modalRoot.children)) {
       if (previous.classList.contains("closing")) continue;
       previous.classList.add("closing");
+      previous.setAttribute("aria-hidden", "true");
+      previous.inert = true;
       const reduced = Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches)
         || document.documentElement.classList.contains("reduced-motion");
       if (reduced) previous.remove();
@@ -278,6 +280,7 @@ function modal(titleText, subtitleText, options = {}) {
     if (!layer.isConnected || layer.classList.contains("closing")) return;
     layer.classList.add("closing");
     layer.setAttribute("aria-hidden", "true");
+    layer.inert = true;
     const reduced = Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches)
       || document.documentElement.classList.contains("reduced-motion");
     if (reduced) layer.remove();
