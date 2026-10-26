@@ -281,6 +281,38 @@ export function fuzzyTextMatch(searchableText, query) {
   return false;
 }
 
+/**
+ * Build stable local-calendar date keys for a capture timeline.
+ * Date grouping intentionally uses the device locale/time zone, matching Today.
+ */
+export function captureDateKey(item) {
+  const raw = Number(item?.createdAt || item?.savedAt || item?.updatedAt || 0);
+  const date = new Date(Number.isFinite(raw) && raw > 0 ? raw : 0);
+  if (!Number.isFinite(date.getTime()) || !raw) return "unknown";
+  const pad = value => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+export function groupCapturesByDate(items) {
+  const sorted = [...(Array.isArray(items) ? items : [])].sort((a, b) =>
+    Number(b?.createdAt || b?.updatedAt || 0) - Number(a?.createdAt || a?.updatedAt || 0)
+  );
+  const groups = [];
+  const byKey = new Map();
+  for (const item of sorted) {
+    if (!item || typeof item !== "object") continue;
+    const key = captureDateKey(item);
+    let group = byKey.get(key);
+    if (!group) {
+      group = { dateKey: key, timestamp: Number(item.createdAt || item.updatedAt || 0), captures: [] };
+      byKey.set(key, group);
+      groups.push(group);
+    }
+    group.captures.push(item);
+  }
+  return groups;
+}
+
 export function visibleCaptures(items, filter = "all", query = "") {
   const parsed = parseSearchQuery(query);
   const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
