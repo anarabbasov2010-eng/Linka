@@ -1287,3 +1287,14 @@ html.reduced-motion .item-collection,
 html.reduced-motion .bulk-toolbar {
   transition: none !important; animation: none !important;
 }
+
+
+/* Navigation uses consistent, lightweight stroke icons rather than font-dependent glyphs. */
+.web-nav-glyph svg {
+  display: block; width: 16px; height: 16px; flex: 0 0 16px; overflow: visible;
+  fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+  transition: stroke 180ms var(--ease-linka), transform 220ms var(--ease-linka);
+}
+.web-nav-item:focus-visible .web-nav-glyph svg { stroke: var(--atelier-brass); }
+@media (prefers-reduced-motion: reduce) { .web-nav-glyph svg { transition: none !important; } }
+html.reduced-motion .web-nav-glyph svg { transition: none !important; }
