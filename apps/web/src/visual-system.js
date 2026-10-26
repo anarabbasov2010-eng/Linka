@@ -8,9 +8,9 @@ const EFFECTS = ["quiet", "balanced", "atmosphere"];
 const THEMES = ["forest"];
 const THEME_PRESETS = {
   forest: {
-    "--bg": "#0B120D", "--panel": "rgba(18,28,20,.88)", "--panel-solid": "#121C14", "--panel-raised": "#1B291D",
-    "--line": "rgba(232,223,200,.105)", "--line-strong": "rgba(181,154,105,.30)", "--text": "#E8DFC8",
-    "--muted": "#B3BDA9", "--soft": "#D1C3A2", "--shadow": "0 28px 88px rgba(0,0,0,.33)", "--surface-top": "rgba(255,255,255,.035)"
+    "--bg": "#08100B", "--panel": "rgba(15,26,18,.84)", "--panel-solid": "#101B13", "--panel-raised": "#1A291D",
+    "--line": "rgba(232,223,200,.11)", "--line-strong": "rgba(200,173,121,.34)", "--text": "#EEE7D4",
+    "--muted": "#ADB5A3", "--soft": "#D9CFB7", "--shadow": "0 28px 88px rgba(0,0,0,.42)", "--surface-top": "rgba(255,248,224,.045)"
   },
   dark: {
     "--bg": "#09090B", "--panel": "rgba(17,17,20,.90)", "--panel-solid": "#111114", "--panel-raised": "#1B1B21",
@@ -104,7 +104,7 @@ export function initVisualSystem() {
   setLinkaTheme("forest");
   setLinkaAccent(storageGet("linka.accent", "forest"));
   setLinkaDensity(storageGet("linka.density", "standard"));
-  setLinkaEffects(storageGet("linka.effects", "atmosphere"));
+  setLinkaEffects(storageGet("linka.effects", "balanced"));
 
   const savedMotion = storageGet("linka.reduceMotion", "");
   let reducedMotion = savedMotion === "true";
