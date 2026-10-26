@@ -572,3 +572,37 @@ mark.search-highlight {
 .search-result.command-result { text-align: left; }
 .search-result.command-selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--surface-top)); }
 .search-result.command-selected .search-thumb { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
+
+
+/* Persistent, accessible cloud synchronization state. */
+.cloud-sync-status {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  max-width:180px;
+  min-height:25px;
+  padding:4px 8px;
+  overflow:hidden;
+  border:1px solid var(--line);
+  border-radius:9px;
+  color:var(--muted);
+  background:var(--panel-solid);
+  font-size:10px;
+  line-height:1.25;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+}
+.cloud-sync-status::before {
+  content:"";
+  flex:0 0 6px;
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  background:currentColor;
+  opacity:.72;
+}
+.cloud-sync-status[data-state="success"] { color:#5eaa83; border-color:color-mix(in srgb,#5eaa83 28%,var(--line)); }
+.cloud-sync-status[data-state="pending"],.cloud-sync-status[data-state="syncing"] { color:var(--accent); }
+.cloud-sync-status[data-state="error"] { color:#d97070; border-color:color-mix(in srgb,#d97070 35%,var(--line)); }
+@media(max-width:760px) { .cloud-sync-status { max-width:132px; font-size:9px; padding:4px 6px; } }
+@media(max-width:520px) { .cloud-sync-status { max-width:100px; white-space:normal; } }
