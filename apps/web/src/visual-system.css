@@ -648,3 +648,13 @@ mark.search-highlight {
 }
 .timeline-item .date { font-variant-numeric:tabular-nums; }
 .timeline-mode .empty { max-width:640px; margin-inline:auto; }
+
+
+/* Keyboard-accessible one-step history controls. */
+.history-toolbar { display:inline-flex; align-items:center; gap:5px; }
+.history-toolbar .history-action { min-height:33px; padding:6px 9px; font-size:10px; }
+.history-toolbar .history-action:disabled { opacity:.38; cursor:not-allowed; transform:none; }
+@media(max-width:680px) {
+  .history-toolbar { flex:1 1 auto; }
+  .history-toolbar .history-action { flex:1 1 60px; }
+}
