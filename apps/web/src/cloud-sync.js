@@ -1,3 +1,5 @@
+import { getCaptureRecovery } from "./store.js";
+
 const CONFIG_KEY = "linka.cloud.config.v1";
 const SESSION_KEY = "linka.cloud.session.v1";
 export const DELETED_IDS_KEY = "linka.deletedIds.v1";
@@ -56,6 +58,9 @@ async function readResponse(response) {
   if (!response.ok) {
     const detail = data.msg || data.message || data.error_description || data.error || "";
     if (response.status === 401 || response.status === 403) throw new Error("Linka sign-in failed. Check the Google OAuth configuration and try again.");
+    if (response.status === 413 || (response.status === 400 && /payload too large|request entity too large/i.test(raw))) {
+      throw new Error("The cloud service rejected a request because its payload is too large. For Cloud Sync, export a backup and reduce the amount or size of synced data before retrying.");
+    }
     if (response.status === 404 || (response.status === 400 && /linka_sync/i.test(raw))) {
       throw new Error("The Linka sync table is missing. Set up the shared sync database first.");
     }
@@ -113,6 +118,16 @@ export function readDeletedIds(storage = globalThis.localStorage) {
     return new Set(Array.isArray(parsed) ? parsed.filter(x => typeof x === "string" && x) : []);
   } catch { return new Set(); }
 }
+export function setDeletedIds(ids, storage = globalThis.localStorage) {
+  const clean = [...new Set([...(ids || [])].filter(id => typeof id === "string" && id).map(id => id.slice(0, 200)))];
+  try {
+    if (!storage || typeof storage.setItem !== "function") return false;
+    storage.setItem(DELETED_IDS_KEY, JSON.stringify(clean));
+    return true;
+  } catch {
+    return false;
+  }
+}
 export function addDeletedIds(ids, storage = globalThis.localStorage) {
   const deleted = readDeletedIds(storage);
   for (const id of ids || []) {
@@ -141,6 +156,13 @@ export function removeDeletedIds(ids, storage = globalThis.localStorage) {
     return false;
   }
 }
+export function excludeDeletedCaptures(captures, deletedIds) {
+  const tombstones = deletedIds instanceof Set ? deletedIds : new Set(deletedIds || []);
+  return (Array.isArray(captures) ? captures : []).filter(item =>
+    item && typeof item.id === "string" && item.id && !tombstones.has(item.id)
+  );
+}
+
 export function mergeCloudCaptures(localCaptures, remoteCaptures, deletedIds, maxItems = Number.POSITIVE_INFINITY) {
   const tombstones = deletedIds instanceof Set ? deletedIds : new Set(deletedIds || []);
   const mergedById = new Map();
@@ -291,7 +313,50 @@ export async function claimQrPairing({ id, secret, url, key }) {
   return { session, config };
 }
 
+const RETRYABLE_CLOUD_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
+const MAX_CLOUD_REQUEST_ATTEMPTS = 3;
+
+function cloudRetryDelay(response, attempt) {
+  const retryAfter = response?.headers?.get?.("Retry-After");
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    const requested = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(retryAfter) - Date.now();
+    if (Number.isFinite(requested) && requested > 0) return Math.min(2000, requested);
+  }
+  return Math.min(800, 150 * (2 ** attempt));
+}
+
+/**
+ * Retry only transient cloud failures. Conditional writes make a retried PATCH
+ * safe: if the first request committed but its response was lost, its revision
+ * no longer matches and the outer sync loop re-reads and merges the new row.
+ */
+async function fetchCloudWithRetry(url, options) {
+  let lastError = null;
+  for (let attempt = 0; attempt < MAX_CLOUD_REQUEST_ATTEMPTS; attempt += 1) {
+    let response;
+    try {
+      response = await fetch(url, options);
+    } catch (error) {
+      lastError = error;
+      if (attempt + 1 >= MAX_CLOUD_REQUEST_ATTEMPTS) throw error;
+      await new Promise(resolve => setTimeout(resolve, cloudRetryDelay(null, attempt)));
+      continue;
+    }
+    if (!RETRYABLE_CLOUD_STATUSES.has(response.status) || attempt + 1 >= MAX_CLOUD_REQUEST_ATTEMPTS) {
+      return response;
+    }
+    await new Promise(resolve => setTimeout(resolve, cloudRetryDelay(response, attempt)));
+  }
+  if (lastError) throw lastError;
+  throw new Error("Cloud request failed after retries.");
+}
+
 export async function syncCloudCaptures(localCaptures, localDeletedIds = readDeletedIds(), profile = readLinkaProfile()) {
+  const recovery = getCaptureRecovery();
+  if (recovery && !recovery.acknowledged) {
+    throw new Error("Local capture storage needs recovery. Export the damaged data or restore a local backup before syncing; no cloud changes were made.");
+  }
   const config = getCloudConfig();
   if (!config.url || !config.key) throw new Error("Set the shared sync project URL and public key in Linka settings.");
   const initial = getCloudSession();
@@ -302,33 +367,81 @@ export async function syncCloudCaptures(localCaptures, localDeletedIds = readDel
     Authorization: `Bearer ${session.accessToken}`,
     Accept: "application/json"
   };
-  const query = new URLSearchParams({ user_id: `eq.${session.userId}`, select: "data" });
-  const getResponse = await fetch(`${config.url}/rest/v1/linka_sync?${query}`, { headers });
-  const remoteRows = await readResponse(getResponse);
-  const remoteData = Array.isArray(remoteRows) ? remoteRows[0]?.data : null;
-  const deleted = new Set(localDeletedIds || []);
-  if (Array.isArray(remoteData?.deletedIds)) {
-    remoteData.deletedIds.filter(id => typeof id === "string" && id).forEach(id => deleted.add(id));
+  const maxWriteAttempts = 4;
+  let merged = [];
+  let deleted = new Set();
+  let syncedProfile = null;
+  let committed = false;
+
+  // Optimistic concurrency: only update the row revision we actually read.
+  // If another client wins the race, re-read and merge instead of overwriting
+  // its newer captures or deletion tombstones.
+  for (let attempt = 0; attempt < maxWriteAttempts; attempt += 1) {
+    const query = new URLSearchParams({ user_id: `eq.${session.userId}`, select: "data,updated_at" });
+    const getResponse = await fetchCloudWithRetry(`${config.url}/rest/v1/linka_sync?${query}`, { headers });
+    const remoteRows = await readResponse(getResponse);
+    if (!Array.isArray(remoteRows) || remoteRows.length > 1) {
+      throw new Error("Linka received an unexpected cloud library response. No cloud changes were written.");
+    }
+    const remoteRow = remoteRows[0] || null;
+    const remoteData = remoteRow?.data;
+    if (remoteRow && (
+      !remoteData || typeof remoteData !== "object" || Array.isArray(remoteData) ||
+      !Array.isArray(remoteData.captures) || !Array.isArray(remoteData.deletedIds) ||
+      typeof remoteRow.updated_at !== "string" || !remoteRow.updated_at
+    )) {
+      throw new Error("The cloud library is incomplete or missing its revision. Linka left it unchanged; export a backup and inspect the sync database before retrying.");
+    }
+
+    deleted = new Set(localDeletedIds || []);
+    if (Array.isArray(remoteData?.deletedIds)) {
+      remoteData.deletedIds.filter(id => typeof id === "string" && id).forEach(id => deleted.add(id));
+    }
+    merged = mergeCloudCaptures(localCaptures, Array.isArray(remoteData?.captures) ? remoteData.captures : [], deleted);
+    const remoteProfile = remoteData?.profile && typeof remoteData.profile === "object" && !Array.isArray(remoteData.profile) ? remoteData.profile : null;
+    const localProfile = profile && typeof profile === "object" && !Array.isArray(profile) ? profile : null;
+    syncedProfile = !localProfile ? remoteProfile : (!remoteProfile || Number(localProfile.updatedAt || 0) >= Number(remoteProfile.updatedAt || 0) ? localProfile : remoteProfile);
+    const nextData = { captures: merged, deletedIds: Array.from(deleted), ...(syncedProfile ? { profile: syncedProfile } : {}) };
+    const nextUpdatedAt = new Date().toISOString();
+
+    let writeResponse;
+    if (remoteRow) {
+      const condition = new URLSearchParams({
+        user_id: `eq.${session.userId}`,
+        updated_at: `eq.${remoteRow.updated_at}`,
+        select: "user_id,updated_at"
+      });
+      writeResponse = await fetchCloudWithRetry(`${config.url}/rest/v1/linka_sync?${condition}`, {
+        method: "PATCH",
+        headers: { ...headers, "Content-Type": "application/json", Prefer: "return=representation" },
+        body: JSON.stringify({ data: nextData, updated_at: nextUpdatedAt })
+      });
+    } else {
+      // Ignore a competing first insert, then re-read the row and merge with it.
+      writeResponse = await fetchCloudWithRetry(`${config.url}/rest/v1/linka_sync?on_conflict=user_id`, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json", Prefer: "resolution=ignore-duplicates,return=representation" },
+        body: JSON.stringify({ user_id: session.userId, data: nextData, updated_at: nextUpdatedAt })
+      });
+    }
+    const writtenRows = await readResponse(writeResponse);
+    if (Array.isArray(writtenRows) && writtenRows.length > 0) {
+      committed = true;
+      break;
+    }
+    // An empty representation means the revision changed or a first insert
+    // was won by another client. Retry from the newly observed cloud state.
   }
-  const merged = mergeCloudCaptures(localCaptures, Array.isArray(remoteData?.captures) ? remoteData.captures : [], deleted);
-  const remoteProfile = remoteData?.profile && typeof remoteData.profile === "object" ? remoteData.profile : null;
-  const localProfile = profile && typeof profile === "object" ? profile : null;
-  const syncedProfile = !localProfile ? remoteProfile : (!remoteProfile || Number(localProfile.updatedAt || 0) >= Number(remoteProfile.updatedAt || 0) ? localProfile : remoteProfile);
+
+  if (!committed) {
+    throw new Error("Cloud sync could not commit because another device kept changing the library. No conflicting update was written; retry sync in a moment.");
+  }
   if (syncedProfile) writeObject(PROFILE_KEY, syncedProfile);
-  const body = {
-    user_id: session.userId,
-    data: { captures: merged, deletedIds: Array.from(deleted), ...(syncedProfile ? { profile: syncedProfile } : {}) },
-    updated_at: new Date().toISOString()
-  };
-  const upsert = await fetch(`${config.url}/rest/v1/linka_sync?on_conflict=user_id`, {
-    method: "POST",
-    headers: { ...headers, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
-    body: JSON.stringify(body)
-  });
-  await readResponse(upsert);
-  // A delete can happen while the request is in flight. Preserve any newer
-  // local tombstones rather than replacing them with the stale request snapshot.
+
+  // Preserve newer local tombstones and exclude those records from the result
+  // returned to the UI. The next sync will propagate tombstones added in-flight.
   for (const id of readDeletedIds()) deleted.add(id);
   try { localStorage.setItem(DELETED_IDS_KEY, JSON.stringify(Array.from(deleted))); } catch {}
-  return { captures: merged, deletedIds: deleted, session, message: `Synced ${merged.length} items` };
+  const safeMerged = excludeDeletedCaptures(merged, deleted);
+  return { captures: safeMerged, deletedIds: deleted, session, message: `Synced ${safeMerged.length} items` };
 }

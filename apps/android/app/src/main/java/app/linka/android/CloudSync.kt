@@ -10,12 +10,20 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.util.concurrent.TimeUnit
 import java.security.KeyStore
 import java.time.Instant
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
+
+private const val MAX_SYNC_WRITE_ATTEMPTS = 4
 
 internal data class CloudSyncResult(
     val captures: List<Capture>,
@@ -60,7 +68,28 @@ private object LinkaTokenVault {
     }
 }
 
-private fun requestJson(
+private val patchHttpClient = OkHttpClient.Builder()
+    .connectTimeout(12, TimeUnit.SECONDS)
+    .readTimeout(15, TimeUnit.SECONDS)
+    .build()
+
+private fun cloudRequestError(code: Int, text: String): IllegalStateException {
+    val detail = runCatching {
+        JSONObject(text).optString("message").ifBlank { JSONObject(text).optString("msg") }
+    }.getOrDefault("")
+    val message = when {
+        code == 401 || code == 403 -> "Sign-in failed. Check your email, password and public anon key."
+        code == 413 || (code == 400 && Regex("payload too large|request entity too large", RegexOption.IGNORE_CASE).containsMatchIn(text)) ->
+            "The cloud sync payload is too large. Export a backup and reduce the amount or size of synced data before retrying."
+        code == 404 || (code == 400 && text.contains("linka_sync", true)) ->
+            "Cloud table not found. Copy the SQL setup in Linka and run it in the Supabase SQL Editor."
+        detail.isNotBlank() -> detail.take(220)
+        else -> "Cloud request failed ($code). Check your Supabase settings."
+    }
+    return IllegalStateException(message)
+}
+
+internal fun requestJson(
     url: String,
     method: String,
     anonKey: String,
@@ -68,6 +97,25 @@ private fun requestJson(
     body: String? = null,
     prefer: String? = null
 ): String {
+    // HttpURLConnection rejects PATCH on Android. Use OkHttp for the conditional
+    // revision update so the compare-and-set guard works on real devices.
+    if (method.equals("PATCH", ignoreCase = true)) {
+        val requestBuilder = Request.Builder()
+            .url(url)
+            .header("apikey", anonKey)
+            .header("Accept", "application/json")
+        if (bearer != null) requestBuilder.header("Authorization", "Bearer $bearer")
+        if (prefer != null) requestBuilder.header("Prefer", prefer)
+        val requestBody = (body ?: "").toRequestBody("application/json; charset=utf-8".toMediaType())
+        val request = requestBuilder.patch(requestBody).build()
+        patchHttpClient.newCall(request).execute().use { response ->
+            val code = response.code
+            val text = response.body?.string().orEmpty().take(1_000_000)
+            if (!response.isSuccessful) throw cloudRequestError(code, text)
+            return text
+        }
+    }
+
     val connection = (URL(url).openConnection() as HttpURLConnection).apply {
         requestMethod = method
         connectTimeout = 12_000
@@ -87,18 +135,7 @@ private fun requestJson(
         val code = connection.responseCode
         val stream = if (code in 200..299) connection.inputStream else connection.errorStream
         val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText().take(1_000_000) }.orEmpty()
-        if (code !in 200..299) {
-            val detail = runCatching { JSONObject(text).optString("message").ifBlank { JSONObject(text).optString("msg") } }.getOrDefault("")
-            throw IllegalStateException(
-                when {
-                    code == 401 || code == 403 -> "Sign-in failed. Check your email, password and public anon key."
-                    code == 404 || (code == 400 && text.contains("linka_sync", true)) ->
-                        "Cloud table not found. Copy the SQL setup in Linka and run it in the Supabase SQL Editor."
-                    detail.isNotBlank() -> detail.take(220)
-                    else -> "Cloud request failed ($code). Check your Supabase settings."
-                }
-            )
-        }
+        if (code !in 200..299) throw cloudRequestError(code, text)
         return text
     } finally {
         connection.disconnect()
@@ -283,42 +320,84 @@ internal suspend fun syncWithSupabase(
         )
     }
 
-    val remoteResponse = requestJson(
-        "$base/rest/v1/linka_sync?user_id=eq.$userId&select=data",
-        "GET", key, accessToken
-    )
-    val row = runCatching { JSONArray(remoteResponse).optJSONObject(0) }.getOrNull()
-    val remoteData = row?.optJSONObject("data")
-    val remoteCaptures = remoteData?.optJSONArray("captures")?.let(::parseCaptureArray).orEmpty()
-    val deleted = linkedSetOf<String>().apply {
-        addAll(localDeletedIds)
-        remoteData?.optJSONArray("deletedIds")?.let { array ->
-            for (i in 0 until array.length()) array.optString(i).takeIf { it.isNotBlank() }?.let(::add)
+    var merged: List<Capture> = emptyList()
+    var deleted: Set<String> = emptySet()
+    var syncedProfile: JSONObject? = null
+    var committed = false
+
+    // Use optimistic concurrency on the row revision. If a newer client sync
+    // wins the race, re-read and merge its data before trying another write.
+    for (attempt in 0 until MAX_SYNC_WRITE_ATTEMPTS) {
+        val remoteResponse = requestJson(
+            "$base/rest/v1/linka_sync?user_id=eq.$userId&select=data,updated_at",
+            "GET", key, accessToken
+        )
+        val rows = runCatching { JSONArray(remoteResponse) }.getOrElse {
+            throw IllegalStateException("Could not read the cloud library safely. No cloud changes were written.")
         }
-    }.toList().takeLast(5000).toSet()
-    val remoteProfile = remoteData?.optJSONObject("profile")
-    val validLocalProfile = localProfile?.takeIf { it.optString("displayName").isNotBlank() }
-    val syncedProfile = when {
-        validLocalProfile == null -> remoteProfile
-        remoteProfile == null -> validLocalProfile
-        validLocalProfile.optLong("updatedAt", 0L) >= remoteProfile.optLong("updatedAt", 0L) -> validLocalProfile
-        else -> remoteProfile
+        if (rows.length() > 1) {
+            throw IllegalStateException("The cloud sync table returned duplicate rows. Linka left the library unchanged.")
+        }
+        val row = rows.optJSONObject(0)
+        val remoteData = row?.optJSONObject("data")
+        val remoteRevision = row?.optString("updated_at")?.takeIf { it.isNotBlank() && it != "null" }
+        val rawCaptures = remoteData?.opt("captures")
+        val rawDeletedIds = remoteData?.opt("deletedIds")
+        if (row != null && (remoteData == null || rawCaptures !is JSONArray || rawDeletedIds !is JSONArray || remoteRevision == null)) {
+            throw IllegalStateException(
+                "The cloud library is incomplete or missing its revision. Linka left it unchanged; export a backup and inspect the sync database before retrying."
+            )
+        }
+        val remoteCaptures = (rawCaptures as? JSONArray)?.let(::parseCaptureArray).orEmpty()
+        val remoteDeletedIds = (rawDeletedIds as? JSONArray)?.let { array ->
+            (0 until array.length()).mapNotNull { index -> array.optString(index).takeIf { it.isNotBlank() } }
+        }.orEmpty()
+        deleted = mergeCloudDeletedIds(localDeletedIds, remoteDeletedIds)
+
+        val remoteProfile = remoteData?.optJSONObject("profile")
+        val validLocalProfile = localProfile?.takeIf { it.optString("displayName").isNotBlank() }
+        syncedProfile = when {
+            validLocalProfile == null -> remoteProfile
+            remoteProfile == null -> validLocalProfile
+            validLocalProfile.optLong("updatedAt", 0L) >= remoteProfile.optLong("updatedAt", 0L) -> validLocalProfile
+            else -> remoteProfile
+        }
+
+        merged = mergeCloudCapturesSafely(
+            localCaptures = localCaptures,
+            remoteCaptures = remoteCaptures,
+            deletedIds = deleted,
+            maxCaptures = MAX_CAPTURES
+        )
+
+        val data = JSONObject().put("captures", captureArray(merged)).put("deletedIds", JSONArray(deleted))
+        if (syncedProfile != null) data.put("profile", syncedProfile)
+        val nextRevision = Instant.now().toString()
+        val writeResponse = if (row == null) {
+            val insert = JSONObject().put("user_id", userId).put("data", data).put("updated_at", nextRevision)
+            requestJson(
+                "$base/rest/v1/linka_sync?on_conflict=user_id",
+                "POST", key, accessToken, insert.toString(), "resolution=ignore-duplicates,return=representation"
+            )
+        } else {
+            val encodedRevision = URLEncoder.encode(remoteRevision, "UTF-8")
+            val conditionalUrl = "$base/rest/v1/linka_sync?user_id=eq.$userId&updated_at=eq.$encodedRevision&select=user_id,updated_at"
+            val update = JSONObject().put("data", data).put("updated_at", nextRevision)
+            requestJson(conditionalUrl, "PATCH", key, accessToken, update.toString(), "return=representation")
+        }
+        val writtenRows = runCatching { JSONArray(writeResponse) }.getOrNull()
+        if (writtenRows != null && writtenRows.length() > 0) {
+            committed = true
+            break
+        }
+        // No rows returned means a concurrent change or first insert won.
     }
 
-    val merged = (remoteCaptures + localCaptures)
-        .filterNot { it.id in deleted }
-        .groupBy { it.id }
-        .values.map { copies -> copies.maxByOrNull { it.updatedAt }!! }
-        .sortedWith(compareByDescending<Capture> { it.pinned }.thenByDescending { it.updatedAt })
-        .take(MAX_CAPTURES)
-
-    val data = JSONObject().put("captures", captureArray(merged)).put("deletedIds", JSONArray(deleted))
-    if (syncedProfile != null) data.put("profile", syncedProfile)
-    val upsert = JSONObject().put("user_id", userId).put("data", data).put("updated_at", Instant.now().toString())
-    requestJson(
-        "$base/rest/v1/linka_sync?on_conflict=user_id",
-        "POST", key, accessToken, upsert.toString(), "resolution=merge-duplicates,return=minimal"
-    )
+    if (!committed) {
+        throw IllegalStateException(
+            "Cloud sync could not commit because another device kept changing the library. No conflicting update was written; retry sync in a moment."
+        )
+    }
 
     CloudSyncResult(
         captures = merged,
@@ -329,6 +408,40 @@ internal suspend fun syncWithSupabase(
     )
 }
 
+internal fun mergeCloudDeletedIds(
+    localDeletedIds: Set<String>,
+    remoteDeletedIds: Iterable<String>
+): Set<String> = linkedSetOf<String>().apply {
+    localDeletedIds.filter { it.isNotBlank() }.forEach { add(it) }
+    remoteDeletedIds.filter { it.isNotBlank() }.forEach { add(it) }
+}
+
+/**
+ * Merge the shared library but refuse to publish a truncated result.
+ * The Android local store currently has a 500-capture limit, while Web/Windows
+ * can hold more. Sending only the first 500 items would overwrite and destroy
+ * the larger cloud library, so an oversized merge must stop before the upsert.
+ */
+internal fun mergeCloudCapturesSafely(
+    localCaptures: List<Capture>,
+    remoteCaptures: List<Capture>,
+    deletedIds: Set<String>,
+    maxCaptures: Int
+): List<Capture> {
+    require(maxCaptures > 0) { "The capture limit must be positive." }
+    val merged = (remoteCaptures + localCaptures)
+        .filterNot { it.id in deletedIds }
+        .groupBy { it.id }
+        .values.map { copies -> copies.maxByOrNull { it.updatedAt }!! }
+        .sortedWith(compareByDescending<Capture> { it.pinned }.thenByDescending { it.updatedAt })
+    if (merged.size > maxCaptures) {
+        throw IllegalStateException(
+            "This Android version can safely sync up to $maxCaptures captures, but the cloud merge contains ${merged.size}. " +
+                "Sync was stopped before writing to avoid deleting records. Open Linka Web or Windows to manage the larger library and export a backup."
+        )
+    }
+    return merged
+}
 internal val CLOUD_SYNC_SETUP_SQL = """
     create table if not exists public.linka_sync (
         user_id uuid primary key references auth.users(id) on delete cascade,

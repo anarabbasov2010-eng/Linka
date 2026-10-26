@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { loadCaptures, saveCaptures, makeCapture, visibleCaptures, STORAGE_KEY, RECOVERY_KEY, getCaptureRecovery, startFreshCaptureLibrary } from "./store.js";
+import { loadCaptures, saveCaptures, makeCapture, normalizeCapture, fuzzyTextMatch, groupCapturesByDate, captureDateKey, COLLECTION_COLORS, normalizeCollectionColor, normalizePreviewImageUrl, visibleCaptures, sortCaptures, normalizeDuplicateKey, findDuplicateCapture, STORAGE_KEY, RECOVERY_KEY, getCaptureRecovery, startFreshCaptureLibrary, reopenCaptureRecovery } from "./store.js";
 
 function memoryStorage() {
   const data = new Map();
@@ -18,6 +18,19 @@ test("saving and loading captures keeps normalized text", () => {
   assert.ok(storage.getItem(STORAGE_KEY));
 });
 
+test("saveCaptures rejects invalid batches without overwriting the last good library", () => {
+  const storage = memoryStorage();
+  const original = [makeCapture("keep this record")];
+  assert.equal(saveCaptures(original, storage), true);
+  const lastGoodRaw = storage.getItem(STORAGE_KEY);
+
+  assert.equal(saveCaptures([makeCapture("valid record"), { id: "broken", text: "   " }], storage), false);
+  assert.equal(storage.getItem(STORAGE_KEY), lastGoodRaw);
+  assert.equal(loadCaptures(storage)[0].text, "keep this record");
+  assert.equal(saveCaptures(null, storage), false);
+  assert.equal(storage.getItem(STORAGE_KEY), lastGoodRaw);
+});
+
 test("invalid stored JSON is preserved and blocks writes until the user chooses recovery", () => {
   const storage = memoryStorage();
   storage.setItem(STORAGE_KEY, "{broken source");
@@ -32,6 +45,71 @@ test("invalid stored JSON is preserved and blocks writes until the user chooses 
   assert.equal(getCaptureRecovery(storage).acknowledged, true);
   assert.equal(saveCaptures([makeCapture("new data")], storage), true);
   assert.equal(loadCaptures(storage)[0].text, "new data");
+});
+
+test("failed restore can re-open recovery and continue blocking writes", () => {
+  const storage = memoryStorage();
+  storage.setItem(STORAGE_KEY, "{broken source");
+  loadCaptures(storage);
+  assert.equal(startFreshCaptureLibrary(storage), true);
+  assert.equal(getCaptureRecovery(storage).acknowledged, true);
+  assert.equal(reopenCaptureRecovery(storage), true);
+  const recovery = getCaptureRecovery(storage);
+  assert.equal(recovery.raw, "{broken source");
+  assert.equal(recovery.acknowledged, false);
+  assert.equal(saveCaptures([makeCapture("must not overwrite recovery")], storage), false);
+  assert.equal(storage.getItem(STORAGE_KEY), "[]");
+});
+
+test("recovery gate can only be re-opened when preserved source exists and storage is writable", () => {
+  const missing = memoryStorage();
+  assert.equal(reopenCaptureRecovery(missing), false);
+
+  const storage = memoryStorage();
+  storage.setItem(STORAGE_KEY, "{damaged}");
+  loadCaptures(storage);
+  assert.equal(startFreshCaptureLibrary(storage), true);
+  assert.equal(reopenCaptureRecovery(storage), true);
+  assert.equal(getCaptureRecovery(storage).raw, "{damaged}");
+  assert.equal(getCaptureRecovery(storage).acknowledged, false);
+
+  const blocked = {
+    getItem: key => key === RECOVERY_KEY
+      ? JSON.stringify({ raw: "{preserved}", acknowledged: true })
+      : null,
+    setItem: () => { throw new Error("storage quota exceeded"); }
+  };
+  assert.equal(reopenCaptureRecovery(blocked), false);
+});
+
+test("malformed records inside a valid JSON array are preserved instead of silently dropped", () => {
+  const storage = memoryStorage();
+  const raw = JSON.stringify([
+    { id: "good", text: "valid record", createdAt: 1 },
+    { id: "broken", text: "   ", createdAt: 2 }
+  ]);
+  storage.setItem(STORAGE_KEY, raw);
+
+  assert.deepEqual(loadCaptures(storage), []);
+  assert.equal(storage.getItem(STORAGE_KEY), raw);
+  assert.equal(getCaptureRecovery(storage).raw, raw);
+  assert.equal(saveCaptures([makeCapture("replacement")], storage), false);
+});
+
+test("a stale acknowledged recovery record cannot mask a newer storage corruption", () => {
+  const storage = memoryStorage();
+  storage.setItem(STORAGE_KEY, "{first damaged source");
+  loadCaptures(storage);
+  assert.equal(startFreshCaptureLibrary(storage), true);
+  assert.equal(getCaptureRecovery(storage).acknowledged, true);
+
+  storage.setItem(STORAGE_KEY, "{second damaged source");
+  const recovery = getCaptureRecovery(storage);
+  assert.equal(recovery.raw, "{second damaged source");
+  assert.equal(recovery.acknowledged, false);
+  assert.equal(JSON.parse(storage.getItem(RECOVERY_KEY)).raw, "{second damaged source");
+  assert.equal(saveCaptures([makeCapture("must not overwrite second corruption")], storage), false);
+  assert.equal(storage.getItem(STORAGE_KEY), "{second damaged source");
 });
 
 test("malformed recovery metadata does not prevent recovery of the original capture JSON", () => {
@@ -139,4 +217,143 @@ test("archive and trash filters keep records recoverable and separate", () => {
   assert.deepEqual(loadCaptures(saved).map(item => [item.id, item.archivedAt, item.trashedAt]), [
     ["active", 0, 0], ["archived", 10, 0], ["trashed", 0, 20]
   ]);
+});
+
+
+test("duplicate detection normalizes tracking parameters and whitespace without treating trashed records as duplicates", () => {
+  const items = [
+    makeCapture("https://example.com/article?utm_source=newsletter&id=7#section", { id: "url" }),
+    makeCapture("  A note   with    repeated whitespace ", { id: "note" }),
+    makeCapture("https://example.com/article?utm_source=old&id=8", { id: "different" }),
+    makeCapture("https://example.com/article?id=7", { id: "trashed", trashedAt: Date.now() })
+  ];
+  assert.equal(normalizeDuplicateKey("https://EXAMPLE.com/article/?id=7&utm_medium=email"), normalizeDuplicateKey("https://example.com/article?id=7"));
+  assert.equal(findDuplicateCapture(items, "https://example.com/article?id=7")?.id, "url");
+  assert.equal(findDuplicateCapture(items, "a note with repeated whitespace")?.id, "note");
+  assert.equal(findDuplicateCapture(items, "https://example.com/article?id=8")?.id, "different");
+  assert.equal(findDuplicateCapture(items, "https://new.example.com") , null);
+});
+
+test("Today filter includes only captures created during the current local day", () => {
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  const today = makeCapture("today", { id: "today", createdAt: start.getTime() + 1000 });
+  const yesterday = makeCapture("yesterday", { id: "yesterday", createdAt: start.getTime() - 1000 });
+  const archived = makeCapture("archived today", { id: "archived", createdAt: start.getTime() + 2000, archivedAt: Date.now() });
+  assert.deepEqual(visibleCaptures([today, yesterday, archived], "today").map(item => item.id), ["today"]);
+});
+
+
+test("library sorting supports activity, creation date, title and domain orders without mutating the source array", () => {
+  const items = [
+    { id: "z", text: "https://z.example.com/z", createdAt: 20, updatedAt: 50, previewTitle: "Zebra", pinned: false },
+    { id: "a", text: "Alpha note", createdAt: 10, updatedAt: 60, previewTitle: "Alpha", pinned: false },
+    { id: "a-url", text: "https://a.example.com/a", createdAt: 30, updatedAt: 40, previewTitle: "A Page", pinned: false }
+  ];
+  const originalIds = items.map(item => item.id);
+  assert.deepEqual(sortCaptures(items, "updated").map(item => item.id), ["a", "z", "a-url"]);
+  assert.deepEqual(sortCaptures(items, "newest").map(item => item.id), ["a-url", "z", "a"]);
+  assert.deepEqual(sortCaptures(items, "oldest").map(item => item.id), ["a", "z", "a-url"]);
+  assert.deepEqual(sortCaptures(items, "title").map(item => item.id), ["a-url", "a", "z"]);
+  assert.deepEqual(sortCaptures(items, "domain").map(item => item.id), ["a-url", "z", "a"]);
+  assert.deepEqual(items.map(item => item.id), originalIds);
+  assert.deepEqual(sortCaptures(items, "unknown").map(item => item.id), sortCaptures(items, "updated").map(item => item.id));
+});
+
+
+test("preview cover URLs allow only valid HTTPS URLs without embedded credentials", () => {
+  assert.equal(normalizePreviewImageUrl("https://example.com/cover.png"), "https://example.com/cover.png");
+  assert.equal(normalizePreviewImageUrl(" https://example.com/cover.png "), "https://example.com/cover.png");
+  assert.equal(normalizePreviewImageUrl("http://example.com/cover.png"), "");
+  assert.equal(normalizePreviewImageUrl("javascript:alert(1)"), "");
+  assert.equal(normalizePreviewImageUrl("https://user:password@example.com/cover.png"), "");
+  assert.equal(normalizePreviewImageUrl("not a url"), "");
+  assert.equal(normalizePreviewImageUrl(""), "");
+  assert.equal(normalizeCapture({ id: "cover", text: "https://example.com", previewImageUrl: "javascript:alert(1)" }).previewImageUrl, "");
+});
+
+
+test("capture timestamp normalization falls back safely when stored timestamps are invalid", () => {
+  const item = normalizeCapture({
+    id: "  capture-id  ",
+    text: "Record",
+    createdAt: "not-a-time",
+    updatedAt: "also-not-a-time"
+  });
+  assert.equal(item.id, "capture-id");
+  assert.ok(Number.isFinite(item.createdAt) && item.createdAt > 0);
+  assert.equal(item.updatedAt, item.createdAt);
+
+  const longId = "i".repeat(500);
+  assert.equal(normalizeCapture({ id: longId, text: "Record" }).id.length, 200);
+  assert.ok(Number.isFinite(normalizeCapture({ id: {}, text: "Record" }).createdAt));
+});
+
+test("search supports explicit content-presence filters", () => {
+  const items = [
+    makeCapture("Tagged link", { id: "tags", tags: ["design"] }),
+    makeCapture("Covered link", { id: "cover", previewImageUrl: "https://example.com/cover.png" }),
+    makeCapture("Described link", { id: "description", previewDescription: "A helpful summary" }),
+    makeCapture("Plain note", { id: "plain" })
+  ];
+  assert.deepEqual(visibleCaptures(items, "all", "has:tags").map(item => item.id), ["tags"]);
+  assert.deepEqual(visibleCaptures(items, "all", "is:untagged").map(item => item.id).sort(), ["cover", "description", "plain"]);
+  assert.deepEqual(visibleCaptures(items, "all", "has:cover").map(item => item.id), ["cover"]);
+  assert.deepEqual(visibleCaptures(items, "all", "has:description").map(item => item.id), ["description"]);
+});
+
+test("fuzzy search catches limited single-word typos without making short queries fuzzy", () => {
+  assert.equal(fuzzyTextMatch("The quick brown fox jumps", "quik"), true);
+  assert.equal(fuzzyTextMatch("A searchable JavaScript guide", "javascrip"), true);
+  assert.equal(fuzzyTextMatch("A searchable JavaScript guide", "js"), false);
+  assert.equal(fuzzyTextMatch("An unrelated word", "wordx"), true);
+  assert.equal(fuzzyTextMatch("A phrase with two words", "phr ase"), false);
+
+  const items = [
+    makeCapture("JavaScript reference", { id: "js" }),
+    makeCapture("Cookbook for dinner", { id: "food" })
+  ];
+  assert.deepEqual(visibleCaptures(items, "all", "javascrip").map(item => item.id), ["js"]);
+});
+
+
+test("timeline groups captures by the device-local calendar date in newest-first order", () => {
+  const yesterday = new Date();
+  yesterday.setHours(12, 0, 0, 0);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const today = new Date();
+  today.setHours(9, 0, 0, 0);
+  const laterToday = new Date(today.getTime() + 60 * 60 * 1000);
+  const input = [
+    makeCapture("Yesterday note", { id: "yesterday", createdAt: yesterday.getTime() }),
+    makeCapture("Today note", { id: "today-first", createdAt: today.getTime() }),
+    makeCapture("Latest today", { id: "today-latest", createdAt: laterToday.getTime() })
+  ];
+  const groups = groupCapturesByDate(input);
+  assert.equal(groups.length, 2);
+  assert.equal(groups[0].dateKey, captureDateKey(input[2]));
+  assert.deepEqual(groups[0].captures.map(item => item.id), ["today-latest", "today-first"]);
+  assert.deepEqual(groups[1].captures.map(item => item.id), ["yesterday"]);
+  assert.equal(input[0].id, "yesterday", "grouping must not mutate the original order");
+});
+
+test("timeline date key consistently uses local year, month and day", () => {
+  const saved = new Date(2024, 0, 2, 23, 59, 0, 0).getTime();
+  assert.equal(captureDateKey({ createdAt: saved }), "2024-01-02");
+  assert.equal(captureDateKey({ id: "missing" }), "unknown");
+  assert.deepEqual(groupCapturesByDate(null), []);
+});
+
+
+test("collection colors are allowlisted, normalized and persisted with captures", () => {
+  assert.deepEqual(COLLECTION_COLORS, ["violet", "blue", "mint", "rose", "amber", "slate", "teal"]);
+  assert.equal(normalizeCollectionColor(" BLUE "), "blue");
+  assert.equal(normalizeCollectionColor("#fff"), "");
+  assert.equal(normalizeCollectionColor("url(javascript:alert(1))"), "");
+
+  const storage = memoryStorage();
+  const capture = makeCapture("A saved note", { id: "colorful", collection: "Research", collectionColor: "mint" });
+  assert.equal(capture.collectionColor, "mint");
+  assert.equal(saveCaptures([capture], storage), true);
+  assert.equal(loadCaptures(storage)[0].collectionColor, "mint");
+  assert.equal(normalizeCapture({ text: "Unsafe", collectionColor: "red" }).collectionColor, "");
 });

@@ -1,27 +1,60 @@
-import { loadCaptures, saveCaptures, makeCapture, visibleCaptures, getCaptureRecovery, startFreshCaptureLibrary } from "./store.js";
-import { initLinkaExperience } from "./experience.js";
-import { initVisualSystem } from "./visual-system.js";
+import { loadCaptures, saveCaptures, makeCapture, normalizeCapture, normalizePreviewImageUrl, visibleCaptures, sortCaptures, findDuplicateCapture, normalizeDuplicateKey, parseSearchQuery, captureDateKey, getCaptureRecovery, startFreshCaptureLibrary, reopenCaptureRecovery } from "./store.js";
+import { MAX_CAPTURE_HISTORY, cloneCaptureSnapshot, pushCaptureSnapshot, reconcileDeletedIds } from "./capture-history.js";
+import { splitSearchHighlights } from "./search-highlight.js";
+import { appendClipboardText } from "./clipboard-capture.js";
+import { filterPaletteCommands } from "./command-palette.js";
+import { initLinkaExperience, setLanguage } from "./experience.js";
+import { initVisualSystem, setLinkaTheme, setLinkaAccent, setLinkaDensity, setLinkaEffects } from "./visual-system.js";
 import { initLinkaAtmosphere, openAtmosphereSettings } from "./atmosphere.js";
-import { initLinkaDocuments, searchLinkaDocuments, openLinkaDocumentById } from "./documents.js";
+import { initLinkaDocuments, searchLinkaDocuments, openLinkaDocumentById, exportLinkaDocuments, importLinkaDocuments, setLinkaDocumentBeforeSave } from "./documents.js";
 import { initLinkaSignature } from "./signature-theme.js";
 import {
-  addDeletedId, addDeletedIds, removeDeletedIds, disconnectCloud, getCloudConfig, getCloudSession,
+  addDeletedId, addDeletedIds, removeDeletedIds, setDeletedIds, disconnectCloud, getCloudConfig, getCloudSession,
   getOtpCooldown, readDeletedIds, requestEmailOtp, saveCloudConfig, syncCloudCaptures, mergeCloudCaptures,
   verifyEmailOtp, readLinkaProfile, saveLinkaProfile, beginQrPairing, claimQrPairing,
   startGoogleOAuth, completeGoogleOAuthCallback
 } from "./cloud-sync.js";
 import QRCode from "qrcode";
+import { listen as listenTauriEvent } from "@tauri-apps/api/event";
+import { invoke as invokeTauri } from "@tauri-apps/api/core";
+import {
+  createLinkaBackup, parseLinkaBackup
+} from "./backup-format.js";
+import {
+  saveBackupSnapshot, listBackupSnapshots, getBackupSnapshot, deleteBackupSnapshot,
+  isBackupHistoryAvailable, findLatestUsableBackupSnapshot, findUsableBackupSnapshots, MAX_AUTOMATIC_SNAPSHOT_BYTES
+} from "./backup-history.js";
 
 const $ = selector => document.querySelector(selector);
 const form = $("#capture-form");
 const draft = $("#capture-text");
 const tagsDraft = $("#capture-tags");
 const collectionDraft = $("#capture-collection");
+const collectionColorDraft = $("#capture-collection-color");
+const previewTitleDraft = $("#capture-preview-title");
+const previewDescriptionDraft = $("#capture-preview-description");
+const previewImageDraft = $("#capture-preview-image");
 const saveButton = $("#save-button");
+const clipboardPasteButton = document.createElement("button");
+clipboardPasteButton.type = "button";
+clipboardPasteButton.className = "ghost paste-clipboard-button";
+clipboardPasteButton.textContent = clipboardCaptureUiText("paste");
+clipboardPasteButton.setAttribute("aria-label", clipboardCaptureUiText("paste"));
+clipboardPasteButton.title = clipboardCaptureUiText("pasteHelp");
+saveButton.insertAdjacentElement("beforebegin", clipboardPasteButton);
 const list = $("#capture-list");
 const search = $("#search");
+const sortOrder = $("#sort-order");
+const SORT_ORDERS = new Set(["updated", "newest", "oldest", "title", "domain"]);
+let sortMode = localStorage.getItem("linka.sortOrder.v1") || "updated";
+if (!SORT_ORDERS.has(sortMode)) sortMode = "updated";
+if (sortOrder) sortOrder.value = sortMode;
 const count = $("#capture-count");
 const status = $("#status");
+const cloudStatusElement = $("#cloud-sync-status");
+const focusModeButton = $("#focus-mode-button");
+const APP_FOCUS_STORAGE_KEY = "linka.appFocusMode.v1";
+let appFocusMode = false;
 const composeLabel = $("#compose-label");
 const filters = Array.from(document.querySelectorAll("[data-filter]"));
 const modalRoot = $("#modal-root");
@@ -33,18 +66,80 @@ selectionButton.className = "ghost selection-mode-button";
 selectionButton.textContent = "Select items";
 selectionButton.setAttribute("aria-pressed", "false");
 $("#export-button").insertAdjacentElement("beforebegin", selectionButton);
+const undoStack = [];
+const redoStack = [];
+const historyToolbar = document.createElement("div");
+historyToolbar.className = "history-toolbar";
+const undoButton = document.createElement("button");
+undoButton.type = "button";
+undoButton.className = "ghost history-action";
+undoButton.textContent = captureUiText("undo");
+undoButton.setAttribute("aria-label", captureUiText("undo"));
+undoButton.disabled = true;
+const redoButton = document.createElement("button");
+redoButton.type = "button";
+redoButton.className = "ghost history-action";
+redoButton.textContent = captureUiText("redo");
+redoButton.setAttribute("aria-label", captureUiText("redo"));
+redoButton.disabled = true;
+historyToolbar.append(undoButton, redoButton);
+selectionButton.insertAdjacentElement("afterend", historyToolbar);
+
+function updateHistoryControls() {
+  undoButton.disabled = undoStack.length === 0;
+  redoButton.disabled = redoStack.length === 0;
+  undoButton.title = captureUiText("undo") + (undoStack.length ? ` · ${undoStack.length}` : "");
+  redoButton.title = captureUiText("redo") + (redoStack.length ? ` · ${redoStack.length}` : "");
+}
+
+function clearCaptureHistory() {
+  undoStack.length = 0;
+  redoStack.length = 0;
+  updateHistoryControls();
+}
+
+function restoreCaptureHistory(sourceStack, destinationStack, statusKey) {
+  if (!sourceStack.length) return false;
+  const target = cloneCaptureSnapshot(sourceStack[sourceStack.length - 1]);
+  const current = cloneCaptureSnapshot(captures);
+  const nextDeletedIds = reconcileDeletedIds(current, target, readDeletedIds());
+  if (!saveCaptures(target)) {
+    say(captureUiText("historyFailed"));
+    return false;
+  }
+  if (!setDeletedIds(nextDeletedIds)) {
+    const rolledBack = saveCaptures(current);
+    say(rolledBack
+      ? captureUiText("historyFailed")
+      : "History rollback failed. Export the library immediately and pause editing.");
+    return false;
+  }
+  sourceStack.pop();
+  pushCaptureSnapshot(destinationStack, current, MAX_CAPTURE_HISTORY);
+  captures = target;
+  persistedCaptures = cloneCaptureSnapshot(target);
+  localDataRevision += 1;
+  scheduleCloudSync();
+  updateHistoryControls();
+  render();
+  say(captureUiText(statusKey));
+  return true;
+}
+undoButton.addEventListener("click", () => restoreCaptureHistory(undoStack, redoStack, "undoDone"));
+redoButton.addEventListener("click", () => restoreCaptureHistory(redoStack, undoStack, "redoDone"));
+
 const bulkToolbar = document.createElement("div");
 bulkToolbar.className = "bulk-toolbar";
 bulkToolbar.hidden = true;
 list.parentElement.insertBefore(bulkToolbar, list);
-search.title = "Search operators: type:link, type:note, is:pinned, is:later, tag:design, in:research, site:example.com, before:YYYY-MM-DD, after:YYYY-MM-DD";
+search.title = "Search operators: type:link, type:note, is:pinned, is:later, is:untagged, has:tags, has:cover, has:description, tag:design, in:research, site:example.com, before:YYYY-MM-DD, after:YYYY-MM-DD";
 function captureUiText(key) {
   const language = (() => { try { return localStorage.getItem("linka.language.v1") || "en"; } catch { return "en"; } })();
   const copy = {
-    en: { later: "Read later", removeLater: "Remove later", tagSearch: "Search this tag", collectionSearch: "Show this collection", savedLater: "Saved for later", removedLater: "Removed from read later", readLater: "Read later", archive: "Archive", unarchive: "Unarchive", trash: "Move to trash", restore: "Restore", deletePermanent: "Delete permanently", archived: "Archived", unarchived: "Moved out of archive", movedTrash: "Moved to trash", restored: "Restored from trash", deletedPermanent: "Permanently deleted", confirmPermanent: "Permanently delete the selected items? This cannot be undone.", tags: "Edit tags", collection: "Set collection", markLater: "Mark for later", removeLaterBulk: "Remove from read later", tagPrompt: "Comma-separated tags (leave empty to clear)", collectionPrompt: "Collection name (leave empty to clear)", savedViews: "Saved searches", saveView: "Save view", removeView: "Remove view", nameView: "Name this search", viewSaved: "Search saved", viewRemoved: "Saved search removed", enterSearch: "Type a search before saving it." },
-    ru: { later: "Сохранить на потом", removeLater: "Убрать из отложенного", tagSearch: "Найти этот тег", collectionSearch: "Открыть коллекцию", savedLater: "Добавлено в «Сохранить на потом»", removedLater: "Убрано из отложенного", readLater: "Отложено", archive: "В архив", unarchive: "Вернуть из архива", trash: "В корзину", restore: "Восстановить", deletePermanent: "Удалить навсегда", archived: "Перемещено в архив", unarchived: "Возвращено из архива", movedTrash: "Перемещено в корзину", restored: "Восстановлено из корзины", deletedPermanent: "Удалено навсегда", confirmPermanent: "Удалить выбранные записи навсегда? Это действие нельзя отменить.", tags: "Изменить теги", collection: "Задать коллекцию", markLater: "Отложить", removeLaterBulk: "Убрать из отложенного", tagPrompt: "Теги через запятую (пустое поле очистит теги)", collectionPrompt: "Название коллекции (пустое поле очистит её)", savedViews: "Сохранённые поиски", saveView: "Сохранить поиск", removeView: "Удалить поиск", nameView: "Название поиска", viewSaved: "Поиск сохранён", viewRemoved: "Поиск удалён", enterSearch: "Сначала введи поисковый запрос." },
-    az: { later: "Sonra oxu", removeLater: "Sonra oxumaqdan çıxar", tagSearch: "Bu teqi axtar", collectionSearch: "Kolleksiyanı göstər", savedLater: "Sonra oxumaq üçün saxlanıldı", removedLater: "Sonra oxumaq siyahısından çıxarıldı", readLater: "Sonra oxu", archive: "Arxivə köçür", unarchive: "Arxivdən çıxar", trash: "Zibil qutusuna köçür", restore: "Bərpa et", deletePermanent: "Həmişəlik sil", archived: "Arxivə köçürüldü", unarchived: "Arxivdən çıxarıldı", movedTrash: "Zibil qutusuna köçürüldü", restored: "Zibil qutusundan bərpa edildi", deletedPermanent: "Həmişəlik silindi", confirmPermanent: "Seçilmiş qeydlər həmişəlik silinsin? Bu əməl geri qaytarıla bilməz.", tags: "Teqləri dəyiş", collection: "Kolleksiya təyin et", markLater: "Sonra oxu üçün saxla", removeLaterBulk: "Sonra oxu siyahısından çıxar", tagPrompt: "Vergüllə ayrılmış teqlər (boş buraxmaq təmizləyir)", collectionPrompt: "Kolleksiyanın adı (boş buraxmaq təmizləyir)", savedViews: "Saxlanmış axtarışlar", saveView: "Axtarışı saxla", removeView: "Axtarışı sil", nameView: "Axtarışın adı", viewSaved: "Axtarış saxlanıldı", viewRemoved: "Saxlanmış axtarış silindi", enterSearch: "Əvvəlcə axtarış sorğusu yaz." },
-    tr: { later: "Daha sonra oku", removeLater: "Sonradan oku listesinden çıkar", tagSearch: "Bu etiketi ara", collectionSearch: "Bu koleksiyonu göster", savedLater: "Daha sonra okumak için kaydedildi", removedLater: "Sonradan oku listesinden kaldırıldı", readLater: "Daha sonra oku", archive: "Arşivle", unarchive: "Arşivden çıkar", trash: "Çöp kutusuna taşı", restore: "Geri yükle", deletePermanent: "Kalıcı olarak sil", archived: "Arşive taşındı", unarchived: "Arşivden çıkarıldı", movedTrash: "Çöp kutusuna taşındı", restored: "Çöp kutusundan geri yüklendi", deletedPermanent: "Kalıcı olarak silindi", confirmPermanent: "Seçili kayıtlar kalıcı olarak silinsin mi? Bu işlem geri alınamaz.", tags: "Etiketleri düzenle", collection: "Koleksiyon ata", markLater: "Daha sonra oku", removeLaterBulk: "Sonradan oku listesinden çıkar", tagPrompt: "Virgülle ayrılmış etiketler (boş bırakmak temizler)", collectionPrompt: "Koleksiyon adı (boş bırakmak temizler)", savedViews: "Kayıtlı aramalar", saveView: "Aramayı kaydet", removeView: "Aramayı kaldır", nameView: "Arama adı", viewSaved: "Arama kaydedildi", viewRemoved: "Kayıtlı arama silindi", enterSearch: "Önce bir arama yaz." }
+    en: { later: "Read later", removeLater: "Remove later", tagSearch: "Search this tag", collectionSearch: "Show this collection", savedLater: "Saved for later", removedLater: "Removed from read later", readLater: "Read later", archive: "Archive", unarchive: "Unarchive", trash: "Move to trash", restore: "Restore", deletePermanent: "Delete permanently", archived: "Archived", unarchived: "Moved out of archive", movedTrash: "Moved to trash", restored: "Restored from trash", deletedPermanent: "Permanently deleted", confirmPermanent: "Permanently delete the selected items? This cannot be undone.", tags: "Edit tags", collection: "Set collection", markLater: "Mark for later", removeLaterBulk: "Remove from read later", tagPrompt: "Comma-separated tags (leave empty to clear)", collectionPrompt: "Collection name (leave empty to clear)", savedViews: "Saved searches", saveView: "Save view", removeView: "Remove view", nameView: "Name this search", viewSaved: "Search saved", viewRemoved: "Saved search removed", enterSearch: "Type a search before saving it.", exportedJson: "JSON backup downloaded", exportedMarkdown: "Markdown export downloaded", exportedText: "Text export downloaded", exportedHtml: "HTML export downloaded", duplicatePrompt: "A matching item already exists. Save another copy anyway?", duplicateSkipped: "Existing item kept; duplicate was not added.", backupConfirm: "This complete Linka backup merges captures and local documents and restores appearance and search preferences. Existing items will not be deleted. Continue?", backupRestored: "Backup restored", backupPartial: "Captures were restored, but some documents or preferences could not be restored. Check available storage.", backupFailed: "Could not save or restore the complete backup. Check available storage and try again.", recentViews: "Recent searches · this device only", clearRecent: "Clear history", recentCleared: "Recent searches cleared.", invalidBookmarkImport: "No web bookmarks were found in this HTML file.", bookmarkDuplicatesSkipped: "All imported bookmarks already exist in your library.", bookmarkImportLimited: "Only the first 5,000 bookmarks were processed.", previewImageInvalid: "Cover image must be a valid HTTPS URL without credentials.", selectItems: "Select items", exitSelection: "Exit selection", selectedCount: "{count} selected", selectVisible: "Select visible", clearSelection: "Clear selection", pin: "Pin", unpin: "Unpin", copy: "Copy", export: "Export", restoreSelected: "Restore selected", archiveSelected: "Archive selected", unarchiveSelected: "Unarchive selected", nothingMatches: "Nothing matches this view", trySearch: "Try another search or switch the filter.", emptyLibraryTitle: "A little room for what matters", emptyLibraryDescription: "Paste a link or write a thought above. It will stay in this browser profile until you remove it.", pinned: "Pinned", link: "Link", note: "Note", selected: "Selected", select: "Select", timelineToday: "Today", timelineYesterday: "Yesterday", timelineUnknown: "Date unknown", undo: "Undo", redo: "Redo", undoDone: "Last change undone", redoDone: "Change redone", historyFailed: "Could not update history; the saved library was kept." },
+    ru: { later: "Сохранить на потом", removeLater: "Убрать из отложенного", tagSearch: "Найти этот тег", collectionSearch: "Открыть коллекцию", savedLater: "Добавлено в «Сохранить на потом»", removedLater: "Убрано из отложенного", readLater: "Отложено", archive: "В архив", unarchive: "Вернуть из архива", trash: "В корзину", restore: "Восстановить", deletePermanent: "Удалить навсегда", archived: "Перемещено в архив", unarchived: "Возвращено из архива", movedTrash: "Перемещено в корзину", restored: "Восстановлено из корзины", deletedPermanent: "Удалено навсегда", confirmPermanent: "Удалить выбранные записи навсегда? Это действие нельзя отменить.", tags: "Изменить теги", collection: "Задать коллекцию", markLater: "Отложить", removeLaterBulk: "Убрать из отложенного", tagPrompt: "Теги через запятую (пустое поле очистит теги)", collectionPrompt: "Название коллекции (пустое поле очистит её)", savedViews: "Сохранённые поиски", saveView: "Сохранить поиск", removeView: "Удалить поиск", nameView: "Название поиска", viewSaved: "Поиск сохранён", viewRemoved: "Поиск удалён", enterSearch: "Сначала введи поисковый запрос.", exportedJson: "JSON-резервная копия скачана", exportedMarkdown: "Экспорт Markdown скачан", exportedText: "Текстовый экспорт скачан", exportedHtml: "HTML-экспорт скачан", duplicatePrompt: "Похожая запись уже существует. Сохранить ещё одну копию?", duplicateSkipped: "Существующая запись сохранена; дубликат не добавлен.", backupConfirm: "Эта полная резервная копия объединит записи и локальные документы и восстановит оформление и поисковые настройки. Существующие данные не будут удалены. Продолжить?", backupRestored: "Резервная копия восстановлена", backupPartial: "Записи восстановлены, но часть документов или настроек не удалось восстановить. Проверь свободное место.", backupFailed: "Не удалось сохранить или полностью восстановить резервную копию. Проверь свободное место.", recentViews: "Недавние поиски · только на устройстве", clearRecent: "Очистить историю", recentCleared: "История поиска очищена.", invalidBookmarkImport: "В этом HTML-файле не найдены закладки со ссылками на сайты.", bookmarkDuplicatesSkipped: "Все импортируемые закладки уже есть в библиотеке.", bookmarkImportLimited: "Обработаны только первые 5 000 закладок.", previewImageInvalid: "Для обложки укажи корректный HTTPS-адрес без логина и пароля.", selectItems: "Выбрать записи", exitSelection: "Выйти из режима выбора", selectedCount: "Выбрано: {count}", selectVisible: "Выбрать видимые", clearSelection: "Снять выбор", pin: "Закрепить", unpin: "Открепить", copy: "Копировать", export: "Экспортировать", restoreSelected: "Восстановить выбранные", archiveSelected: "Архивировать выбранные", unarchiveSelected: "Разархивировать выбранные", nothingMatches: "По этому фильтру ничего не найдено", trySearch: "Попробуй другой запрос или переключи фильтр.", emptyLibraryTitle: "Место для важных мыслей", emptyLibraryDescription: "Вставь ссылку или запиши мысль выше. Она останется в профиле этого браузера, пока ты её не удалишь.", pinned: "Закреплено", link: "Ссылка", note: "Заметка", selected: "Выбрано", select: "Выбрать", timelineToday: "Сегодня", timelineYesterday: "Вчера", timelineUnknown: "Дата неизвестна", undo: "Отменить", redo: "Повторить", undoDone: "Последнее изменение отменено", redoDone: "Изменение повторено", historyFailed: "Не удалось изменить историю; сохранённая библиотека не потеряна." },
+    az: { later: "Sonra oxu", removeLater: "Sonra oxumaqdan çıxar", tagSearch: "Bu teqi axtar", collectionSearch: "Kolleksiyanı göstər", savedLater: "Sonra oxumaq üçün saxlanıldı", removedLater: "Sonra oxumaq siyahısından çıxarıldı", readLater: "Sonra oxu", archive: "Arxivə köçür", unarchive: "Arxivdən çıxar", trash: "Zibil qutusuna köçür", restore: "Bərpa et", deletePermanent: "Həmişəlik sil", archived: "Arxivə köçürüldü", unarchived: "Arxivdən çıxarıldı", movedTrash: "Zibil qutusuna köçürüldü", restored: "Zibil qutusundan bərpa edildi", deletedPermanent: "Həmişəlik silindi", confirmPermanent: "Seçilmiş qeydlər həmişəlik silinsin? Bu əməl geri qaytarıla bilməz.", tags: "Teqləri dəyiş", collection: "Kolleksiya təyin et", markLater: "Sonra oxu üçün saxla", removeLaterBulk: "Sonra oxu siyahısından çıxar", tagPrompt: "Vergüllə ayrılmış teqlər (boş buraxmaq təmizləyir)", collectionPrompt: "Kolleksiyanın adı (boş buraxmaq təmizləyir)", savedViews: "Saxlanmış axtarışlar", saveView: "Axtarışı saxla", removeView: "Axtarışı sil", nameView: "Axtarışın adı", viewSaved: "Axtarış saxlanıldı", viewRemoved: "Saxlanmış axtarış silindi", enterSearch: "Əvvəlcə axtarış sorğusu yaz.", exportedJson: "JSON ehtiyat nüsxəsi endirildi", exportedMarkdown: "Markdown ixracı endirildi", exportedText: "Mətn ixracı endirildi", exportedHtml: "HTML ixracı endirildi", duplicatePrompt: "Oxşar qeyd artıq mövcuddur. Daha bir nüsxə saxlanılsın?", duplicateSkipped: "Mövcud qeyd saxlanıldı; dublikat əlavə edilmədi.", backupConfirm: "Bu tam Linka ehtiyat nüsxəsi qeydləri və yerli sənədləri birləşdirəcək, görünüş və axtarış parametrlərini bərpa edəcək. Mövcud məlumatlar silinməyəcək. Davam edilsin?", backupRestored: "Ehtiyat nüsxə bərpa edildi", backupPartial: "Qeydlər bərpa edildi, lakin bəzi sənədlər və ya parametrlər bərpa olunmadı. Yaddaş yerini yoxla.", backupFailed: "Tam ehtiyat nüsxəni saxlamaq və ya bərpa etmək olmadı. Yaddaş yerini yoxla.", recentViews: "Son axtarışlar · yalnız bu cihazda", clearRecent: "Tarixçəni təmizlə", recentCleared: "Axtarış tarixçəsi təmizləndi.", invalidBookmarkImport: "Bu HTML faylında veb keçidli əlfəcinlər tapılmadı.", bookmarkDuplicatesSkipped: "İdxal edilən bütün əlfəcinlər kitabxanada artıq mövcuddur.", bookmarkImportLimited: "Yalnız ilk 5 000 əlfəcin emal edildi.", previewImageInvalid: "Üz qabığı üçün giriş məlumatları olmayan düzgün HTTPS URL-i daxil et.", selectItems: "Qeydləri seç", exitSelection: "Seçim rejimindən çıx", selectedCount: "Seçildi: {count}", selectVisible: "Görünənləri seç", clearSelection: "Seçimi təmizlə", pin: "Bərkid", unpin: "Bərkitməni götür", copy: "Kopyala", export: "İxrac et", restoreSelected: "Seçilənləri bərpa et", archiveSelected: "Seçilənləri arxivlə", unarchiveSelected: "Seçilənləri arxivdən çıxar", nothingMatches: "Bu görünüşə uyğun heç nə yoxdur", trySearch: "Başqa axtarış sınayın və ya filtri dəyişin.", emptyLibraryTitle: "Vacib fikirlər üçün yer", emptyLibraryDescription: "Yuxarıya keçid yapışdır və ya fikir yaz. Sən silənədək bu brauzer profilində qalacaq.", pinned: "Bərkidilib", link: "Keçid", note: "Qeyd", selected: "Seçildi", select: "Seç", timelineToday: "Bu gün", timelineYesterday: "Dünən", timelineUnknown: "Tarix məlum deyil", undo: "Geri al", redo: "Təkrar et", undoDone: "Son dəyişiklik geri alındı", redoDone: "Dəyişiklik təkrar edildi", historyFailed: "Tarixçəni dəyişmək olmadı; saxlanmış kitabxana qorunub." },
+    tr: { later: "Daha sonra oku", removeLater: "Sonradan oku listesinden çıkar", tagSearch: "Bu etiketi ara", collectionSearch: "Bu koleksiyonu göster", savedLater: "Daha sonra okumak için kaydedildi", removedLater: "Sonradan oku listesinden kaldırıldı", readLater: "Daha sonra oku", archive: "Arşivle", unarchive: "Arşivden çıkar", trash: "Çöp kutusuna taşı", restore: "Geri yükle", deletePermanent: "Kalıcı olarak sil", archived: "Arşive taşındı", unarchived: "Arşivden çıkarıldı", movedTrash: "Çöp kutusuna taşındı", restored: "Çöp kutusundan geri yüklendi", deletedPermanent: "Kalıcı olarak silindi", confirmPermanent: "Seçili kayıtlar kalıcı olarak silinsin mi? Bu işlem geri alınamaz.", tags: "Etiketleri düzenle", collection: "Koleksiyon ata", markLater: "Daha sonra oku", removeLaterBulk: "Sonradan oku listesinden çıkar", tagPrompt: "Virgülle ayrılmış etiketler (boş bırakmak temizler)", collectionPrompt: "Koleksiyon adı (boş bırakmak temizler)", savedViews: "Kayıtlı aramalar", saveView: "Aramayı kaydet", removeView: "Aramayı kaldır", nameView: "Arama adı", viewSaved: "Arama kaydedildi", viewRemoved: "Kayıtlı arama silindi", enterSearch: "Önce bir arama yaz.", exportedJson: "JSON yedeği indirildi", exportedMarkdown: "Markdown dışa aktarımı indirildi", exportedText: "Metin dışa aktarımı indirildi", exportedHtml: "HTML dışa aktarımı indirildi", duplicatePrompt: "Benzer bir kayıt zaten var. Bir kopya daha kaydedilsin mi?", duplicateSkipped: "Mevcut kayıt korundu; kopya eklenmedi.", backupConfirm: "Bu tam Linka yedeği kayıtları ve yerel belgeleri birleştirir, görünüm ve arama tercihlerini geri yükler. Mevcut veriler silinmez. Devam edilsin mi?", backupRestored: "Yedek geri yüklendi", backupPartial: "Kayıtlar geri yüklendi ancak bazı belgeler veya tercihler yüklenemedi. Depolama alanını kontrol et.", backupFailed: "Tam yedek kaydedilemedi veya geri yüklenemedi. Depolama alanını kontrol et.", recentViews: "Son aramalar · yalnızca bu cihazda", clearRecent: "Geçmişi temizle", recentCleared: "Arama geçmişi temizlendi.", invalidBookmarkImport: "Bu HTML dosyasında web bağlantılı yer imleri bulunamadı.", bookmarkDuplicatesSkipped: "İçe aktarılacak tüm yer imleri kitaplığınızda zaten var.", bookmarkImportLimited: "Yalnızca ilk 5.000 yer imi işlendi.", previewImageInvalid: "Kapak için kullanıcı bilgisi içermeyen geçerli bir HTTPS URL’si gir.", selectItems: "Kayıtları seç", exitSelection: "Seçim modundan çık", selectedCount: "{count} seçildi", selectVisible: "Görünenleri seç", clearSelection: "Seçimi temizle", pin: "Sabitle", unpin: "Sabitlemeyi kaldır", copy: "Kopyala", export: "Dışa aktar", restoreSelected: "Seçilenleri geri yükle", archiveSelected: "Seçilenleri arşivle", unarchiveSelected: "Seçilenleri arşivden çıkar", nothingMatches: "Bu görünümle eşleşen sonuç yok", trySearch: "Başka bir arama dene veya filtreyi değiştir.", emptyLibraryTitle: "Önemli düşünceler için alan", emptyLibraryDescription: "Yukarıya bir bağlantı yapıştır veya düşünceni yaz. Sen silene kadar bu tarayıcı profilinde kalır.", pinned: "Sabitlendi", link: "Bağlantı", note: "Not", selected: "Seçildi", select: "Seç", timelineToday: "Bugün", timelineYesterday: "Dün", timelineUnknown: "Tarih bilinmiyor", undo: "Geri al", redo: "Yinele", undoDone: "Son değişiklik geri alındı", redoDone: "Değişiklik yinelendi", historyFailed: "Geçmiş güncellenemedi; kayıtlı kitaplık korundu." }
   };
   return (copy[language] || copy.en)[key] || copy.en[key] || key;
 }
@@ -70,6 +165,56 @@ let persistedCaptures = captures.map(item => ({ ...item }));
 const QUICK_DRAFT_KEY = "linka.captureDraft.v1";
 const QUICK_DRAFT_TAGS_KEY = "linka.captureDraft.tags.v1";
 const QUICK_DRAFT_COLLECTION_KEY = "linka.captureDraft.collection.v1";
+const QUICK_DRAFT_COLLECTION_COLOR_KEY = "linka.captureDraft.collectionColor.v1";
+const QUICK_DRAFT_PREVIEW_TITLE_KEY = "linka.captureDraft.previewTitle.v1";
+const QUICK_DRAFT_PREVIEW_DESCRIPTION_KEY = "linka.captureDraft.previewDescription.v1";
+const QUICK_DRAFT_PREVIEW_IMAGE_KEY = "linka.captureDraft.previewImage.v1";
+function clipboardCaptureUiText(key) {
+  const language = (() => {
+    try { return (localStorage.getItem("linka.language.v1") || "en").toLowerCase().slice(0, 2); }
+    catch { return "en"; }
+  })();
+  const copy = {
+    en: {
+      paste: "Paste clipboard",
+      pasteHelp: "Read the clipboard only after you press this button; Linka does not monitor it.",
+      clipboardEmpty: "The clipboard has no text to add.",
+      clipboardAccessFailed: "Clipboard access failed. You can paste directly into the capture field instead.",
+      clipboardPasted: "Clipboard text added to the draft. Review it before saving.",
+      clipboardTruncated: "Clipboard text was shortened to fit the 100,000-character limit.",
+      clipboardLimit: "This draft is already at the 100,000-character limit."
+    },
+    ru: {
+      paste: "Вставить из буфера",
+      pasteHelp: "Буфер читается только после нажатия. Linka не отслеживает его в фоне.",
+      clipboardEmpty: "В буфере нет текста для добавления.",
+      clipboardAccessFailed: "Не удалось прочитать буфер. Можно вставить текст прямо в поле сохранения.",
+      clipboardPasted: "Текст из буфера добавлен в черновик. Проверь его перед сохранением.",
+      clipboardTruncated: "Текст из буфера сокращён до лимита в 100 000 символов.",
+      clipboardLimit: "Черновик уже достиг лимита в 100 000 символов."
+    },
+    az: {
+      paste: "Mübadilə buferindən əlavə et",
+      pasteHelp: "Bufer yalnız düyməyə basdıqda oxunur; Linka onu arxa planda izləmir.",
+      clipboardEmpty: "Buferdə əlavə ediləcək mətn yoxdur.",
+      clipboardAccessFailed: "Buferi oxumaq olmadı. Mətni birbaşa saxlama sahəsinə yapışdıra bilərsən.",
+      clipboardPasted: "Buferdəki mətn qaralamaya əlavə edildi. Saxlamazdan əvvəl yoxla.",
+      clipboardTruncated: "Mətn 100 000 simvol limitinə uyğun qısaldıldı.",
+      clipboardLimit: "Qaralama artıq 100 000 simvol limitinə çatıb."
+    },
+    tr: {
+      paste: "Panodan ekle",
+      pasteHelp: "Pano yalnızca bu düğmeye bastığında okunur; Linka arka planda pano takibi yapmaz.",
+      clipboardEmpty: "Panoda eklenecek metin yok.",
+      clipboardAccessFailed: "Panoya erişilemedi. Metni doğrudan kayıt alanına yapıştırabilirsin.",
+      clipboardPasted: "Pano metni taslağa eklendi. Kaydetmeden önce gözden geçir.",
+      clipboardTruncated: "Metin, 100.000 karakter sınırına uyacak şekilde kısaltıldı.",
+      clipboardLimit: "Bu taslak zaten 100.000 karakter sınırında."
+    }
+  };
+  return (copy[language] || copy.en)[key] || copy.en[key] || key;
+}
+
 function parseTagInput(value) {
   return String(value || "").split(/[,;\n]+/).map(tag => tag.trim().replace(/^#+/, "").replace(/\s+/g, " ").slice(0, 40)).filter(Boolean).slice(0, 24);
 }
@@ -79,15 +224,31 @@ function saveCaptureMetadataDraft() {
     else localStorage.removeItem(QUICK_DRAFT_TAGS_KEY);
     if (collectionDraft.value) localStorage.setItem(QUICK_DRAFT_COLLECTION_KEY, collectionDraft.value);
     else localStorage.removeItem(QUICK_DRAFT_COLLECTION_KEY);
+    if (collectionColorDraft.value) localStorage.setItem(QUICK_DRAFT_COLLECTION_COLOR_KEY, collectionColorDraft.value);
+    else localStorage.removeItem(QUICK_DRAFT_COLLECTION_COLOR_KEY);
+    if (previewTitleDraft.value) localStorage.setItem(QUICK_DRAFT_PREVIEW_TITLE_KEY, previewTitleDraft.value);
+    else localStorage.removeItem(QUICK_DRAFT_PREVIEW_TITLE_KEY);
+    if (previewDescriptionDraft.value) localStorage.setItem(QUICK_DRAFT_PREVIEW_DESCRIPTION_KEY, previewDescriptionDraft.value);
+    else localStorage.removeItem(QUICK_DRAFT_PREVIEW_DESCRIPTION_KEY);
+    if (previewImageDraft.value) localStorage.setItem(QUICK_DRAFT_PREVIEW_IMAGE_KEY, previewImageDraft.value);
+    else localStorage.removeItem(QUICK_DRAFT_PREVIEW_IMAGE_KEY);
   } catch {}
 }
 try {
   const savedDraft = localStorage.getItem(QUICK_DRAFT_KEY);
   const savedTags = localStorage.getItem(QUICK_DRAFT_TAGS_KEY);
   const savedCollection = localStorage.getItem(QUICK_DRAFT_COLLECTION_KEY);
+  const savedCollectionColor = localStorage.getItem(QUICK_DRAFT_COLLECTION_COLOR_KEY);
+  const savedPreviewTitle = localStorage.getItem(QUICK_DRAFT_PREVIEW_TITLE_KEY);
+  const savedPreviewDescription = localStorage.getItem(QUICK_DRAFT_PREVIEW_DESCRIPTION_KEY);
+  const savedPreviewImage = localStorage.getItem(QUICK_DRAFT_PREVIEW_IMAGE_KEY);
   if (savedDraft && !draft.value) draft.value = savedDraft;
   if (savedTags && !tagsDraft.value) tagsDraft.value = savedTags;
   if (savedCollection && !collectionDraft.value) collectionDraft.value = savedCollection;
+  if (savedCollectionColor && !collectionColorDraft.value) collectionColorDraft.value = normalizeCollectionColor(savedCollectionColor);
+  if (savedPreviewTitle && !previewTitleDraft.value) previewTitleDraft.value = savedPreviewTitle;
+  if (savedPreviewDescription && !previewDescriptionDraft.value) previewDescriptionDraft.value = savedPreviewDescription;
+  if (savedPreviewImage && !previewImageDraft.value) previewImageDraft.value = savedPreviewImage;
   saveButton.disabled = !draft.value.trim();
 } catch {}
 let activeFilter = "all";
@@ -98,11 +259,64 @@ let cloudSyncBusy = false;
 let cloudSyncQueued = false;
 let localDataRevision = 0;
 let cloudSyncStatus = "";
+const CLOUD_LAST_SUCCESS_KEY = "linka.cloud.lastSuccess.v1";
 let lastCloudRefreshAt = 0;
 const expandedCards = new Set();
 const desktopBuildVersion = String(import.meta.env.VITE_LINKA_DESKTOP_VERSION || "").trim();
 let reduceMotion = localStorage.getItem("linka.reduceMotion") === "true" || (localStorage.getItem("linka.reduceMotion") === null && (() => { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } })());
 
+function focusQuickCaptureFromNative() {
+  const input = $("#capture-text");
+  if (!input) return;
+  input.focus({ preventScroll: true });
+  input.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
+  const capturePanel = document.querySelector(".capture");
+  capturePanel?.classList.add("spotlight");
+  setTimeout(() => capturePanel?.classList.remove("spotlight"), 900);
+}
+async function applyNativeCloseToTrayPreference() {
+  if (!(window.__TAURI_INTERNALS__ || window.__TAURI__)) return;
+  const enabled = localStorage.getItem("linka.closeToTray") !== "false";
+  try { await invokeTauri("set_close_to_tray", { enabled }); }
+  catch (error) { console.warn("Could not apply Linka close-to-tray preference", error); }
+}
+async function registerNativeDesktopEvents() {
+  if (!(window.__TAURI_INTERNALS__ || window.__TAURI__)) return;
+  try {
+    await Promise.all([
+      listenTauriEvent("linka-global-capture", () => focusQuickCaptureFromNative()),
+      listenTauriEvent("linka-tray-quick-capture", () => focusQuickCaptureFromNative()),
+      listenTauriEvent("linka-menu-action", event => {
+        const action = String(event.payload || "");
+        if (action === "undo" || action === "redo") {
+          const active = document.activeElement;
+          if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || active?.isContentEditable) {
+            active.focus();
+            document.execCommand(action);
+          }
+        } else if (action === "quick-capture") {
+          focusQuickCaptureFromNative();
+        } else if (action === "new-document") {
+          document.dispatchEvent(new Event("linka:open-documents"));
+        } else if (action === "export-backup") {
+          const format = $("#export-format");
+          if (format) format.value = "json";
+          $("#export-button")?.click();
+        } else if (action === "search") {
+          $("#search-space-button")?.click();
+        } else if (action === "backup-history") {
+          $("#backup-history-button")?.click();
+        } else if (action === "settings") {
+          $("#settings-button")?.click();
+        } else if (action === "shortcuts") {
+          window.dispatchEvent(new Event("linka:open-keyboard-shortcuts"));
+        }
+      })
+    ]);
+  } catch (error) {
+    console.warn("Could not register Linka native desktop event listeners", error);
+  }
+}
 function say(message) {
   status.textContent = message;
   status.style.opacity = "1";
@@ -116,8 +330,12 @@ function showCaptureRecoveryNotice() {
   const copy = ({
     ru: {
       title: "Не удалось прочитать библиотеку Linka",
-      body: "Исходные данные не заменены. Запись новых изменений заблокирована, чтобы не перезаписать библиотеку. Сначала экспортируй повреждённые данные для восстановления.",
-      export: "Экспортировать исходные данные", fresh: "Начать с пустой библиотекой",
+      body: "Исходные данные не заменены. Запись новых изменений заблокирована, чтобы не перезаписать библиотеку. Экспортируй повреждённые данные или восстанови локальную резервную копию; исходник останется сохранён отдельно.",
+      export: "Экспортировать исходные данные", restoreLatest: "Восстановить последнюю резервную копию", fresh: "Начать с пустой библиотекой",
+      confirmRestoreLatest: "Восстановить последнюю локальную резервную копию? Повреждённые исходные данные останутся сохранены на этом устройстве.",
+      restoreLatestDone: "Локальная резервная копия восстановлена. Повреждённые исходные данные сохранены отдельно.",
+      restoreLatestUnavailable: "Не найдена подходящая локальная резервная копия с данными.",
+      restoreLatestFailed: "Не удалось восстановить резервную копию. Исходные данные по-прежнему сохранены.",
       exportDone: "Исходные данные экспортированы. Сохрани файл до продолжения работы.",
       confirmFresh: "Сначала экспортируй исходные данные. Linka сохранит их локально для диагностики, но создаст новую пустую библиотеку. Продолжить?",
       freshFailed: "Не удалось безопасно сохранить исходные данные. Экспортируй их и проверь свободное место в хранилище.",
@@ -125,8 +343,12 @@ function showCaptureRecoveryNotice() {
     },
     en: {
       title: "Linka could not read the library",
-      body: "The original data has not been replaced. Writes are paused to prevent overwriting the library. Export the damaged data before continuing.",
-      export: "Export original data", fresh: "Start with an empty library",
+      body: "The original data has not been replaced. Writes are paused to prevent overwriting the library. Export the damaged data or restore a local backup; the original remains preserved separately.",
+      export: "Export original data", restoreLatest: "Restore latest local backup", fresh: "Start with an empty library",
+      confirmRestoreLatest: "Restore the newest local backup? The damaged original will remain preserved on this device.",
+      restoreLatestDone: "Local backup restored. The damaged original remains preserved separately.",
+      restoreLatestUnavailable: "No usable local backup with saved data was found.",
+      restoreLatestFailed: "Could not restore a local backup. The original data remains preserved.",
       exportDone: "Original data exported. Keep the file before continuing.",
       confirmFresh: "Export the original data first. Linka will retain it locally for recovery and create a new empty library. Continue?",
       freshFailed: "Could not safely preserve the original data. Export it and check available storage.",
@@ -134,8 +356,12 @@ function showCaptureRecoveryNotice() {
     },
     az: {
       title: "Linka kitabxananı oxuya bilmədi",
-      body: "Orijinal məlumatlar dəyişdirilməyib. Kitabxananın üzərinə yazılmaması üçün yeni yazılar dayandırılıb. Davam etməzdən əvvəl zədələnmiş məlumatları ixrac et.",
-      export: "Orijinal məlumatları ixrac et", fresh: "Boş kitabxana yarat",
+      body: "Orijinal məlumatlar dəyişdirilməyib. Kitabxananın üzərinə yazılmaması üçün yeni yazılar dayandırılıb. Zədələnmiş məlumatları ixrac et və ya yerli ehtiyat nüsxəni bərpa et; orijinal ayrıca saxlanacaq.",
+      export: "Orijinal məlumatları ixrac et", restoreLatest: "Son ehtiyat nüsxəni bərpa et", fresh: "Boş kitabxana yarat",
+      confirmRestoreLatest: "Ən son yerli ehtiyat nüsxə bərpa edilsin? Zədələnmiş orijinal məlumatlar bu cihazda ayrıca saxlanılacaq.",
+      restoreLatestDone: "Yerli ehtiyat nüsxə bərpa edildi. Zədələnmiş orijinal məlumatlar ayrıca saxlanıldı.",
+      restoreLatestUnavailable: "Məlumatları olan uyğun yerli ehtiyat nüsxə tapılmadı.",
+      restoreLatestFailed: "Ehtiyat nüsxəni bərpa etmək mümkün olmadı. Orijinal məlumatlar saxlanılır.",
       exportDone: "Orijinal məlumatlar ixrac edildi. Davam etməzdən əvvəl faylı saxla.",
       confirmFresh: "Əvvəlcə orijinal məlumatları ixrac et. Linka onları bərpa üçün cihazda saxlayacaq və yeni boş kitabxana yaradacaq. Davam edilsin?",
       freshFailed: "Orijinal məlumatları təhlükəsiz saxlamaq mümkün olmadı. Onları ixrac et və yaddaş yerini yoxla.",
@@ -143,8 +369,12 @@ function showCaptureRecoveryNotice() {
     },
     tr: {
       title: "Linka kitaplığı okuyamadı",
-      body: "Özgün veriler değiştirilmedi. Kitaplığın üzerine yazılmasını önlemek için yeni kayıtlar duraklatıldı. Devam etmeden önce bozuk verileri dışa aktar.",
-      export: "Özgün verileri dışa aktar", fresh: "Boş kitaplık oluştur",
+      body: "Özgün veriler değiştirilmedi. Kitaplığın üzerine yazılmasını önlemek için yeni kayıtlar duraklatıldı. Bozuk verileri dışa aktar veya yerel yedeği geri yükle; özgün veriler ayrı olarak korunacak.",
+      export: "Özgün verileri dışa aktar", restoreLatest: "En son yerel yedeği geri yükle", fresh: "Boş kitaplık oluştur",
+      confirmRestoreLatest: "En yeni yerel yedek geri yüklensin mi? Bozuk özgün veriler bu cihazda ayrı olarak korunacak.",
+      restoreLatestDone: "Yerel yedek geri yüklendi. Bozuk özgün veriler ayrı olarak korundu.",
+      restoreLatestUnavailable: "Kayıtlı verisi olan uygun bir yerel yedek bulunamadı.",
+      restoreLatestFailed: "Yerel yedek geri yüklenemedi. Özgün veriler korunuyor.",
       exportDone: "Özgün veriler dışa aktarıldı. Devam etmeden önce dosyayı sakla.",
       confirmFresh: "Önce özgün verileri dışa aktar. Linka bunları kurtarma için cihazda saklayıp yeni boş bir kitaplık oluşturacak. Devam edilsin mi?",
       freshFailed: "Özgün veriler güvenli biçimde korunamadı. Verileri dışa aktar ve kullanılabilir alanı kontrol et.",
@@ -152,8 +382,12 @@ function showCaptureRecoveryNotice() {
     }
   })[language] || {
     title: "Linka could not read the library",
-    body: "The original data has not been replaced. Writes are paused to prevent overwriting the library. Export the damaged data before continuing.",
-    export: "Export original data", fresh: "Start with an empty library",
+    body: "The original data has not been replaced. Writes are paused to prevent overwriting the library. Export the damaged data or restore a local backup; the original remains preserved separately.",
+    export: "Export original data", restoreLatest: "Restore latest local backup", fresh: "Start with an empty library",
+      confirmRestoreLatest: "Restore the newest local backup? The damaged original will remain preserved on this device.",
+      restoreLatestDone: "Local backup restored. The damaged original remains preserved separately.",
+      restoreLatestUnavailable: "No usable local backup with saved data was found.",
+      restoreLatestFailed: "Could not restore a local backup. The original data remains preserved.",
     exportDone: "Original data exported. Keep the file before continuing.",
     confirmFresh: "Export the original data first. Linka will retain it locally for recovery and create a new empty library. Continue?",
     freshFailed: "Could not safely preserve the original data. Export it and check available storage.",
@@ -194,6 +428,51 @@ function showCaptureRecoveryNotice() {
     setTimeout(() => URL.revokeObjectURL(url), 5000);
     say(copy.exportDone);
   });
+  const restoreLatestButton = button(copy.restoreLatest);
+  restoreLatestButton.addEventListener("click", async () => {
+    if (!window.confirm(copy.confirmRestoreLatest)) return;
+    restoreLatestButton.disabled = true;
+    try {
+      const snapshots = await listBackupSnapshots();
+      let stored = null;
+      // A newer snapshot can have valid metadata but a damaged payload. Try
+      // older candidates instead of giving up on the first unreadable backup.
+      for (const snapshot of findUsableBackupSnapshots(snapshots)) {
+        const candidate = await getBackupSnapshot(snapshot.id);
+        const parsed = candidate?.backup ? parseLinkaBackup(candidate.backup) : null;
+        if (parsed && (parsed.captures.length > 0 || parsed.documents.length > 0)) {
+          stored = candidate;
+          break;
+        }
+      }
+      if (!stored) {
+        say(copy.restoreLatestUnavailable);
+        return;
+      }
+
+      // Keep the malformed source in RECOVERY_KEY, acknowledge it and open a
+      // safe empty target before restoring. This is required because normal
+      // writes are intentionally blocked while corruption is unacknowledged.
+      const recoveryState = getCaptureRecovery();
+      if (recoveryState && !recoveryState.acknowledged && !startFreshCaptureLibrary()) {
+        throw new Error(copy.restoreLatestFailed);
+      }
+      captures = [];
+      persistedCaptures = [];
+      const result = await restoreBackupHistorySnapshot(stored.backup);
+      panel.remove();
+      const detail = " · " + result.captures + " captures, " + result.documents + " documents";
+      say((result.partial ? captureUiText("backupPartial") : copy.restoreLatestDone) + detail);
+    } catch (error) {
+      console.error("Could not restore latest backup after capture-store corruption", error);
+      // If the malformed source was acknowledged before a failed write/restore,
+      // put the recovery gate back so a reload cannot hide the recovery options.
+      reopenCaptureRecovery();
+      say(copy.restoreLatestFailed);
+    } finally {
+      restoreLatestButton.disabled = false;
+    }
+  });
   const freshButton = button(copy.fresh);
   freshButton.addEventListener("click", () => {
     if (!window.confirm(copy.confirmFresh)) return;
@@ -217,20 +496,93 @@ function formatDate(value) {
   catch { return "Saved"; }
 }
 function persist() {
+  const previousState = cloneCaptureSnapshot(persistedCaptures);
+  const recoveryState = getCaptureRecovery();
+  if (!recoveryState || recoveryState.acknowledged) {
+    void saveAutomaticBackupSnapshot(previousState).catch(error => {
+      console.warn("Automatic Linka backup snapshot was not saved", error);
+    });
+  }
   if (!saveCaptures(captures)) {
     // Roll back the in-memory mutation to the last state known to be on disk.
     // This prevents the UI from presenting an unsaved edit/delete as durable.
-    captures = persistedCaptures.map(item => ({ ...item }));
+    captures = cloneCaptureSnapshot(persistedCaptures);
     say("Не удалось сохранить данные. Предыдущее состояние восстановлено; освободи место или экспортируй резервную копию.");
     return false;
   }
-  persistedCaptures = captures.map(item => ({ ...item }));
+  const savedState = cloneCaptureSnapshot(captures);
+  if (JSON.stringify(previousState) !== JSON.stringify(savedState)) {
+    pushCaptureSnapshot(undoStack, previousState, MAX_CAPTURE_HISTORY);
+    redoStack.length = 0;
+  }
+  persistedCaptures = savedState;
   localDataRevision += 1;
+  updateHistoryControls();
   scheduleCloudSync();
   return true;
 }
+function setAppFocusMode(enabled, { persist = true, announce = false } = {}) {
+  appFocusMode = Boolean(enabled);
+  document.documentElement.dataset.appFocus = appFocusMode ? "true" : "false";
+  const language = (() => {
+    try { return (localStorage.getItem("linka.language.v1") || "en").toLowerCase().slice(0, 2); }
+    catch { return "en"; }
+  })();
+  const labels = {
+    en: { on: "Exit focus mode", off: "Enter focus mode", enabled: "Focus mode enabled", disabled: "Focus mode disabled" },
+    ru: { on: "Выйти из режима фокуса", off: "Включить режим фокуса", enabled: "Режим фокуса включён", disabled: "Режим фокуса выключен" },
+    az: { on: "Fokus rejimindən çıx", off: "Fokus rejimini aktiv et", enabled: "Fokus rejimi aktivdir", disabled: "Fokus rejimi söndürüldü" },
+    tr: { on: "Odak modundan çık", off: "Odak modunu aç", enabled: "Odak modu açıldı", disabled: "Odak modu kapatıldı" }
+  };
+  const copy = labels[language] || labels.en;
+  const buttonLabel = appFocusMode ? copy.on : copy.off;
+  if (focusModeButton) {
+    focusModeButton.setAttribute("aria-label", buttonLabel);
+    focusModeButton.title = buttonLabel + " (Ctrl+Shift+F)";
+    focusModeButton.setAttribute("aria-pressed", String(appFocusMode));
+    focusModeButton.classList.toggle("focus-mode-active", appFocusMode);
+  }
+  if (persist) {
+    try { localStorage.setItem(APP_FOCUS_STORAGE_KEY, String(appFocusMode)); } catch {}
+  }
+  if (announce) say(appFocusMode ? copy.enabled : copy.disabled);
+}
+
+function updateCloudSyncStatus(state = "auto", detail = "") {
+  if (!cloudStatusElement) return;
+  const language = (() => {
+    try { return (localStorage.getItem("linka.language.v1") || "en").toLowerCase().slice(0, 2); }
+    catch { return "en"; }
+  })();
+  const copy = {
+    en: { local: "Local only", pending: "Changes pending", syncing: "Syncing…", success: "Synced at {time}", never: "Cloud connected", error: "Sync needs attention" },
+    ru: { local: "Только на устройстве", pending: "Ожидает синхронизации", syncing: "Синхронизация…", success: "Синхронизировано · {time}", never: "Облако подключено", error: "Ошибка синхронизации" },
+    az: { local: "Yalnız bu cihazda", pending: "Sinxronizasiya gözləyir", syncing: "Sinxronizasiya…", success: "Sinxronizasiya · {time}", never: "Bulud qoşulub", error: "Sinxronizasiya xətası" },
+    tr: { local: "Yalnızca bu cihazda", pending: "Eşitleme bekliyor", syncing: "Eşitleniyor…", success: "Eşitlendi · {time}", never: "Bulut bağlı", error: "Eşitleme hatası" }
+  };
+  let resolved = state;
+  let lastSuccess = 0;
+  try { lastSuccess = Number(localStorage.getItem(CLOUD_LAST_SUCCESS_KEY) || 0); } catch {}
+  if (resolved === "auto") {
+    if (!getCloudSession()) resolved = "local";
+    else resolved = lastSuccess > 0 ? "success" : "never";
+  }
+  const labels = copy[language] || copy.en;
+  let label = labels[resolved] || labels.local;
+  if (resolved === "success") {
+    let time = "";
+    try { time = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(new Date(lastSuccess)); }
+    catch { time = new Date(lastSuccess).toLocaleTimeString(); }
+    label = label.replace("{time}", time || "—");
+  }
+  cloudStatusElement.textContent = label;
+  cloudStatusElement.dataset.state = resolved;
+  cloudStatusElement.title = detail ? label + ": " + String(detail).slice(0, 180) : label;
+}
+
 function scheduleCloudSync() {
-  if (!getCloudSession()) return;
+  if (!getCloudSession()) { updateCloudSyncStatus("local"); return; }
+  updateCloudSyncStatus("pending");
   clearTimeout(cloudSyncTimer);
   cloudSyncTimer = setTimeout(() => {
     if (cloudSyncBusy) { cloudSyncQueued = true; return; }
@@ -238,8 +590,9 @@ function scheduleCloudSync() {
   }, 1400);
 }
 async function syncNow({ silent = false } = {}) {
-  if (cloudSyncBusy) { cloudSyncQueued = true; return null; }
+  if (cloudSyncBusy) { cloudSyncQueued = true; updateCloudSyncStatus("pending"); return null; }
   cloudSyncBusy = true;
+  updateCloudSyncStatus("syncing");
   const startRevision = localDataRevision;
   try {
     const localSnapshot = captures.map(item => ({ ...item }));
@@ -257,15 +610,19 @@ async function syncNow({ silent = false } = {}) {
     if (!saveCaptures(latestCaptures)) {
       throw new Error("Облако ответило, но объединённую библиотеку не удалось сохранить на устройстве. Локальные данные не перезаписаны; экспортируй резервную копию и освободи место.");
     }
+    if (JSON.stringify(latestCaptures) !== JSON.stringify(captures)) clearCaptureHistory();
     captures = latestCaptures;
     persistedCaptures = captures.map(item => ({ ...item }));
     cloudSyncStatus = result.message;
+    try { localStorage.setItem(CLOUD_LAST_SUCCESS_KEY, String(Date.now())); } catch {}
+    updateCloudSyncStatus("success", result.message);
     if (localDataRevision !== startRevision) cloudSyncQueued = true;
     render();
     if (!silent) say(result.message);
     return { ...result, captures: latestCaptures, deletedIds: latestDeleted };
   } catch (error) {
     cloudSyncStatus = error?.message || "Cloud sync failed";
+    updateCloudSyncStatus("error", cloudSyncStatus);
     if (!silent) say("Sync failed: " + cloudSyncStatus);
     throw error;
   } finally {
@@ -286,9 +643,21 @@ function compareVersions(a, b) {
   }
   return 0;
 }
+function appendSearchHighlights(target, value, query) {
+  const parts = splitSearchHighlights(value, query);
+  target.replaceChildren(...parts.map(part => {
+    if (!part.highlighted) return document.createTextNode(part.text);
+    const mark = document.createElement("mark");
+    mark.className = "search-highlight";
+    mark.textContent = part.text;
+    return mark;
+  }));
+}
+
 function render() {
+  const highlightQuery = parseSearchQuery(search.value).text;
   for (const id of selectedIds) if (!captures.some(item => item.id === id)) selectedIds.delete(id);
-  const shown = visibleCaptures(captures, activeFilter, search.value);
+  const shown = sortCaptures(visibleCaptures(captures, activeFilter, search.value), activeFilter === "timeline" ? "newest" : sortMode);
   const tagOptions = $("#linka-tag-options");
   if (tagOptions) {
     const tags = [...new Map(captures.flatMap(item => item.tags || []).map(tag => [tag.toLocaleLowerCase(), tag])).values()].sort((a, b) => a.localeCompare(b));
@@ -300,7 +669,7 @@ function render() {
     collectionOptions.replaceChildren(...collections.map(value => { const option = document.createElement("option"); option.value = value; return option; }));
   }
   count.textContent = captures.length + (captures.length === 1 ? " item" : " items");
-  selectionButton.textContent = selectionMode ? "Exit selection" : "Select items";
+  selectionButton.textContent = captureUiText(selectionMode ? "exitSelection" : "selectItems");
   selectionButton.setAttribute("aria-pressed", String(selectionMode));
   selectionButton.classList.toggle("selection-mode-active", selectionMode);
   bulkToolbar.hidden = !selectionMode;
@@ -308,7 +677,7 @@ function render() {
   if (selectionMode) {
     const summary = document.createElement("span");
     summary.className = "bulk-summary";
-    summary.textContent = selectedIds.size + " selected";
+    summary.textContent = captureUiText("selectedCount").replace("{count}", String(selectedIds.size));
     bulkToolbar.append(summary);
     const bulkButton = (label, action, danger = false) => {
       const button = document.createElement("button");
@@ -318,54 +687,80 @@ function render() {
       button.textContent = label;
       bulkToolbar.append(button);
     };
-    bulkButton("Select visible", "select-visible");
-    bulkButton("Clear", "clear");
-    bulkButton("Pin", "pin");
-    bulkButton("Unpin", "unpin");
-    bulkButton("Copy", "copy");
-    bulkButton("Export", "export");
+    bulkButton(captureUiText("selectVisible"), "select-visible");
+    bulkButton(captureUiText("clearSelection"), "clear");
+    bulkButton(captureUiText("pin"), "pin");
+    bulkButton(captureUiText("unpin"), "unpin");
+    bulkButton(captureUiText("copy"), "copy");
+    bulkButton(captureUiText("export"), "export");
     bulkButton(captureUiText("tags"), "tags");
     bulkButton(captureUiText("collection"), "collection");
     bulkButton(captureUiText(selected.every(item => item.readLater) ? "removeLaterBulk" : "markLater"), "later");
     if (activeFilter === "trash") {
-      bulkButton(captureUiText("restore") + " selected", "restore-trash");
+      bulkButton(captureUiText("restoreSelected"), "restore-trash");
       bulkButton(captureUiText("deletePermanent"), "delete", true);
     } else {
-      bulkButton((activeFilter === "archive" ? captureUiText("unarchive") : captureUiText("archive")) + " selected", "archive");
+      bulkButton(captureUiText(activeFilter === "archive" ? "unarchiveSelected" : "archiveSelected"), "archive");
       bulkButton(captureUiText("trash"), "delete", true);
     }
   }
   list.replaceChildren();
+  list.classList.toggle("timeline-mode", activeFilter === "timeline");
   if (!shown.length) {
     const empty = document.createElement("div");
     empty.className = "empty";
     empty.innerHTML = '<span class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18"/></svg></span>';
     const title = document.createElement("strong");
-    title.textContent = captures.length ? "Nothing matches this view" : "A little room for what matters";
+    title.textContent = captureUiText(captures.length ? "nothingMatches" : "emptyLibraryTitle");
     const description = document.createElement("p");
-    description.textContent = captures.length ? "Try another search or switch the filter." : "Paste a link or write a thought above. It will stay in this browser profile until you remove it.";
+    description.textContent = captureUiText(captures.length ? "trySearch" : "emptyLibraryDescription");
     empty.append(title, description);
     list.append(empty);
     return;
   }
+  let previousTimelineDay = "";
   shown.forEach((item, index) => {
+    if (activeFilter === "timeline") {
+      const dayKey = captureDateKey(item);
+      if (dayKey !== previousTimelineDay) {
+        previousTimelineDay = dayKey;
+        const heading = document.createElement("h3");
+        heading.className = "timeline-day";
+        const timestamp = Number(item.createdAt || item.updatedAt || 0);
+        const date = new Date(timestamp);
+        if (dayKey === "unknown") {
+          heading.textContent = captureUiText("timelineUnknown");
+        } else {
+          const today = new Date(); today.setHours(0, 0, 0, 0);
+          const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+          const keyOf = value => captureDateKey({ createdAt: value.getTime() });
+          if (dayKey === keyOf(today)) heading.textContent = captureUiText("timelineToday");
+          else if (dayKey === keyOf(yesterday)) heading.textContent = captureUiText("timelineYesterday");
+          else {
+            try { heading.textContent = new Intl.DateTimeFormat(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" }).format(date); }
+            catch { heading.textContent = formatDate(timestamp); }
+          }
+        }
+        list.append(heading);
+      }
+    }
     const card = document.createElement("article");
     card.dataset.itemId = item.id;
-    card.className = "item" + (item.pinned ? " pinned" : "") + (expandedCards.has(item.id) ? " expanded" : "") + (selectedIds.has(item.id) ? " is-selected" : "");
+    card.className = "item" + (item.pinned ? " pinned" : "") + (expandedCards.has(item.id) ? " expanded" : "") + (selectedIds.has(item.id) ? " is-selected" : "") + (activeFilter === "timeline" ? " timeline-item" : "");
     card.style.setProperty("--index", String(index));
     const head = document.createElement("div"); head.className = "item-head";
     const kind = document.createElement("span"); kind.className = "kind";
-    kind.textContent = item.trashedAt ? captureUiText("trash") : (item.archivedAt ? captureUiText("archive") : (item.pinned ? "Pinned" : (item.readLater ? captureUiText("readLater") : (isLink(item.text) ? "Link" : "Note"))));
+    kind.textContent = item.trashedAt ? captureUiText("trash") : (item.archivedAt ? captureUiText("archive") : (item.pinned ? captureUiText("pinned") : (item.readLater ? captureUiText("readLater") : captureUiText(isLink(item.text) ? "link" : "note"))));
     if (selectionMode) {
-      const selectItem = makeAction(selectedIds.has(item.id) ? "✓ Selected" : "Select", "select", item.id);
+      const selectItem = makeAction(selectedIds.has(item.id) ? "✓ " + captureUiText("selected") : captureUiText("select"), "select", item.id);
       selectItem.setAttribute("aria-pressed", String(selectedIds.has(item.id)));
-      head.append(kind, selectItem, makeAction(item.pinned ? "Unpin" : "Pin", "pin", item.id));
+      head.append(kind, selectItem, makeAction(captureUiText(item.pinned ? "unpin" : "pin"), "pin", item.id));
     } else {
-      head.append(kind, makeAction(item.pinned ? "Unpin" : "Pin", "pin", item.id));
+      head.append(kind, makeAction(captureUiText(item.pinned ? "unpin" : "pin"), "pin", item.id));
     }
     const body = document.createElement("p");
     body.className = "item-text" + (isLink(item.text) ? " link" : "");
-    body.textContent = item.text;
+    appendSearchHighlights(body, item.text, highlightQuery);
     const previewBits = [];
     if (isLink(item.text) && /^https:\/\//i.test(item.previewImageUrl || "")) {
       const frame = document.createElement("div"); frame.className = "item-cover-frame";
@@ -374,8 +769,8 @@ function render() {
       cover.addEventListener("load", () => cover.classList.add("loaded"), { once: true });
       cover.addEventListener("error", () => frame.remove(), { once: true }); frame.append(cover); previewBits.push(frame);
     }
-    if (isLink(item.text) && item.previewTitle) { const title = document.createElement("p"); title.className = "item-title"; title.textContent = item.previewTitle; previewBits.push(title); }
-    if (isLink(item.text) && item.previewDescription) { const description = document.createElement("p"); description.className = "item-description"; description.textContent = item.previewDescription; previewBits.push(description); }
+    if (isLink(item.text) && item.previewTitle) { const title = document.createElement("p"); title.className = "item-title"; appendSearchHighlights(title, item.previewTitle, highlightQuery); previewBits.push(title); }
+    if (isLink(item.text) && item.previewDescription) { const description = document.createElement("p"); description.className = "item-description"; appendSearchHighlights(description, item.previewDescription, highlightQuery); previewBits.push(description); }
     if (isLink(item.text)) {
       const url = document.createElement("a");
       url.href = item.text.trim(); url.target = "_blank"; url.rel = "noopener noreferrer";
@@ -399,7 +794,7 @@ function render() {
       }
       if (item.collection) {
         const collectionButton = document.createElement("button");
-        collectionButton.type = "button"; collectionButton.className = "item-collection"; collectionButton.textContent = item.collection;
+        collectionButton.type = "button"; collectionButton.className = "item-collection"; collectionButton.dataset.collectionColor = normalizeCollectionColor(item.collectionColor) || "default"; collectionButton.textContent = item.collection;
         collectionButton.title = captureUiText("collectionSearch");
         collectionButton.addEventListener("click", () => {
           search.value = "in:" + item.collection; activeFilter = "all";
@@ -443,7 +838,7 @@ function showSearchSpace(initial = "") {
   const searchWrap = document.createElement("label"); searchWrap.className = "search-space-input-wrap";
   searchWrap.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.5"/><path d="m16 16 4 4"/></svg>';
   const input = document.createElement("input"); input.className = "search-space-input"; input.type = "search";
-  input.placeholder = "Search everything you’ve saved…"; input.value = initial; input.autocomplete = "off"; input.setAttribute("aria-label", "Search your Linka library");
+  input.placeholder = initial.trim().startsWith(">") ? "Commands · try > today" : "Search everything you’ve saved…"; input.value = initial; input.autocomplete = "off"; input.setAttribute("aria-label", "Search your Linka library");
   const hint = document.createElement("span"); hint.className = "search-hint"; hint.textContent = "Esc to close";
   searchWrap.append(input, hint);
   const info = document.createElement("div"); info.className = "search-space-meta";
@@ -451,10 +846,13 @@ function showSearchSpace(initial = "") {
   info.append(count, scope);
   const savedSearchToolbar = document.createElement("div"); savedSearchToolbar.className = "saved-search-toolbar";
   const savedSearchSelect = document.createElement("select"); savedSearchSelect.className = "saved-search-select"; savedSearchSelect.setAttribute("aria-label", captureUiText("savedViews"));
+  const recentSearchSelect = document.createElement("select"); recentSearchSelect.className = "saved-search-select recent-search-select"; recentSearchSelect.setAttribute("aria-label", captureUiText("recentViews")); recentSearchSelect.title = captureUiText("recentViews");
   const savedSearchSave = document.createElement("button"); savedSearchSave.type = "button"; savedSearchSave.className = "search-save-button"; savedSearchSave.textContent = captureUiText("saveView");
   const savedSearchRemove = document.createElement("button"); savedSearchRemove.type = "button"; savedSearchRemove.className = "search-save-button secondary"; savedSearchRemove.textContent = captureUiText("removeView");
-  savedSearchToolbar.append(savedSearchSelect, savedSearchSave, savedSearchRemove);
+  const recentSearchClear = document.createElement("button"); recentSearchClear.type = "button"; recentSearchClear.className = "search-save-button secondary"; recentSearchClear.textContent = captureUiText("clearRecent");
+  savedSearchToolbar.append(savedSearchSelect, savedSearchSave, savedSearchRemove, recentSearchSelect, recentSearchClear);
   const results = document.createElement("div"); results.className = "search-space-results"; results.setAttribute("role", "listbox"); results.setAttribute("aria-label", "Search results");
+  results.addEventListener("click", () => { if (!input.value.trim().startsWith(">")) rememberRecentSearch(input.value); });
   content.append(head, searchWrap, info, savedSearchToolbar, results);
   const SAVED_SEARCHES_KEY = "linka.savedSearches.v1";
   let savedSearches = [];
@@ -476,6 +874,41 @@ function showSearchSpace(initial = "") {
     savedSearchRemove.disabled = !savedSearchSelect.value;
   };
   renderSavedSearches(input.value.trim());
+  const RECENT_SEARCHES_KEY = "linka.recentSearches.v1";
+  const readRecentSearches = () => {
+    try {
+      const value = JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) || "[]");
+      return Array.isArray(value) ? [...new Set(value.filter(item => typeof item === "string" && item.trim()))].slice(0, 10) : [];
+    } catch { return []; }
+  };
+  const renderRecentSearches = selectedQuery => {
+    const recent = readRecentSearches();
+    const placeholder = document.createElement("option"); placeholder.value = ""; placeholder.textContent = captureUiText("recentViews");
+    recentSearchSelect.replaceChildren(placeholder);
+    for (const query of recent) {
+      const option = document.createElement("option"); option.value = query; option.textContent = query.slice(0, 64);
+      recentSearchSelect.append(option);
+    }
+    recentSearchSelect.value = selectedQuery && recent.includes(selectedQuery) ? selectedQuery : "";
+    recentSearchClear.disabled = recent.length === 0;
+  };
+  const rememberRecentSearch = value => {
+    const query = String(value || "").trim();
+    if (query.length < 2) return;
+    const next = [query, ...readRecentSearches().filter(item => item !== query)].slice(0, 10);
+    try { localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next)); renderRecentSearches(query); } catch {}
+  };
+  renderRecentSearches();
+  recentSearchSelect.addEventListener("change", () => {
+    if (!recentSearchSelect.value) return;
+    input.value = recentSearchSelect.value;
+    void refresh();
+    input.focus();
+  });
+  recentSearchClear.addEventListener("click", () => {
+    try { localStorage.removeItem(RECENT_SEARCHES_KEY); renderRecentSearches(); say(captureUiText("recentCleared")); } catch {}
+  });
+
   savedSearchSave.addEventListener("click", () => {
     const query = input.value.trim();
     if (!query) { say(captureUiText("enterSearch")); return; }
@@ -508,10 +941,73 @@ function showSearchSpace(initial = "") {
   });
   const layer = modalShell(content, { dismissable: true }); layer.classList.add("search-space-layer");
   let searchSequence = 0;
+  let activePaletteCommands = [];
+  let paletteSelection = 0;
+  const activateView = filter => {
+    modalRoot.replaceChildren();
+    activeFilter = filter;
+    search.value = "";
+    filters.forEach(button => button.classList.toggle("active", button.dataset.filter === activeFilter));
+    render();
+  };
+  const runPaletteAction = action => {
+    modalRoot.replaceChildren();
+    action();
+  };
+  const paletteCommands = [
+    { title: "All items", description: "Show your full capture inbox", keywords: ["view", "inbox", "library"], run: () => activateView("all") },
+    { title: "Today", description: "Show captures saved today", keywords: ["view", "date", "recent"], run: () => activateView("today") },
+    { title: "Pinned", description: "Show pinned captures", keywords: ["view", "favorites", "favourites"], run: () => activateView("pinned") },
+    { title: "Read later", description: "Open items saved for later", keywords: ["view", "later", "reading"], run: () => activateView("read-later") },
+    { title: "Links", description: "Show saved web links", keywords: ["view", "urls", "web"], run: () => activateView("links") },
+    { title: "Notes", description: "Show saved text notes", keywords: ["view", "thoughts", "text"], run: () => activateView("notes") },
+    { title: "Archive", description: "Show archived captures", keywords: ["view", "completed"], run: () => activateView("archive") },
+    { title: "Trash", description: "Restore or permanently delete removed captures", keywords: ["view", "deleted", "recycle"], run: () => activateView("trash") },
+    { title: "Quick capture", description: "Focus the capture field", keywords: ["new", "shortcut", "save"], run: () => runPaletteAction(() => focusQuickCaptureFromNative()) },
+    { title: "Text documents", description: "Open the local document editor", keywords: ["editor", "new document", "write"], run: () => runPaletteAction(() => document.dispatchEvent(new Event("linka:open-documents"))) },
+    { title: "Settings", description: "Open Linka settings", keywords: ["preferences", "configuration"], run: () => runPaletteAction(() => $("#settings-button")?.click()) },
+    { title: "Backup history", description: "Restore or download a local snapshot", keywords: ["backup", "recovery", "storage"], run: () => runPaletteAction(() => $("#backup-history-button")?.click()) },
+    { title: "Export JSON backup", description: "Download a full Linka backup", keywords: ["export", "backup", "data"], run: () => runPaletteAction(() => { const format = $("#export-format"); if (format) format.value = "json"; $("#export-button")?.click(); }) },
+    { title: "Keyboard shortcuts", description: "Review available keyboard commands", keywords: ["keys", "help", "hotkeys"], run: () => runPaletteAction(() => window.dispatchEvent(new Event("linka:open-keyboard-shortcuts"))) },
+    { title: "Atmosphere settings", description: "Configure background media and ambience", keywords: ["appearance", "background", "music"], run: () => runPaletteAction(() => window.dispatchEvent(new Event("linka:open-atmosphere-settings"))) },
+    { title: "Toggle selection mode", description: "Select multiple captures for bulk actions", keywords: ["bulk", "multi-select", "manage"], run: () => runPaletteAction(() => selectionButton.click()) }
+  ];
   let searchTimer = null;
   async function refresh() {
     const sequence = ++searchSequence;
-    const q = input.value.trim().toLocaleLowerCase();
+    const rawQuery = input.value.trim();
+    const q = rawQuery.toLocaleLowerCase();
+    if (rawQuery.startsWith(">")) {
+      activePaletteCommands = filterPaletteCommands(paletteCommands, rawQuery.slice(1).trim());
+      paletteSelection = 0;
+      count.textContent = activePaletteCommands.length + (activePaletteCommands.length === 1 ? " command" : " commands");
+      scope.textContent = "Use ↑ and ↓ to choose · Enter to run";
+      results.replaceChildren();
+      if (!activePaletteCommands.length) {
+        const empty = document.createElement("div"); empty.className = "search-empty";
+        empty.textContent = "No matching commands. Try > today, > backup, or > settings.";
+        results.append(empty);
+        return;
+      }
+      activePaletteCommands.forEach((command, index) => {
+        const row = document.createElement("button");
+        row.type = "button"; row.className = "search-result command-result";
+        row.setAttribute("role", "option"); row.setAttribute("aria-selected", String(index === paletteSelection));
+        if (index === paletteSelection) row.classList.add("command-selected");
+        const thumb = document.createElement("span"); thumb.className = "search-thumb"; thumb.textContent = "›";
+        const copy = document.createElement("span"); copy.className = "search-result-copy";
+        const rowTitle = document.createElement("span"); rowTitle.className = "search-result-title"; appendSearchHighlights(rowTitle, command.title, rawQuery.slice(1).trim());
+        const detail = document.createElement("span"); detail.className = "search-result-detail"; appendSearchHighlights(detail, command.description, rawQuery.slice(1).trim());
+        const type = document.createElement("span"); type.className = "search-result-type"; type.textContent = "Command";
+        copy.append(rowTitle, detail); row.append(thumb, copy, type);
+        row.addEventListener("click", () => command.run());
+        results.append(row);
+      });
+      return;
+    }
+    activePaletteCommands = [];
+    paletteSelection = 0;
+    scope.textContent = "Across links, notes and documents";
     const found = visibleCaptures(captures, "all", input.value).slice(0, 80);
     const freeTextQuery = q.includes(":") ? "" : input.value.trim().replace(/^"|"$/g, "");
     let documentFound = [];
@@ -540,9 +1036,9 @@ function showSearchSpace(initial = "") {
       const copy = document.createElement("span"); copy.className = "search-result-copy";
       const rowTitle = document.createElement("span"); rowTitle.className = "search-result-title";
       let host = ""; if (isLink(item.text)) { try { host = new URL(item.text).hostname.replace(/^www\./i, ""); } catch {} }
-      rowTitle.textContent = item.previewTitle || host || item.text.slice(0, 100);
+      appendSearchHighlights(rowTitle, item.previewTitle || host || item.text.slice(0, 100), freeTextQuery);
       const detail = document.createElement("span"); detail.className = "search-result-detail";
-      detail.textContent = item.previewDescription || item.text;
+      appendSearchHighlights(detail, item.previewDescription || item.text, freeTextQuery);
       const type = document.createElement("span"); type.className = "search-result-type"; type.textContent = item.pinned ? "Pinned" : (isLink(item.text) ? "Link" : "Note");
       copy.append(rowTitle, detail); row.append(thumb, copy, type);
       row.addEventListener("click", () => {
@@ -566,8 +1062,8 @@ function showSearchSpace(initial = "") {
         row.type = "button"; row.className = "search-result"; row.setAttribute("role", "option");
         const thumb = document.createElement("span"); thumb.className = "search-thumb"; thumb.textContent = "Aa";
         const copy = document.createElement("span"); copy.className = "search-result-copy";
-        const rowTitle = document.createElement("span"); rowTitle.className = "search-result-title"; rowTitle.textContent = item.title || "Untitled document";
-        const detail = document.createElement("span"); detail.className = "search-result-detail"; detail.textContent = item.excerpt || "Open local document";
+        const rowTitle = document.createElement("span"); rowTitle.className = "search-result-title"; appendSearchHighlights(rowTitle, item.title || "Untitled document", freeTextQuery);
+        const detail = document.createElement("span"); detail.className = "search-result-detail"; appendSearchHighlights(detail, item.excerpt || "Open local document", freeTextQuery);
         const type = document.createElement("span"); type.className = "search-result-type"; type.textContent = "Document";
         copy.append(rowTitle, detail); row.append(thumb, copy, type);
         row.addEventListener("click", async () => {
@@ -579,7 +1075,36 @@ function showSearchSpace(initial = "") {
       });
     }
   }
+  input.addEventListener("keydown", event => {
+    if (input.value.trim().startsWith(">")) {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        if (!activePaletteCommands.length) return;
+        event.preventDefault();
+        const direction = event.key === "ArrowDown" ? 1 : -1;
+        paletteSelection = (paletteSelection + direction + activePaletteCommands.length) % activePaletteCommands.length;
+        results.querySelectorAll(".command-result").forEach((row, index) => {
+          const selected = index === paletteSelection;
+          row.classList.toggle("command-selected", selected);
+          row.setAttribute("aria-selected", String(selected));
+        });
+        results.querySelector(".command-selected")?.scrollIntoView({ block: "nearest" });
+        return;
+      }
+      if (event.key === "Enter") {
+        event.preventDefault();
+        activePaletteCommands[paletteSelection]?.run();
+        return;
+      }
+      return;
+    }
+    if (event.key === "Enter" && input.value.trim().length >= 2) rememberRecentSearch(input.value);
+  });
   input.addEventListener("input", () => {
+    paletteSelection = 0;
+    activePaletteCommands = [];
+    const commandMode = input.value.trim().startsWith(">");
+    input.placeholder = commandMode ? "Commands · try > today" : "Search everything you’ve saved…";
+    scope.textContent = commandMode ? "Use ↑ and ↓ to choose · Enter to run" : "Across links, notes and documents";
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => { void refresh(); }, 160);
   });
@@ -592,11 +1117,15 @@ function makeAction(label, action, id) {
   return button;
 }
 function resetEditor() {
-  editingId = null; draft.value = ""; tagsDraft.value = ""; collectionDraft.value = ""; composeLabel.textContent = "Quick capture";
+  editingId = null; draft.value = ""; tagsDraft.value = ""; collectionDraft.value = ""; collectionColorDraft.value = ""; composeLabel.textContent = "Quick capture";
   try {
     localStorage.removeItem(QUICK_DRAFT_KEY);
     localStorage.removeItem(QUICK_DRAFT_TAGS_KEY);
     localStorage.removeItem(QUICK_DRAFT_COLLECTION_KEY);
+    localStorage.removeItem(QUICK_DRAFT_COLLECTION_COLOR_KEY);
+    localStorage.removeItem(QUICK_DRAFT_PREVIEW_TITLE_KEY);
+    localStorage.removeItem(QUICK_DRAFT_PREVIEW_DESCRIPTION_KEY);
+    localStorage.removeItem(QUICK_DRAFT_PREVIEW_IMAGE_KEY);
   } catch {}
   saveButton.innerHTML = 'Save to inbox <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg>';
   saveButton.disabled = true;
@@ -624,7 +1153,7 @@ function addTermsBody(container) {
   const body = document.createElement("div");
   const sections = [
     ["Your data stays local", "Captures live in this browser profile or local app storage. Browser resets, cleared data, device loss or uninstallation may erase them. Keep an export backup."],
-    ["Optional cloud sync", "Войти to the same Linka account on Android, Windows and the web to sync your library. Local storage and manual export/import remain available even when you are offline. Sync needs a configured shared Supabase project; never enter a service-role or secret key into the app."],
+    ["Optional cloud sync", "Sign in to the same Linka account on supported devices to sync your library. Local storage and manual export/import remain available offline. Sync requires a configured shared Supabase project; never enter a service-role or secret key into the app."],
     ["Use and responsibility", "You are responsible for what you save, protecting your device, and keeping backups. Do not use Linka as the only copy of critical information."],
     ["Links and early access", "Opened links are handled by external apps/sites. Linka is an early-stage utility; features can change and uninterrupted, error-free operation is not guaranteed."],
     ["Acceptable use", "Use Linka lawfully, respect other people’s rights, and avoid saving sensitive information on shared devices."]
@@ -667,7 +1196,7 @@ function showCloudSyncНастройки() {
   meta.append(title, sub); head.append(logo, meta); content.append(head);
 
   const note = document.createElement("p");
-  note.textContent = "Войди через Google. Один аккаунт — твоя библиотека на телефоне, компьютере и сайте.";
+  note.textContent = "Войди через Google. Один аккаунт — твоя библиотека в Windows и веб-версии Linka."
   content.append(note);
 
   const config = getCloudConfig();
@@ -727,6 +1256,7 @@ function showCloudSyncНастройки() {
   const profileSaveButton = makeButton("Сохранить профиль и синхронизировать", "primary", () => void saveProfileAndSync());
   const disconnectButton = makeButton("Выйти из аккаунта", "ghost", () => {
     disconnectCloud();
+    updateCloudSyncStatus("local");
     statusLine.textContent = "Выход выполнен. Локальные сохранения остались на устройстве.";
     modalRoot.replaceChildren();
   });
@@ -880,7 +1410,7 @@ function showCloudSyncНастройки() {
   }
 }
 async function checkWindowsInstaller(statusLine, downloadLink) {
-  statusLine.textContent = "Проверитьing the latest Linka release…";
+  statusLine.textContent = "Checking the latest Linka release…";
   downloadLink.hidden = true;
   try {
     const response = await fetch("https://api.github.com/repos/anarabbasov2010-eng/Linka/releases/latest", {
@@ -891,16 +1421,16 @@ async function checkWindowsInstaller(statusLine, downloadLink) {
     const tag = String(release.tag_name || "").replace(/^v/, "");
     const asset = (release.assets || []).find(item => item.name === "Linka-Windows-x64-setup.exe");
     if (!asset) {
-      statusLine.textContent = "The Windows installer for this release is still being built. Проверить again shortly.";
+      statusLine.textContent = "The Windows installer for this release is still being built. Check again shortly.";
       return;
     }
     downloadLink.href = asset.browser_download_url;
     downloadLink.hidden = false;
     downloadLink.textContent = desktopBuildVersion && compareVersions(tag, desktopBuildVersion) > 0
-      ? `Скачать update ${tag}`
-      : "Скачать Windows installer";
+      ? `Download update ${tag}`
+      : "Download Windows installer";
     if (desktopBuildVersion && compareVersions(tag, desktopBuildVersion) <= 0) {
-      statusLine.textContent = `Приложение для Windows version ${desktopBuildVersion} is current. You can reinstall the latest installer over the existing copy.`;
+      statusLine.textContent = `Linka for Windows ${desktopBuildVersion} is up to date. You can reinstall the latest installer over the existing copy.`;
     } else {
       statusLine.textContent = `Linka Windows ${tag} is available. Run the installer over your existing copy to update it.`;
     }
@@ -908,6 +1438,32 @@ async function checkWindowsInstaller(statusLine, downloadLink) {
     statusLine.textContent = error?.message || "Не удалось проверить обновления Windows.";
   }
 }
+
+clipboardPasteButton.addEventListener("click", async () => {
+  if (typeof navigator.clipboard?.readText !== "function") {
+    say(clipboardCaptureUiText("clipboardAccessFailed"));
+    return;
+  }
+  clipboardPasteButton.disabled = true;
+  try {
+    const clipboardText = await navigator.clipboard.readText();
+    const result = appendClipboardText(draft.value, clipboardText, Number(draft.maxLength) || 100000);
+    if (!result.ok) {
+      say(clipboardCaptureUiText(result.reason === "empty" ? "clipboardEmpty" : "clipboardLimit"));
+      return;
+    }
+    draft.value = result.text;
+    draft.dispatchEvent(new Event("input", { bubbles: true }));
+    draft.focus();
+    draft.setSelectionRange(draft.value.length, draft.value.length);
+    say(clipboardCaptureUiText(result.truncated ? "clipboardTruncated" : "clipboardPasted"));
+  } catch (error) {
+    console.warn("Linka clipboard paste was unavailable", error);
+    say(clipboardCaptureUiText("clipboardAccessFailed"));
+  } finally {
+    clipboardPasteButton.disabled = false;
+  }
+});
 
 draft.addEventListener("input",()=>{
   saveButton.disabled=!draft.value.trim();
@@ -917,14 +1473,55 @@ draft.addEventListener("input",()=>{
   } catch {}
 });
 tagsDraft.addEventListener("input", saveCaptureMetadataDraft);
-collectionDraft.addEventListener("input", saveCaptureMetadataDraft);
+collectionDraft.addEventListener("input", () => {
+  const name = collectionDraft.value.trim().toLocaleLowerCase();
+  const knownColor = captures.find(item => String(item.collection || "").toLocaleLowerCase() === name && normalizeCollectionColor(item.collectionColor))?.collectionColor || "";
+  if (name && !collectionColorDraft.value && knownColor) collectionColorDraft.value = knownColor;
+  saveCaptureMetadataDraft();
+});
+collectionColorDraft.addEventListener("change", saveCaptureMetadataDraft);
+previewTitleDraft.addEventListener("input", saveCaptureMetadataDraft);
+previewDescriptionDraft.addEventListener("input", saveCaptureMetadataDraft);
+previewImageDraft.addEventListener("input", saveCaptureMetadataDraft);
 draft.addEventListener("keydown",event=>{if((event.ctrlKey||event.metaKey)&&event.key==="Enter"&&draft.value.trim()){event.preventDefault();form.requestSubmit();}});
 form.addEventListener("submit",event=>{
   event.preventDefault();
   const text=draft.value.trim();
   if(!text)return;
-  const metadata = { tags: parseTagInput(tagsDraft.value), collection: collectionDraft.value.trim().slice(0,80) };
+  const previewImageUrl = normalizePreviewImageUrl(previewImageDraft.value);
+  if (previewImageDraft.value.trim() && !previewImageUrl) {
+    say(captureUiText("previewImageInvalid"));
+    previewImageDraft.focus();
+    return;
+  }
+  const collectionName = collectionDraft.value.trim().slice(0, 80);
+  const chosenCollectionColor = normalizeCollectionColor(collectionColorDraft.value);
+  const existingCollectionColor = collectionName
+    ? captures.find(item => String(item.collection || "").toLocaleLowerCase() === collectionName.toLocaleLowerCase() && normalizeCollectionColor(item.collectionColor))?.collectionColor || ""
+    : "";
+  const metadata = {
+    tags: parseTagInput(tagsDraft.value),
+    collection: collectionName,
+    collectionColor: collectionName ? (chosenCollectionColor || existingCollectionColor) : "",
+    previewTitle: previewTitleDraft.value.trim().slice(0, 180),
+    previewDescription: previewDescriptionDraft.value.trim().slice(0, 320),
+    previewImageUrl
+  };
   const existing=editingId?captures.find(item=>item.id===editingId):null;
+  if (!existing) {
+    const duplicate = findDuplicateCapture(captures, text);
+    if (duplicate && !window.confirm(captureUiText("duplicatePrompt") + "\n\n" + duplicate.text.slice(0, 240))) {
+      say(captureUiText("duplicateSkipped"));
+      return;
+    }
+  }
+  if (metadata.collection && metadata.collectionColor) {
+    const collectionKey = metadata.collection.toLocaleLowerCase();
+    const now = Date.now();
+    captures = captures.map(item => String(item.collection || "").toLocaleLowerCase() === collectionKey && item.collectionColor !== metadata.collectionColor
+      ? { ...item, collectionColor: metadata.collectionColor, updatedAt: now }
+      : item);
+  }
   if(existing){
     captures=captures.map(item=>item.id===editingId?{...item,...metadata,text:text.slice(0,100000),updatedAt:Date.now()}:item);
     say("Запись обновлена");
@@ -938,6 +1535,11 @@ form.addEventListener("submit",event=>{
   render();
 });
 search.addEventListener("input",render);
+sortOrder?.addEventListener("change", () => {
+  sortMode = SORT_ORDERS.has(sortOrder.value) ? sortOrder.value : "updated";
+  try { localStorage.setItem("linka.sortOrder.v1", sortMode); } catch {}
+  render();
+});
 filters.forEach(button=>button.addEventListener("click",()=>{
   activeFilter=button.dataset.filter;filters.forEach(item=>item.classList.toggle("active",item===button));render();
 }));
@@ -947,6 +1549,569 @@ selectionButton.addEventListener("click", () => {
   render();
   if (selectionMode) say("Select the items you want to manage together");
 });
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, character => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  })[character]);
+}
+function captureExportTitle(item) {
+  return String(item.previewTitle || item.text.split(/\r?\n/)[0] || "Capture").slice(0, 180);
+}
+const BACKUP_PREFERENCE_KEYS = [
+  "linka.theme", "linka.accent", "linka.density", "linka.effects",
+  "linka.language.v1", "linka.reduceMotion", "linka.sortOrder.v1", "linka.closeToTray"
+];
+function readLocalJson(key, fallback) {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || "null");
+    return value == null ? fallback : value;
+  } catch { return fallback; }
+}
+function readBackupPreferences() {
+  const result = {};
+  for (const key of BACKUP_PREFERENCE_KEYS) {
+    try {
+      const value = localStorage.getItem(key);
+      if (value !== null) result[key] = value;
+    } catch {}
+  }
+  return result;
+}
+async function downloadLinkaBackup() {
+  try {
+    const documents = await exportLinkaDocuments();
+    const backup = createLinkaBackup({
+      exportedAt: new Date().toISOString(),
+      captures: captures.map(item => ({ ...item })),
+      documents,
+      deletedIds: [...readDeletedIds()],
+      preferences: readBackupPreferences(),
+      savedSearches: readLocalJson("linka.savedSearches.v1", []),
+      recentSearches: readLocalJson("linka.recentSearches.v1", [])
+    });
+    const blob = new Blob([JSON.stringify(backup, null, 2) + "\n"], { type: "application/json;charset=utf-8" });
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    const day = new Date().toISOString().slice(0, 10);
+    anchor.href = objectUrl;
+    anchor.download = "linka-backup-" + day + ".json";
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
+    say(captureUiText("exportedJson"));
+  } catch (error) {
+    console.error("Linka backup export failed", error);
+    say(captureUiText("backupFailed"));
+  }
+}
+function applyBackupPreferences(backup) {
+  const preferences = backup?.preferences || {};
+  try {
+    for (const [key, value] of Object.entries(preferences)) localStorage.setItem(key, value);
+    localStorage.setItem("linka.savedSearches.v1", JSON.stringify(backup.savedSearches || []));
+    localStorage.setItem("linka.recentSearches.v1", JSON.stringify(backup.recentSearches || []));
+  } catch {
+    // A quota failure should not undo imported user data; the caller reports a partial restore.
+    return false;
+  }
+  if (preferences["linka.theme"]) setLinkaTheme(preferences["linka.theme"]);
+  if (preferences["linka.accent"]) setLinkaAccent(preferences["linka.accent"]);
+  if (preferences["linka.density"]) setLinkaDensity(preferences["linka.density"]);
+  if (preferences["linka.effects"]) setLinkaEffects(preferences["linka.effects"]);
+  if (preferences["linka.closeToTray"] === "true" || preferences["linka.closeToTray"] === "false") {
+    void applyNativeCloseToTrayPreference();
+  }
+  if (preferences["linka.sortOrder.v1"] && SORT_ORDERS.has(preferences["linka.sortOrder.v1"])) {
+    sortMode = preferences["linka.sortOrder.v1"];
+    if (sortOrder) sortOrder.value = sortMode;
+  }
+  if (preferences["linka.reduceMotion"]) {
+    const reduced = preferences["linka.reduceMotion"] === "true";
+    document.documentElement.classList.toggle("reduced-motion", reduced);
+    document.documentElement.dataset.reduceMotion = String(reduced);
+  }
+  if (preferences["linka.language.v1"]) setLanguage(preferences["linka.language.v1"]);
+  return true;
+}
+const BACKUP_HISTORY_LAST_ATTEMPT_KEY = "linka.backupHistory.lastAttemptAt.v1";
+const BACKUP_HISTORY_INTERVAL_MS = 24 * 60 * 60 * 1000;
+let backupHistoryBusy = false;
+
+function backupHistoryText(key) {
+  const language = (() => { try { return localStorage.getItem("linka.language.v1") || "en"; } catch { return "en"; } })();
+  const copy = {
+    en: {
+      title: "Local backup history", subtitle: "Snapshots stay on this device. Keep an exported JSON backup for extra safety.",
+      create: "Create snapshot now", close: "Close", empty: "No snapshots yet. Linka will attempt a snapshot before a library change, at most once a day.",
+      auto: "Automatic before-change snapshot", manual: "Manual snapshot", beforeRestore: "Before restore",
+      download: "Download", restore: "Restore", remove: "Delete snapshot", confirmRestore: "Merge this snapshot into the current library? Matching records will return to the saved version; unrelated records will remain.",
+      confirmDelete: "Delete this local snapshot? This does not delete your captures or documents.",
+      created: "Local backup snapshot created.", restored: "Snapshot restored", partial: "Snapshot restored with some items skipped; check available storage.",
+      deleted: "Snapshot deleted.", failed: "Could not save or read backup history. Use Export to create a full JSON backup.",
+      tooLarge: "This library is too large for the local snapshot history. Export a full JSON backup instead.",
+      unavailable: "Local backup history requires IndexedDB in this browser or app.", storageTitle: "Storage & library health", storageSubtitle: "Local usage estimates and non-destructive integrity checks.", refreshStorage: "Refresh report", analyzeStorage: "Check library", storageBackup: "Export full backup", openHistory: "Backup history", closeStorage: "Close", captureCount: "Captures", documentCountLabel: "Text documents", archivedCount: "Archived", trashCount: "In Trash", duplicateCount: "Potential duplicates", uniqueTags: "Unique tags", localBytes: "Local storage estimate", originUsage: "Browser/app storage usage", noQuota: "Not reported by this browser", checksOk: "No duplicate IDs or blank capture texts found.", checksWarn: "Review potential duplicate links/text before removing anything.", storageReportFailed: "Could not inspect all storage areas. Export a full backup before cleanup." ,
+      busy: "A backup snapshot is already being written.", safetySnapshotFailed: "Restore cancelled: Linka could not save the current state first. Export a full JSON backup or free storage, then retry."
+    },
+    ru: {
+      title: "История локальных копий", subtitle: "Снимки хранятся на этом устройстве. Для дополнительной защиты сохраняй полную JSON-копию.",
+      create: "Создать снимок сейчас", close: "Закрыть", empty: "Снимков пока нет. Linka попытается создать снимок перед изменением библиотеки, не чаще раза в сутки.",
+      auto: "Автоматически перед изменением", manual: "Создан вручную", beforeRestore: "Перед восстановлением",
+      download: "Скачать", restore: "Восстановить", remove: "Удалить снимок", confirmRestore: "Объединить этот снимок с текущей библиотекой? Записи с совпадающими ID вернутся к сохранённой версии, остальные записи останутся.",
+      confirmDelete: "Удалить этот локальный снимок? Записи и документы приложения не удалятся.",
+      created: "Локальный снимок создан.", restored: "Снимок восстановлен", partial: "Снимок восстановлен частично. Проверь свободное место.",
+      deleted: "Снимок удалён.", failed: "Не удалось сохранить или прочитать историю копий. Используй «Экспорт» для полной JSON-копии.",
+      tooLarge: "Библиотека слишком велика для истории локальных снимков. Экспортируй полную JSON-копию.",
+      unavailable: "История локальных копий требует IndexedDB в браузере или приложении.", storageTitle: "Хранилище и состояние библиотеки", storageSubtitle: "Приблизительный объём данных и безопасная проверка целостности.", refreshStorage: "Обновить отчёт", analyzeStorage: "Проверить библиотеку", storageBackup: "Экспорт полной копии", openHistory: "История копий", closeStorage: "Закрыть", captureCount: "Записи", documentCountLabel: "Текстовые документы", archivedCount: "В архиве", trashCount: "В корзине", duplicateCount: "Возможные дубликаты", uniqueTags: "Уникальные теги", localBytes: "Оценка локального хранилища", originUsage: "Использование хранилища браузера/приложения", noQuota: "Браузер не сообщает объём", checksOk: "Дубликаты ID и пустые записи не найдены.", checksWarn: "Проверь возможные дубликаты ссылок/текста перед удалением.", storageReportFailed: "Не удалось проверить все области хранения. Перед очисткой экспортируй полную резервную копию.",
+      busy: "Сейчас уже сохраняется резервный снимок.", safetySnapshotFailed: "Восстановление отменено: сначала не удалось сохранить текущее состояние. Экспортируй полную JSON-копию или освободи место и повтори попытку."
+    },
+    az: {
+      title: "Yerli ehtiyat nüsxə tarixçəsi", subtitle: "Sənədlər bu cihazda saxlanılır. Əlavə təhlükəsizlik üçün tam JSON ehtiyat nüsxəsi yarat.",
+      create: "İndi snapshot yarat", close: "Bağla", empty: "Hələ snapshot yoxdur. Linka kitabxana dəyişməzdən əvvəl gündə ən çox bir dəfə snapshot yaratmağa çalışacaq.",
+      auto: "Dəyişiklikdən əvvəl avtomatik", manual: "Əl ilə yaradılıb", beforeRestore: "Bərpadan əvvəl",
+      download: "Endir", restore: "Bərpa et", remove: "Snapshot-u sil", confirmRestore: "Bu snapshot cari kitabxanaya birləşdirilsin? Eyni ID-li qeydlər saxlanmış versiyaya qayıdacaq, digər qeydlər qalacaq.",
+      confirmDelete: "Bu yerli snapshot silinsin? Qeydlərin və sənədlərin özü silinməyəcək.",
+      created: "Yerli snapshot yaradıldı.", restored: "Snapshot bərpa edildi", partial: "Snapshot qismən bərpa edildi. Yaddaş yerini yoxla.",
+      deleted: "Snapshot silindi.", failed: "Ehtiyat nüsxə tarixçəsini saxlamaq və ya oxumaq olmadı. Tam JSON nüsxəsi üçün ixracdan istifadə et.",
+      tooLarge: "Kitabxana yerli snapshot tarixçəsi üçün çox böyükdür. Tam JSON nüsxəsini ixrac et.",
+      unavailable: "Yerli ehtiyat nüsxə tarixçəsi IndexedDB tələb edir.", storageTitle: "Yaddaş və kitabxana vəziyyəti", storageSubtitle: "Yerli yaddaşın təxmini ölçüsü və təhlükəsiz bütövlük yoxlaması.", refreshStorage: "Hesabatı yenilə", analyzeStorage: "Kitabxananı yoxla", storageBackup: "Tam ehtiyat nüsxəni ixrac et", openHistory: "Ehtiyat nüsxə tarixçəsi", closeStorage: "Bağla", captureCount: "Qeydlər", documentCountLabel: "Mətn sənədləri", archivedCount: "Arxivdə", trashCount: "Zibil qutusunda", duplicateCount: "Mümkün dublikatlar", uniqueTags: "Unikal teqlər", localBytes: "Yerli yaddaşın təxmini ölçüsü", originUsage: "Brauzer/tətbiq yaddaş istifadəsi", noQuota: "Brauzer məlumat vermir", checksOk: "Təkrarlanan ID və boş qeydlər tapılmadı.", checksWarn: "Silməzdən əvvəl mümkün təkrar keçidləri/mətni yoxla.", storageReportFailed: "Bütün yaddaş sahələrini yoxlamaq olmadı. Təmizləməzdən əvvəl tam ehtiyat nüsxə yarat.",
+      busy: "Hazırda başqa ehtiyat snapshot yazılır.", safetySnapshotFailed: "Bərpa ləğv edildi: əvvəlcə cari vəziyyəti saxlamaq mümkün olmadı. Tam JSON nüsxəsini ixrac et və ya yaddaşda yer boşalt."
+    },
+    tr: {
+      title: "Yerel yedek geçmişi", subtitle: "Anlık görüntüler bu cihazda kalır. Ek güvenlik için tam JSON yedeği indir.",
+      create: "Şimdi anlık görüntü oluştur", close: "Kapat", empty: "Henüz anlık görüntü yok. Linka, kitaplık değişmeden önce günde en fazla bir kez görüntü oluşturmaya çalışır.",
+      auto: "Değişiklik öncesi otomatik", manual: "Manuel anlık görüntü", beforeRestore: "Geri yükleme öncesi",
+      download: "İndir", restore: "Geri yükle", remove: "Anlık görüntüyü sil", confirmRestore: "Bu görüntü geçerli kitaplıkla birleştirilsin mi? Eşleşen kayıtlar kaydedilmiş sürüme döner, diğer kayıtlar kalır.",
+      confirmDelete: "Bu yerel görüntü silinsin mi? Kayıtların ve belgelerin kendisi silinmez.",
+      created: "Yerel yedek görüntüsü oluşturuldu.", restored: "Görüntü geri yüklendi", partial: "Görüntü kısmen geri yüklendi. Depolama alanını kontrol et.",
+      deleted: "Görüntü silindi.", failed: "Yedek geçmişi okunamadı veya kaydedilemedi. Tam JSON yedeği için Dışa Aktar'ı kullan.",
+      tooLarge: "Kitaplık yerel yedek geçmişi için çok büyük. Tam JSON yedeğini dışa aktar.",
+      unavailable: "Yerel yedek geçmişi IndexedDB gerektirir.", storageTitle: "Depolama ve kitaplık durumu", storageSubtitle: "Yerel kullanım tahminleri ve veri silmeyen bütünlük kontrolleri.", refreshStorage: "Raporu yenile", analyzeStorage: "Kitaplığı denetle", storageBackup: "Tam yedeği dışa aktar", openHistory: "Yedek geçmişi", closeStorage: "Kapat", captureCount: "Kayıtlar", documentCountLabel: "Metin belgeleri", archivedCount: "Arşivde", trashCount: "Çöp kutusunda", duplicateCount: "Olası kopyalar", uniqueTags: "Benzersiz etiketler", localBytes: "Yerel depolama tahmini", originUsage: "Tarayıcı/uygulama depolama kullanımı", noQuota: "Tarayıcı bilgi vermiyor", checksOk: "Yinelenen kimlik veya boş kayıt bulunmadı.", checksWarn: "Silmeden önce olası yinelenen bağlantıları/metni gözden geçir.", storageReportFailed: "Tüm depolama alanları incelenemedi. Temizlemeden önce tam yedek dışa aktar.",
+      busy: "Başka bir yedek görüntüsü şu anda kaydediliyor.", safetySnapshotFailed: "Geri yükleme iptal edildi: önce mevcut durum kaydedilemedi. Tam JSON yedeğini dışa aktar veya depolama alanı açıp yeniden dene."
+    }
+  };
+  return (copy[language] || copy.en)[key] || copy.en[key] || key;
+}
+
+async function buildLinkaBackup(captureSnapshot = captures) {
+  const documents = await exportLinkaDocuments();
+  return createLinkaBackup({
+    exportedAt: new Date().toISOString(),
+    captures: captureSnapshot.map(item => ({ ...item, tags: [...(item.tags || [])] })),
+    documents,
+    deletedIds: [...readDeletedIds()],
+    preferences: readBackupPreferences(),
+    savedSearches: readLocalJson("linka.savedSearches.v1", []),
+    recentSearches: readLocalJson("linka.recentSearches.v1", [])
+  });
+}
+
+async function storeBackupHistorySnapshot(captureSnapshot = captures, reason = "manual", automatic = false) {
+  if (backupHistoryBusy) return { saved: false, reason: "busy" };
+  const now = Date.now();
+  if (automatic) {
+    let lastAttempt = 0;
+    try { lastAttempt = Number(localStorage.getItem(BACKUP_HISTORY_LAST_ATTEMPT_KEY) || 0); } catch {}
+    if (lastAttempt && now - lastAttempt < BACKUP_HISTORY_INTERVAL_MS) return { saved: false, reason: "not-due" };
+  }
+
+  backupHistoryBusy = true;
+  try {
+    const backup = await buildLinkaBackup(captureSnapshot);
+    if (!backup.captures.length && !backup.documents.length) return { saved: false, reason: "empty" };
+    if (automatic) {
+      try { localStorage.setItem(BACKUP_HISTORY_LAST_ATTEMPT_KEY, String(now)); } catch {}
+    }
+    const bytes = new Blob([JSON.stringify(backup)]).size;
+    if (bytes > MAX_AUTOMATIC_SNAPSHOT_BYTES) return { saved: false, reason: "too-large", bytes };
+    const snapshot = {
+      id: "snapshot-" + now.toString(36) + "-" + Math.random().toString(36).slice(2, 8),
+      createdAt: now,
+      reason,
+      captureCount: backup.captures.length,
+      documentCount: backup.documents.length,
+      bytes,
+      backup
+    };
+    const result = await saveBackupSnapshot(snapshot);
+    if (result.saved && automatic) {
+      try { localStorage.setItem(BACKUP_HISTORY_LAST_ATTEMPT_KEY, String(now)); } catch {}
+    }
+    return { ...result, snapshot, bytes };
+  } finally {
+    backupHistoryBusy = false;
+  }
+}
+
+async function saveAutomaticBackupSnapshot(previousCaptures) {
+  return storeBackupHistorySnapshot(previousCaptures, "automatic-before-change", true);
+}
+setLinkaDocumentBeforeSave(() => {
+  const recoveryState = getCaptureRecovery();
+  if (recoveryState && !recoveryState.acknowledged) return;
+  const previousState = persistedCaptures.map(item => ({ ...item, tags: [...(item.tags || [])] }));
+  return saveAutomaticBackupSnapshot(previousState);
+});
+
+function downloadBackupPayload(backup, filename = "linka-backup.json") {
+  const blob = new Blob([JSON.stringify(backup, null, 2) + "\n"], { type: "application/json;charset=utf-8" });
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = filename;
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
+}
+
+async function restoreBackupHistorySnapshot(backup) {
+  const safetySnapshot = await storeBackupHistorySnapshot(captures, "before-restore", false);
+  if (!safetySnapshot.saved && safetySnapshot.reason !== "empty") {
+    throw new Error(backupHistoryText("safetySnapshotFailed"));
+  }
+  const validated = parseLinkaBackup(backup);
+  if (!validated) throw new Error("Invalid Linka backup snapshot.");
+  const normalized = validated.captures
+    .filter(item => item && typeof item === "object" && typeof item.text === "string")
+    .map(item => normalizeCapture(item))
+    .filter(Boolean);
+  const importedIds = new Set(normalized.map(item => item.id));
+  const previous = captures.map(item => ({ ...item, tags: [...(item.tags || [])] }));
+  const map = new Map(captures.map(item => [item.id, item]));
+  normalized.forEach(item => map.set(item.id, item));
+  const next = [...map.values()].sort((a, b) =>
+    Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) ||
+    Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0)
+  );
+  if (!saveCaptures(next)) throw new Error("Could not save restored captures; the current library was kept.");
+
+  const deleted = new Set(readDeletedIds());
+  validated.deletedIds.forEach(id => deleted.add(id));
+  importedIds.forEach(id => deleted.delete(id));
+  if (!setDeletedIds([...deleted])) {
+    const rolledBack = saveCaptures(previous);
+    if (!rolledBack) throw new Error("Restore rollback failed. Export the current library immediately.");
+    throw new Error("Restore cancelled because cloud deletion markers could not be saved.");
+  }
+
+  captures = next;
+  persistedCaptures = captures.map(item => ({ ...item, tags: [...(item.tags || [])] }));
+  localDataRevision += 1;
+  let documentResult = { imported: 0, skipped: 0 };
+  let documentFailed = false;
+  if (validated.documents.length) {
+    try { documentResult = await importLinkaDocuments(validated.documents); }
+    catch (error) { console.error("Backup history document restore failed", error); documentFailed = true; }
+  }
+  const preferencesApplied = applyBackupPreferences(validated);
+  scheduleCloudSync();
+  render();
+  return {
+    captures: normalized.length,
+    documents: documentResult.imported,
+    partial: documentFailed || !preferencesApplied || documentResult.skipped > 0
+  };
+}
+
+function formatBytes(bytes) {
+  const value = Number(bytes);
+  if (!Number.isFinite(value) || value < 0) return "—";
+  if (value < 1024) return value + " B";
+  if (value < 1024 * 1024) return (value / 1024).toFixed(1) + " KB";
+  if (value < 1024 * 1024 * 1024) return (value / (1024 * 1024)).toFixed(2) + " MB";
+  return (value / (1024 * 1024 * 1024)).toFixed(2) + " GB";
+}
+async function inspectLinkaStorage() {
+  const docs = await exportLinkaDocuments();
+  const captureJson = JSON.stringify(captures);
+  const documentJson = JSON.stringify(docs);
+  let localStorageBytes = 0;
+  let localStorageKeys = 0;
+  try {
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+      localStorageKeys += 1;
+      localStorageBytes += new Blob([key, localStorage.getItem(key) || ""]).size;
+    }
+  } catch {}
+  let usage = null, quota = null;
+  try {
+    const estimate = await navigator.storage?.estimate?.();
+    if (Number.isFinite(estimate?.usage)) usage = estimate.usage;
+    if (Number.isFinite(estimate?.quota)) quota = estimate.quota;
+  } catch {}
+  const ids = new Set();
+  let duplicateIds = 0, blankTexts = 0;
+  const duplicateKeys = new Map();
+  let duplicateCaptures = 0;
+  for (const item of captures) {
+    if (!item) { blankTexts += 1; continue; }
+    const id = item.id == null ? "" : String(item.id).trim();
+    if (id) {
+      if (ids.has(id)) duplicateIds += 1;
+      ids.add(id);
+    }
+    if (!String(item.text || "").trim()) { blankTexts += 1; continue; }
+    if (item.trashedAt) continue;
+    const key = normalizeDuplicateKey(item.text);
+    if (!key) continue;
+    if (duplicateKeys.has(key)) {
+      duplicateCaptures += 1;
+      duplicateKeys.set(key, duplicateKeys.get(key) + 1);
+    } else duplicateKeys.set(key, 1);
+  }
+  return {
+    captures: captures.length,
+    documents: docs.length,
+    archived: captures.filter(item => item.archivedAt && !item.trashedAt).length,
+    trashed: captures.filter(item => item.trashedAt).length,
+    uniqueTags: new Set(captures.flatMap(item => item.tags || [])).size,
+    duplicateUrlsOrTexts: duplicateCaptures,
+    duplicateIds,
+    blankTexts,
+    localStorageKeys,
+    localStorageBytes,
+    captureBytes: new Blob([captureJson]).size,
+    documentBytes: new Blob([documentJson]).size,
+    usage,
+    quota
+  };
+}
+async function showStorageHealth() {
+  const content = document.createElement("div");
+  content.className = "storage-health-panel";
+  const heading = document.createElement("h2"); heading.textContent = backupHistoryText("storageTitle");
+  const subtitle = document.createElement("p"); subtitle.className = "storage-health-subtitle"; subtitle.textContent = backupHistoryText("storageSubtitle");
+  const controls = document.createElement("div"); controls.className = "storage-health-controls";
+  const refresh = document.createElement("button"); refresh.type = "button"; refresh.className = "ghost"; refresh.textContent = backupHistoryText("refreshStorage");
+  const analyze = document.createElement("button"); analyze.type = "button"; analyze.className = "ghost"; analyze.textContent = backupHistoryText("analyzeStorage");
+  const backup = document.createElement("button"); backup.type = "button"; backup.className = "ghost"; backup.textContent = backupHistoryText("storageBackup");
+  const history = document.createElement("button"); history.type = "button"; history.className = "ghost"; history.textContent = backupHistoryText("openHistory");
+  const close = document.createElement("button"); close.type = "button"; close.className = "ghost"; close.textContent = backupHistoryText("closeStorage");
+  controls.append(refresh, analyze, backup, history, close);
+  const statusLine = document.createElement("p"); statusLine.className = "storage-health-status"; statusLine.setAttribute("role", "status");
+  const metrics = document.createElement("div"); metrics.className = "storage-health-metrics";
+  const diagnostics = document.createElement("div"); diagnostics.className = "storage-health-diagnostics";
+  content.append(heading, subtitle, controls, statusLine, metrics, diagnostics);
+  const layer = modalShell(content, { dismissable: true });
+  close.addEventListener("click", () => layer.remove());
+  backup.addEventListener("click", async () => {
+    $("#export-format").value = "json";
+    await downloadLinkaBackup();
+  });
+  history.addEventListener("click", async () => {
+    layer.remove();
+    await showBackupHistory();
+  });
+  const refreshReport = async (runIntegrityCheck = false) => {
+    refresh.disabled = true; analyze.disabled = true;
+    statusLine.textContent = "";
+    try {
+      const report = await inspectLinkaStorage();
+      const items = [
+        [backupHistoryText("captureCount"), report.captures],
+        [backupHistoryText("documentCountLabel"), report.documents],
+        [backupHistoryText("archivedCount"), report.archived],
+        [backupHistoryText("trashCount"), report.trashed],
+        [backupHistoryText("uniqueTags"), report.uniqueTags],
+        [backupHistoryText("localBytes"), formatBytes(report.localStorageBytes) + " · " + report.localStorageKeys + " keys"],
+        ["Captures JSON", formatBytes(report.captureBytes)],
+        ["Documents JSON", formatBytes(report.documentBytes)],
+        [backupHistoryText("originUsage"), report.usage == null ? backupHistoryText("noQuota") : formatBytes(report.usage) + (report.quota == null ? "" : " / " + formatBytes(report.quota))]
+      ];
+      metrics.replaceChildren(...items.map(([label, value]) => {
+        const card = document.createElement("div"); card.className = "storage-health-metric";
+        const name = document.createElement("span"); name.textContent = label;
+        const amount = document.createElement("strong"); amount.textContent = String(value);
+        card.append(name, amount); return card;
+      }));
+      diagnostics.replaceChildren();
+      if (runIntegrityCheck) {
+        const found = report.duplicateIds + report.blankTexts + report.duplicateUrlsOrTexts;
+        const result = document.createElement("p"); result.className = found ? "storage-health-warning" : "storage-health-ok";
+        result.textContent = found
+          ? backupHistoryText("checksWarn") + " IDs: " + report.duplicateIds + ", blank: " + report.blankTexts + ", URL/text duplicates: " + report.duplicateUrlsOrTexts + "."
+          : backupHistoryText("checksOk");
+        diagnostics.append(result);
+      }
+    } catch (error) {
+      console.error("Linka storage inspection failed", error);
+      statusLine.textContent = backupHistoryText("storageReportFailed");
+    } finally { refresh.disabled = false; analyze.disabled = false; }
+  };
+  refresh.addEventListener("click", () => { void refreshReport(false); });
+  analyze.addEventListener("click", () => { void refreshReport(true); });
+  await refreshReport(false);
+}
+
+async function showBackupHistory() {
+  const content = document.createElement("div");
+  content.className = "backup-history-panel";
+  const heading = document.createElement("h2"); heading.textContent = backupHistoryText("title");
+  const subtitle = document.createElement("p"); subtitle.className = "backup-history-subtitle"; subtitle.textContent = backupHistoryText("subtitle");
+  const controls = document.createElement("div"); controls.className = "backup-history-controls";
+  const createButton = document.createElement("button"); createButton.type = "button"; createButton.className = "ghost"; createButton.textContent = backupHistoryText("create");
+  const healthButton = document.createElement("button"); healthButton.type = "button"; healthButton.className = "ghost"; healthButton.textContent = backupHistoryText("storageTitle");
+  const closeButton = document.createElement("button"); closeButton.type = "button"; closeButton.className = "ghost"; closeButton.textContent = backupHistoryText("close");
+  controls.append(createButton, healthButton, closeButton);
+  const statusLine = document.createElement("p"); statusLine.className = "backup-history-status"; statusLine.setAttribute("role", "status");
+  const rows = document.createElement("div"); rows.className = "backup-history-rows";
+  content.append(heading, subtitle, controls, statusLine, rows);
+  const layer = modalShell(content, { dismissable: true });
+  closeButton.addEventListener("click", () => layer.remove());
+  healthButton.addEventListener("click", async () => {
+    layer.remove();
+    await showStorageHealth();
+  });
+
+  const refreshRows = async () => {
+    rows.replaceChildren();
+    let available = false;
+    try { available = await isBackupHistoryAvailable(); }
+    catch { available = false; }
+    if (!available) {
+      statusLine.textContent = backupHistoryText("unavailable");
+      const note = document.createElement("p");
+      note.className = "backup-history-empty";
+      note.textContent = backupHistoryText("unavailable");
+      rows.append(note);
+      return;
+    }
+    let snapshots;
+    try { snapshots = await listBackupSnapshots(); }
+    catch (error) { console.error("Could not list backup history", error); statusLine.textContent = backupHistoryText("failed"); return; }
+    if (!snapshots.length) {
+      const empty = document.createElement("p"); empty.className = "backup-history-empty"; empty.textContent = backupHistoryText("empty"); rows.append(empty); return;
+    }
+    snapshots.forEach(snapshot => {
+      const row = document.createElement("article"); row.className = "backup-history-row";
+      const copy = document.createElement("div"); copy.className = "backup-history-copy";
+      const title = document.createElement("strong");
+      title.textContent = snapshot.reason === "manual" ? backupHistoryText("manual") :
+        snapshot.reason === "before-restore" ? backupHistoryText("beforeRestore") : backupHistoryText("auto");
+      const date = document.createElement("span"); date.textContent = formatDate(snapshot.createdAt);
+      const details = document.createElement("small");
+      details.textContent = snapshot.captureCount + " captures · " + snapshot.documentCount + " documents · " +
+        Math.max(1, Math.round(Number(snapshot.bytes || 0) / 1024)) + " KB";
+      copy.append(title, date, details);
+      const actions = document.createElement("div"); actions.className = "backup-history-row-actions";
+      const download = document.createElement("button"); download.type = "button"; download.className = "action"; download.textContent = backupHistoryText("download");
+      const restore = document.createElement("button"); restore.type = "button"; restore.className = "action"; restore.textContent = backupHistoryText("restore");
+      const remove = document.createElement("button"); remove.type = "button"; remove.className = "action danger"; remove.textContent = backupHistoryText("remove");
+      download.addEventListener("click", async () => {
+        try {
+          const stored = await getBackupSnapshot(snapshot.id);
+          if (!stored?.backup) throw new Error("Snapshot payload is missing.");
+          const datePart = new Date(stored.createdAt).toISOString().slice(0, 10);
+          downloadBackupPayload(stored.backup, "linka-snapshot-" + datePart + ".json");
+        } catch (error) { console.error(error); statusLine.textContent = backupHistoryText("failed"); }
+      });
+      restore.addEventListener("click", async () => {
+        if (!window.confirm(backupHistoryText("confirmRestore"))) return;
+        restore.disabled = true;
+        try {
+          const stored = await getBackupSnapshot(snapshot.id);
+          if (!stored?.backup) throw new Error("Snapshot payload is missing.");
+          const result = await restoreBackupHistorySnapshot(stored.backup);
+          layer.remove();
+          say((result.partial ? backupHistoryText("partial") : backupHistoryText("restored")) +
+            " · " + result.captures + " captures, " + result.documents + " documents");
+        } catch (error) {
+          console.error("Could not restore backup history snapshot", error);
+          statusLine.textContent = error?.message || backupHistoryText("failed");
+        } finally { restore.disabled = false; }
+      });
+      remove.addEventListener("click", async () => {
+        if (!window.confirm(backupHistoryText("confirmDelete"))) return;
+        remove.disabled = true;
+        try {
+          await deleteBackupSnapshot(snapshot.id);
+          statusLine.textContent = backupHistoryText("deleted");
+          await refreshRows();
+        } catch (error) {
+          console.error(error);
+          statusLine.textContent = backupHistoryText("failed");
+        } finally { remove.disabled = false; }
+      });
+      actions.append(download, restore, remove);
+      row.append(copy, actions);
+      rows.append(row);
+    });
+  };
+
+  createButton.addEventListener("click", async () => {
+    createButton.disabled = true;
+    statusLine.textContent = "";
+    try {
+      const result = await storeBackupHistorySnapshot(captures, "manual", false);
+      if (!result.saved) {
+        statusLine.textContent = result.reason === "too-large" ? backupHistoryText("tooLarge") :
+          result.reason === "busy" ? backupHistoryText("busy") : backupHistoryText("unavailable");
+      } else {
+        statusLine.textContent = backupHistoryText("created");
+        await refreshRows();
+      }
+    } catch (error) {
+      console.error("Could not create manual backup snapshot", error);
+      statusLine.textContent = backupHistoryText("failed");
+    } finally { createButton.disabled = false; }
+  });
+  await refreshRows();
+}
+
+function exportCaptureItems(items, baseName = "linka-inbox") {
+  const format = $("#export-format")?.value || "json";
+  let content = "", mime = "application/json;charset=utf-8", extension = format, statusKey = "exportedJson";
+  if (format === "md") {
+    mime = "text/markdown;charset=utf-8"; statusKey = "exportedMarkdown";
+    content = "# Linka export\n\n" + items.map((item, index) => {
+      const state = item.trashedAt ? "Trash" : item.archivedAt ? "Archive" : item.readLater ? "Read later" : item.pinned ? "Pinned" : "Inbox";
+      const saved = new Date(Number(item.createdAt || item.updatedAt || Date.now())).toISOString();
+      return "## " + (index + 1) + ". " + captureExportTitle(item).replace(/\r?\n/g, " ") +
+        "\n\n- Saved: " + saved +
+        "\n- Tags: " + ((item.tags || []).join(", ") || "—") +
+        "\n- Collection: " + (item.collection || "—") +
+        "\n- State: " + state + "\n\n" + item.text + "\n";
+    }).join("\n\n---\n\n");
+  } else if (format === "txt") {
+    mime = "text/plain;charset=utf-8"; statusKey = "exportedText";
+    content = items.map((item, index) => {
+      const saved = new Date(Number(item.createdAt || item.updatedAt || Date.now())).toLocaleString();
+      return "[" + (index + 1) + "] " + captureExportTitle(item) +
+        "\nSaved: " + saved +
+        "\nTags: " + ((item.tags || []).join(", ") || "—") +
+        "\nCollection: " + (item.collection || "—") + "\n\n" + item.text;
+    }).join("\n\n--------------------------------------------------\n\n");
+  } else if (format === "html") {
+    mime = "text/html;charset=utf-8"; statusKey = "exportedHtml";
+    const cards = items.map(item => {
+      const body = escapeHtml(item.text);
+      const title = escapeHtml(captureExportTitle(item));
+      const tags = escapeHtml((item.tags || []).join(", "));
+      const collection = escapeHtml(item.collection || "—");
+      const date = escapeHtml(new Date(Number(item.createdAt || item.updatedAt || Date.now())).toLocaleString());
+      const source = isLink(item.text) && /^https?:\/\//i.test(item.text.trim())
+        ? '<p><a rel="noopener noreferrer" href="' + escapeHtml(item.text.trim()) + '">Open original link</a></p>' : "";
+      const cover = /^https:\/\//i.test(item.previewImageUrl || "")
+        ? '<img loading="lazy" alt="" src="' + escapeHtml(item.previewImageUrl) + '">' : "";
+      return '<article><h2>' + title + '</h2><p class="meta">' + date + ' · ' + tags + ' · ' + collection +
+        '</p>' + cover + '<pre>' + body + '</pre>' + source + '</article>';
+    }).join("\n");
+    content = '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+      '<title>Linka export</title><style>body{max-width:900px;margin:40px auto;padding:0 20px;font:16px/1.6 system-ui,sans-serif;color:#202124;background:#f7f7f5}' +
+      'article{padding:22px;margin:18px 0;border:1px solid #ddd;border-radius:14px;background:white}h2{font-size:20px;margin-top:0}.meta{color:#666;font-size:12px}' +
+      'pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}img{max-width:100%;max-height:360px;object-fit:contain;border-radius:8px}</style>' +
+      '<body><h1>Linka export</h1>' + cards + '</body></html>';
+  } else {
+    content = JSON.stringify(items, null, 2);
+    extension = "json"; statusKey = "exportedJson";
+  }
+  const blob = new Blob([content], { type: mime });
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl; anchor.download = baseName + "." + extension; anchor.click();
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
+  say(captureUiText(statusKey));
+}
+
 bulkToolbar.addEventListener("click", async event => {
   const button = event.target.closest("button[data-bulk-action]");
   if (!button) return;
@@ -979,12 +2144,8 @@ bulkToolbar.addEventListener("click", async event => {
     return;
   }
   if (action === "export") {
-    const blob = new Blob([JSON.stringify(selected, null, 2)], { type: "application/json" });
-    const objectUrl = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = objectUrl; anchor.download = "linka-selection.json"; anchor.click();
-    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-    say("Exported " + selected.length + " selected item(s)"); return;
+    exportCaptureItems(selected, "linka-selection");
+    return;
   }
   if (action === "tags") {
     const current = [...new Set(selected.flatMap(item => item.tags || []))].join(", ");
@@ -1112,42 +2273,223 @@ list.addEventListener("click",async event=>{
       }
     }}));
   }
-  else if(action==="edit"){editingId=id;draft.value=item.text;tagsDraft.value=(item.tags||[]).join(", ");collectionDraft.value=item.collection||"";composeLabel.textContent="Edit capture";saveButton.textContent="Save changes ↗";saveButton.disabled=false;saveCaptureMetadataDraft();draft.focus();window.scrollTo({top:0,behavior:"smooth"});}
-  else if(action==="copy"){try{await navigator.clipboard.writeText(item.text);say("Скопировано");}catch{draft.value=item.text;draft.focus();draft.select();say("Text selected for manual copying");}}
+  else if(action==="edit"){editingId=id;draft.value=item.text;tagsDraft.value=(item.tags||[]).join(", ");collectionDraft.value=item.collection||"";collectionColorDraft.value=normalizeCollectionColor(item.collectionColor);previewTitleDraft.value=item.previewTitle||"";previewDescriptionDraft.value=item.previewDescription||"";previewImageDraft.value=item.previewImageUrl||"";const previewDetails=document.querySelector(".capture-preview-details");if(previewDetails)previewDetails.open=Boolean(item.previewTitle||item.previewDescription||item.previewImageUrl);composeLabel.textContent="Edit capture";saveButton.textContent="Save changes ↗";saveButton.disabled=false;saveCaptureMetadataDraft();draft.focus();window.scrollTo({top:0,behavior:"smooth"});}
+  else if(action==="copy"){try{await navigator.clipboard.writeText(item.text);say("Скопировано");}catch{draft.value=item.text;draft.focus();draft.select();say("Текст выделен для копирования вручную");}}
 });
-$("#export-button").addEventListener("click",()=>{
-  const blob=new Blob([JSON.stringify(captures,null,2)],{type:"application/json"});
-  const url=URL.createObjectURL(blob);const anchor=document.createElement("a");anchor.href=url;anchor.download="linka-inbox.json";anchor.click();URL.revokeObjectURL(url);say("Резервная копия создана");
+$("#backup-history-button").addEventListener("click", () => { void showBackupHistory(); });
+$("#export-button").addEventListener("click", async () => {
+  if (($("#export-format")?.value || "json") === "json") {
+    await downloadLinkaBackup();
+  } else {
+    exportCaptureItems(captures, "linka-inbox");
+  }
 });
 $("#import-button").addEventListener("click",()=>$("#import-file").click());
-$("#import-file").addEventListener("change",async event=>{
-  const file=event.target.files?.[0];if(!file)return;
-  try{const parsed=JSON.parse(await file.text());const imported=Array.isArray(parsed)?parsed:parsed.captures;if(!Array.isArray(imported))throw new Error("Invalid file");
-    const normalized=imported.map(item=>makeCapture(item.text,item)).filter(Boolean);const restoredIds=new Set(normalized.map(item=>item.id));const beforeImport=captures.map(item=>({...item}));const map=new Map(captures.map(item=>[item.id,item]));normalized.forEach(item=>map.set(item.id,item));
-    captures=Array.from(map.values()).sort((a,b)=>b.updatedAt-a.updatedAt);
-    if (persist()) {
-      if (!removeDeletedIds(restoredIds)) {
-        captures=beforeImport;
-        if (!persist()) say("Could not safely restore the previous library. Export a backup before continuing.");
-        else say("Import rolled back because old cloud deletion markers could not be removed.");
-        render();
+$("#import-file").addEventListener("change", async event => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  try {
+    const raw = await file.text();
+    let backup = null;
+    let imported = null;
+    let bookmarkImport = false;
+    let bookmarkLimitHit = false;
+
+    if (/\.html?$/i.test(file.name) || file.type === "text/html") {
+      bookmarkImport = true;
+      const parsedHtml = new DOMParser().parseFromString(raw, "text/html");
+      const anchors = [...parsedHtml.querySelectorAll("a[href]")];
+      bookmarkLimitHit = anchors.length > 5000;
+      imported = anchors.slice(0, 5000).flatMap(anchor => {
+        const href = anchor.getAttribute("href") || "";
+        let url;
+        try { url = new URL(href); } catch { return []; }
+        if (url.protocol !== "http:" && url.protocol !== "https:") return [];
+        const title = String(anchor.textContent || "").replace(/\s+/g, " ").trim().slice(0, 180) || url.hostname;
+        const createdSeconds = Number(anchor.getAttribute("ADD_DATE") || 0);
+        const updatedSeconds = Number(anchor.getAttribute("LAST_MODIFIED") || 0);
+        const createdAt = Number.isFinite(createdSeconds) && createdSeconds > 0 ? createdSeconds * 1000 : Date.now();
+        const updatedAt = Number.isFinite(updatedSeconds) && updatedSeconds > 0 ? updatedSeconds * 1000 : createdAt;
+        const tags = String(anchor.getAttribute("TAGS") || "").split(/[,;]+/).map(tag => tag.trim()).filter(Boolean).slice(0, 24);
+        return [{ text: url.href, previewTitle: title, createdAt, updatedAt, tags }];
+      });
+      if (!imported.length) {
+        say(captureUiText("invalidBookmarkImport"));
         return;
       }
-      scheduleCloudSync();
-      render(); say("Imported "+normalized.length+" capture(s)");
-    } else render();
-  }catch{say("Этот файл не похож на экспорт Linka");}finally{event.target.value="";}
+    } else if (/\.json$/i.test(file.name) || file.type === "application/json") {
+      const parsed = JSON.parse(raw);
+      backup = parseLinkaBackup(parsed);
+      imported = backup
+        ? backup.captures
+        : (Array.isArray(parsed) ? parsed : parsed?.captures);
+      if (!Array.isArray(imported)) throw new Error("Invalid Linka JSON backup");
+    } else {
+      // TXT/Markdown is kept as a single note. When the contents are valid
+      // JSON, recognize only known backup shapes instead of guessing that any
+      // arbitrary object with a "captures" property is trusted.
+      try {
+        const parsed = JSON.parse(raw);
+        backup = parseLinkaBackup(parsed);
+        if (backup) {
+          imported = backup.captures;
+        } else {
+          const candidate = Array.isArray(parsed) ? parsed : parsed?.captures;
+          imported = Array.isArray(candidate) && candidate.every(item => item && typeof item.text === "string")
+            ? candidate
+            : [{ text: raw }];
+        }
+      } catch (error) {
+        if (String(error?.message || "").includes("unsupported version") || String(error?.message || "").includes("incomplete or damaged")) throw error;
+        imported = [{ text: raw }];
+      }
+    }
+
+    if (backup && !window.confirm(captureUiText("backupConfirm"))) return;
+    if (!Array.isArray(imported)) throw new Error("Import must contain an array of captures.");
+    let normalized = imported
+      .filter(item => item && typeof item === "object" && typeof item.text === "string")
+      .map(item => normalizeCapture(item))
+      .filter(Boolean);
+    let bookmarkDuplicatesSkipped = 0;
+    if (bookmarkImport) {
+      const accepted = [];
+      for (const item of normalized) {
+        if (findDuplicateCapture([...captures, ...accepted], item.text)) {
+          bookmarkDuplicatesSkipped += 1;
+          continue;
+        }
+        accepted.push(item);
+      }
+      normalized = accepted;
+      if (!normalized.length) {
+        say(captureUiText("bookmarkDuplicatesSkipped"));
+        return;
+      }
+    }
+    if (!backup && !normalized.length) throw new Error("No text captures found");
+
+    const importedIds = new Set(normalized.map(item => item.id));
+    const beforeImport = captures.map(item => ({ ...item }));
+    const map = new Map(captures.map(item => [item.id, item]));
+    normalized.forEach(item => map.set(item.id, item));
+    const nextCaptures = [...map.values()].sort((a, b) =>
+      Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) ||
+      Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0)
+    );
+
+    // Save captures first; do not change in-memory state or start cloud sync
+    // until local capture data and deletion markers have both been committed.
+    if (!saveCaptures(nextCaptures)) {
+      say("Could not save imported captures. The current library remains unchanged.");
+      return;
+    }
+    const nextDeleted = new Set(readDeletedIds());
+    if (backup) for (const id of backup.deletedIds) nextDeleted.add(id);
+    for (const id of importedIds) nextDeleted.delete(id);
+    if (!setDeletedIds([...nextDeleted])) {
+      const rolledBack = saveCaptures(beforeImport);
+      say(rolledBack
+        ? "Import cancelled because cloud deletion markers could not be saved."
+        : "Import rollback failed. Stop editing and export whatever data remains immediately.");
+      return;
+    }
+
+    captures = nextCaptures;
+    persistedCaptures = captures.map(item => ({ ...item }));
+    localDataRevision += 1;
+
+    let documentResult = { imported: 0, skipped: 0 };
+    let documentFailed = false;
+    if (backup?.documents?.length) {
+      try {
+        documentResult = await importLinkaDocuments(backup.documents);
+      } catch (error) {
+        console.error("Linka document restore failed", error);
+        documentFailed = true;
+      }
+    }
+
+    let preferencesApplied = true;
+    if (backup) preferencesApplied = applyBackupPreferences(backup);
+    scheduleCloudSync();
+    render();
+
+    if (backup) {
+      const partial = documentFailed || !preferencesApplied || documentResult.skipped > 0;
+      const detail = " · " + normalized.length + " captures, " + documentResult.imported + " documents";
+      say((partial ? captureUiText("backupPartial") : captureUiText("backupRestored")) + detail);
+    } else if (bookmarkImport) {
+      const detail = " · " + normalized.length + " bookmarks";
+      say(captureUiText("importSuccess") + detail + (bookmarkLimitHit ? " · " + captureUiText("bookmarkImportLimited") : "") +
+        (bookmarkDuplicatesSkipped ? " · " + bookmarkDuplicatesSkipped + " duplicates skipped" : ""));
+    } else {
+      say(captureUiText("importSuccess") + " " + normalized.length);
+    }
+  } catch (error) {
+    console.error("Linka import failed", error);
+    say(captureUiText("invalidImport"));
+  } finally {
+    event.target.value = "";
+  }
 });
 $("#search-space-button").addEventListener("click",()=>showSearchSpace(search.value));
 document.addEventListener("keydown",event=>{
-  if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="k"){
-    event.preventDefault();showSearchSpace(search.value);
+  const command = event.ctrlKey || event.metaKey;
+  const key = event.key.toLowerCase();
+  const typingTarget = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement || event.target?.isContentEditable;
+  if (command && !typingTarget && event.shiftKey && key === "f") { event.preventDefault(); setAppFocusMode(!appFocusMode); return; }
+  if (event.key === "Escape" && appFocusMode && !typingTarget) { event.preventDefault(); setAppFocusMode(false); return; }
+  if (command && !typingTarget && key === "z" && event.shiftKey && redoStack.length) {
+    event.preventDefault(); restoreCaptureHistory(redoStack, undoStack, "redoDone"); return;
   }
-  if(event.key==="/"&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&!(event.target instanceof HTMLInputElement)&&!(event.target instanceof HTMLTextAreaElement)){
+  if (command && !typingTarget && key === "z" && undoStack.length) {
+    event.preventDefault(); restoreCaptureHistory(undoStack, redoStack, "undoDone"); return;
+  }
+  if (command && !typingTarget && key === "y" && redoStack.length) {
+    event.preventDefault(); restoreCaptureHistory(redoStack, undoStack, "redoDone"); return;
+  }
+  if(command && event.shiftKey && key === "p"){
+    event.preventDefault();
+    showSearchSpace(">");
+    return;
+  }
+  if(command && key === "k"){
+    event.preventDefault();showSearchSpace(search.value);return;
+  }
+  if(command && event.shiftKey && key === "e"){
+    event.preventDefault();
+    const selected = selectionMode && selectedIds.size
+      ? captures.filter(item => selectedIds.has(item.id))
+      : visibleCaptures(captures, activeFilter, search.value);
+    exportCaptureItems(selected, selectionMode && selectedIds.size ? "linka-selection" : "linka-inbox");
+    return;
+  }
+  if(command && event.shiftKey && key === "l" && selectionMode && selectedIds.size){
+    event.preventDefault();
+    const selected = captures.filter(item => selectedIds.has(item.id));
+    const readLater = !selected.every(item => item.readLater);
+    const now = Date.now();
+    captures = captures.map(item => selectedIds.has(item.id) ? { ...item, readLater, updatedAt: now } : item);
+    if (persist()) { render(); say(readLater ? captureUiText("savedLater") : captureUiText("removedLater")); }
+    else render();
+    return;
+  }
+  if(event.key === "Delete" && selectionMode && selectedIds.size && activeFilter !== "trash" && !typingTarget){
+    event.preventDefault();
+    bulkToolbar.querySelector('button[data-bulk-action="delete"]')?.click();
+    return;
+  }
+  if(event.key==="/"&&!command&&!event.altKey&&!typingTarget){
     event.preventDefault();showSearchSpace("");
   }
 });
 document.documentElement.classList.toggle("reduced-motion",reduceMotion);
+setAppFocusMode(localStorage.getItem(APP_FOCUS_STORAGE_KEY) === "true", { persist: false });
+focusModeButton?.addEventListener("click", () => setAppFocusMode(!appFocusMode));
+updateHistoryControls();
+updateCloudSyncStatus("auto");
+$("#linka-language")?.addEventListener("change", () => updateCloudSyncStatus("auto"));
 render();
 if(getCloudSession()) setTimeout(() => { void syncNow({ silent: true }).catch(() => {}); }, 1200);
 function refreshCloudIfDue() {
@@ -1160,9 +2502,11 @@ window.addEventListener("focus", refreshCloudIfDue);
 setInterval(refreshCloudIfDue, 60000);
 if(localStorage.getItem("linka.termsAccepted")!==TERMS_VERSION)showAgreement({mustAccept:true});
 window.addEventListener("linka:authenticated", () => {
+  updateCloudSyncStatus(getCloudSession() ? "pending" : "local");
   if (getCloudSession()) void syncNow({ silent: true }).catch(error => say(error?.message || "Sync unavailable"));
 });
 window.addEventListener("linka:profile-saved", () => {
+  updateCloudSyncStatus(getCloudSession() ? "pending" : "local");
   if (getCloudSession()) void syncNow({ silent: true }).catch(error => say(error?.message || "Sync unavailable"));
 });
 void completeGoogleOAuthCallback().then(session => {
@@ -1174,6 +2518,8 @@ void completeGoogleOAuthCallback().then(session => {
 window.addEventListener("linka:open-cloud-settings", () => showCloudSyncНастройки());
 window.addEventListener("linka:open-atmosphere-settings", () => openAtmosphereSettings());
 window.addEventListener("linka:open-agreement", () => showAgreement({ mustAccept: false }));
+void applyNativeCloseToTrayPreference();
+void registerNativeDesktopEvents();
 initLinkaExperience();
 initLinkaSignature();
 initVisualSystem();

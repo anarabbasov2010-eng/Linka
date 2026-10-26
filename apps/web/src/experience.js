@@ -1,4 +1,5 @@
 import QRCode from "qrcode";
+import { invoke as invokeTauri } from "@tauri-apps/api/core";
 import {
   approveQrPairing, beginQrPairing, claimQrPairing, disconnectCloud,
   getCloudConfig, getCloudSession, getOtpCooldown, readLinkaProfile,
@@ -23,8 +24,8 @@ const COPY = {
     privacy: "Private by default · local-first", eyebrow: "Your personal library",
     hero: ["Keep", "what", "matters."], heroBody: "Links, notes, and useful ideas. Saved once. Easy to find again.",
     quick: "Quick capture", subtitle: "Keep the useful stuff.", placeholder: "Drop a link. Save a thought. Keep it for later…",
-    hint: "Saved on this device. Export a backup whenever you need.", tags: "Tags", collection: "Collection", tagsPlaceholder: "design, reading, work", collectionPlaceholder: "Project or topic", later: "Read later", archive: "Archive", trash: "Trash", save: "Save to inbox",
-    inbox: "Your inbox", export: "Export", import: "Import", filters: ["All", "Pinned", "Read later", "Archive", "Trash", "Links", "Notes"],
+    hint: "Saved on this device. Export a backup whenever you need.", exportFormat: "Export format", sortBy: "Sort order", sortOptions: { updated: "Recently changed", newest: "Newest first", oldest: "Oldest first", title: "Title A–Z", domain: "Domain A–Z" }, previewSummary: "Link preview (optional)", previewTitle: "Page title", previewTitlePlaceholder: "Title shown on the card", previewDescription: "Description", previewDescriptionPlaceholder: "Short description", previewImage: "Cover image URL (HTTPS)", previewImagePlaceholder: "https://example.com/cover.jpg", tags: "Tags", collection: "Collection", tagsPlaceholder: "design, reading, work", collectionPlaceholder: "Project or topic", later: "Read later", archive: "Archive", trash: "Trash", save: "Save to inbox",
+    inbox: "Your inbox", export: "Export", backupHistory: "Backup history", import: "Import", filters: ["All", "Today", "Pinned", "Read later", "Archive", "Trash", "Links", "Notes"],
     footer: "your personal library", footerRight: "Simple by design. Back up what matters.",
     account: "Account", settings: "Settings", language: "Language", theme: "Appearance", dark: "Dark", light: "Light", system: "System", reducedMotion: "Reduce motion", reducedMotionBody: "Use shorter, calmer transitions.",
     startTitle: "Welcome to Linka", startBody: "Create your account with your email. Your library will be ready on every signed-in device.",
@@ -51,8 +52,8 @@ const COPY = {
     privacy: "Приватность по умолчанию · сначала локально", eyebrow: "Твоя личная библиотека",
     hero: ["Сохраняй", "то,", "что важно."], heroBody: "Ссылки, заметки и идеи. Сохраняй один раз — находи снова.",
     quick: "Быстрое сохранение", subtitle: "Только то, что нужно.", placeholder: "Вставь ссылку или сохрани мысль…",
-    hint: "Сохранено на этом устройстве. Не забывай делать резервную копию.", tags: "Теги", collection: "Коллекция", tagsPlaceholder: "дизайн, чтение, работа", collectionPlaceholder: "Проект или тема", later: "Сохранить на потом", archive: "Архивировать", trash: "Корзина", save: "Сохранить",
-    inbox: "Твоя библиотека", export: "Экспорт", import: "Импорт", filters: ["Всё", "Закреплённое", "Сохранить на потом", "Архив", "Корзина", "Ссылки", "Заметки"],
+    hint: "Сохранено на этом устройстве. Не забывай делать резервную копию.", exportFormat: "Формат экспорта", sortBy: "Сортировка", sortOptions: { updated: "Недавно изменённые", newest: "Сначала новые", oldest: "Сначала старые", title: "По названию А–Я", domain: "По домену А–Я" }, previewSummary: "Превью ссылки (необязательно)", previewTitle: "Заголовок страницы", previewTitlePlaceholder: "Заголовок на карточке", previewDescription: "Описание", previewDescriptionPlaceholder: "Краткое описание", previewImage: "URL обложки (HTTPS)", previewImagePlaceholder: "https://example.com/cover.jpg", tags: "Теги", collection: "Коллекция", tagsPlaceholder: "дизайн, чтение, работа", collectionPlaceholder: "Проект или тема", later: "Сохранить на потом", archive: "Архивировать", trash: "Корзина", save: "Сохранить",
+    inbox: "Твоя библиотека", export: "Экспорт", backupHistory: "История копий", import: "Импорт", filters: ["Всё", "Сегодня", "Закреплённое", "Сохранить на потом", "Архив", "Корзина", "Ссылки", "Заметки"],
     footer: "твоя личная библиотека", footerRight: "Ничего лишнего. Сохраняй важное в резервную копию.",
     account: "Аккаунт", settings: "Настройки", language: "Язык", theme: "Оформление", dark: "Тёмная", light: "Светлая", system: "Системная", reducedMotion: "Меньше анимации", reducedMotionBody: "Сокращает движение и переходы.",
     startTitle: "Добро пожаловать в Linka", startBody: "Создай аккаунт по электронной почте. Библиотека будет доступна на устройствах, где выполнен вход.",
@@ -79,8 +80,8 @@ const COPY = {
     privacy: "Məxfilik standartdır · əvvəlcə cihazda", eyebrow: "Şəxsi kitabxanan",
     hero: ["Vacib", "olanı", "saxla."], heroBody: "Linklər, qeydlər və ideyalar. Bir dəfə saxla, sonra asan tap.",
     quick: "Tez yadda saxla", subtitle: "Yalnız lazım olanlar.", placeholder: "Link əlavə et və ya fikrini yaz…",
-    hint: "Bu cihazda saxlanılır. Ehtiyat nüsxə yaratmağı unutma.", tags: "Teqlər", collection: "Kolleksiya", tagsPlaceholder: "dizayn, oxu, iş", collectionPlaceholder: "Layihə və ya mövzu", later: "Sonra oxu", archive: "Arxivə köçür", trash: "Zibil qutusu", save: "Yadda saxla",
-    inbox: "Kitabxanan", export: "İxrac", import: "İdxal", filters: ["Hamısı", "Sabitlənmiş", "Sonra oxu", "Arxiv", "Zibil qutusu", "Linklər", "Qeydlər"],
+    hint: "Bu cihazda saxlanılır. Ehtiyat nüsxə yaratmağı unutma.", exportFormat: "İxrac formatı", sortBy: "Sıralama", sortOptions: { updated: "Son dəyişiklik", newest: "Əvvəlcə yenilər", oldest: "Əvvəlcə köhnələr", title: "Ad A–Z", domain: "Domen A–Z" }, previewSummary: "Link önbaxışı (istəyə bağlı)", previewTitle: "Səhifənin başlığı", previewTitlePlaceholder: "Kartda göstərilən başlıq", previewDescription: "Təsvir", previewDescriptionPlaceholder: "Qısa təsvir", previewImage: "Üz qabığının URL-i (HTTPS)", previewImagePlaceholder: "https://example.com/cover.jpg", tags: "Teqlər", collection: "Kolleksiya", tagsPlaceholder: "dizayn, oxu, iş", collectionPlaceholder: "Layihə və ya mövzu", later: "Sonra oxu", archive: "Arxivə köçür", trash: "Zibil qutusu", save: "Yadda saxla",
+    inbox: "Kitabxanan", export: "İxrac", backupHistory: "Ehtiyat nüsxə tarixçəsi", import: "İdxal", filters: ["Hamısı", "Bu gün", "Sabitlənmiş", "Sonra oxu", "Arxiv", "Zibil qutusu", "Linklər", "Qeydlər"],
     footer: "şəxsi kitabxanan", footerRight: "Sadə və səliqəli. Vacib olanları ehtiyatda saxla.",
     account: "Hesab", settings: "Parametrlər", language: "Dil", theme: "Görünüş", dark: "Tünd", light: "Açıq", system: "Sistem", reducedMotion: "Az animasiya", reducedMotionBody: "Hərəkət və keçidlər azaldılır.",
     startTitle: "Linka-ya xoş gəlmisən", startBody: "E-poçtla hesab yarat. Kitabxanan daxil olduğun bütün cihazlarda əlçatan olacaq.",
@@ -107,8 +108,8 @@ const COPY = {
     privacy: "Varsayılan gizlilik · önce cihazda", eyebrow: "Kişisel kitaplığın",
     hero: ["Önemli", "olanı", "sakla."], heroBody: "Bağlantılar, notlar ve fikirler. Bir kez kaydet, sonra kolayca bul.",
     quick: "Hızlı kayıt", subtitle: "Yalnızca gerekenler.", placeholder: "Bağlantı ekle veya bir düşünce yaz…",
-    hint: "Bu cihazda saklanır. Yedek almayı unutma.", tags: "Etiketler", collection: "Koleksiyon", tagsPlaceholder: "tasarım, okuma, iş", collectionPlaceholder: "Proje veya konu", later: "Daha sonra oku", archive: "Arşivle", trash: "Çöp kutusu", save: "Gelen kutusuna kaydet",
-    inbox: "Kitaplığın", export: "Dışa aktar", import: "İçe aktar", filters: ["Tümü", "Sabitlenen", "Daha sonra oku", "Arşiv", "Çöp kutusu", "Bağlantılar", "Notlar"],
+    hint: "Bu cihazda saklanır. Yedek almayı unutma.", exportFormat: "Dışa aktarma biçimi", sortBy: "Sıralama", sortOptions: { updated: "Son değişiklik", newest: "Önce en yeniler", oldest: "Önce en eskiler", title: "Başlık A–Z", domain: "Alan adı A–Z" }, previewSummary: "Bağlantı önizlemesi (isteğe bağlı)", previewTitle: "Sayfa başlığı", previewTitlePlaceholder: "Kartta gösterilen başlık", previewDescription: "Açıklama", previewDescriptionPlaceholder: "Kısa açıklama", previewImage: "Kapak görseli URL’si (HTTPS)", previewImagePlaceholder: "https://example.com/cover.jpg", tags: "Etiketler", collection: "Koleksiyon", tagsPlaceholder: "tasarım, okuma, iş", collectionPlaceholder: "Proje veya konu", later: "Daha sonra oku", archive: "Arşivle", trash: "Çöp kutusu", save: "Gelen kutusuna kaydet",
+    inbox: "Kitaplığın", export: "Dışa aktar", backupHistory: "Yedek geçmişi", import: "İçe aktar", filters: ["Tümü", "Bugün", "Sabitlenen", "Daha sonra oku", "Arşiv", "Çöp kutusu", "Bağlantılar", "Notlar"],
     footer: "kişisel kitaplığın", footerRight: "Sade tasarım. Önemli olanları yedekle.",
     account: "Hesap", settings: "Ayarlar", language: "Dil", theme: "Görünüm", dark: "Koyu", light: "Açık", system: "Sistem", reducedMotion: "Hareketi azalt", reducedMotionBody: "Hareket ve geçişleri azaltır.",
     startTitle: "Linka'ya hoş geldin", startBody: "E-posta adresinle hesap oluştur. Kitaplığın giriş yaptığın tüm cihazlarda kullanılabilir.",
@@ -328,6 +329,26 @@ function translateInterface() {
   const collectionInput = document.querySelector("#capture-collection");
   if (tagsInput) { tagsInput.placeholder = tr("tagsPlaceholder"); tagsInput.setAttribute("aria-label", tr("tags")); }
   if (collectionInput) { collectionInput.placeholder = tr("collectionPlaceholder"); collectionInput.setAttribute("aria-label", tr("collection")); }
+  const previewSummary = document.querySelector("#capture-preview-summary");
+  if (previewSummary) previewSummary.textContent = tr("previewSummary");
+  const previewLabels = [
+    ["#capture-preview-title-label", "previewTitle"],
+    ["#capture-preview-description-label", "previewDescription"],
+    ["#capture-preview-image-label", "previewImage"]
+  ];
+  previewLabels.forEach(([selector, key]) => {
+    const label = document.querySelector(selector);
+    if (label) label.textContent = tr(key);
+  });
+  const previewFields = [
+    ["#capture-preview-title", "previewTitlePlaceholder", "previewTitle"],
+    ["#capture-preview-description", "previewDescriptionPlaceholder", "previewDescription"],
+    ["#capture-preview-image", "previewImagePlaceholder", "previewImage"]
+  ];
+  previewFields.forEach(([selector, placeholder, label]) => {
+    const field = document.querySelector(selector);
+    if (field) { field.placeholder = tr(placeholder); field.setAttribute("aria-label", tr(label)); }
+  });
   const save = document.querySelector("#save-button");
   if (save) {
     const svg = save.querySelector("svg");
@@ -338,8 +359,20 @@ function translateInterface() {
   if (title?.firstChild) title.firstChild.textContent = tr("inbox") + " ";
   const exportButton = document.querySelector("#export-button");
   const importButton = document.querySelector("#import-button");
+  const backupHistoryButton = document.querySelector("#backup-history-button");
+  const exportFormat = document.querySelector("#export-format");
+  if (exportFormat) exportFormat.setAttribute("aria-label", tr("exportFormat"));
+  const sortOrder = document.querySelector("#sort-order");
+  if (sortOrder) {
+    sortOrder.setAttribute("aria-label", tr("sortBy"));
+    const sortLabels = tr("sortOptions");
+    Array.from(sortOrder.options).forEach(option => {
+      if (sortLabels && sortLabels[option.value]) option.textContent = sortLabels[option.value];
+    });
+  }
   if (exportButton) exportButton.textContent = tr("export");
   if (importButton) importButton.textContent = tr("import");
+  if (backupHistoryButton) backupHistoryButton.textContent = tr("backupHistory");
   document.querySelectorAll("[data-filter]").forEach((el, i) => { el.textContent = tr("filters")[i] || el.textContent; });
   const footer = document.querySelector(".footer");
   if (footer?.children[0]) footer.children[0].innerHTML = "<strong>linka</strong> · " + tr("footer");
@@ -369,7 +402,7 @@ function addRevealAnimations() {
   const list = document.querySelector("#capture-list");
   if (list && "MutationObserver" in window) new MutationObserver(apply).observe(list, { childList: true });
 }
-function setLanguage(value) {
+export function setLanguage(value) {
   if (!COPY[value]) return;
   localStorage.setItem(LANG_KEY, value);
   translateInterface();
@@ -799,6 +832,83 @@ function showAccount({ firstRun = false } = {}) {
   });
   if (!service.url.value || !service.key.value) setStatus(status, tr("setupNeeded"));
 }
+function showKeyboardShortcuts() {
+  const variants = {
+    en: {
+      title: "Keyboard shortcuts", subtitle: "Actions you can use throughout Linka.", close: "Close",
+      rows: [
+        ["Ctrl / ⌘ + K", "Open global search", "Search captures and local text documents."],
+        ["Ctrl / ⌘ + Shift + P", "Open command palette", "Filter actions by words; use ↑ / ↓ and Enter. You can also type > in global search."],
+        ["/", "Search from anywhere", "Opens global search when focus is not inside a field."],
+        ["Ctrl / ⌘ + Enter", "Save quick capture", "Save the current capture draft without reaching for the mouse."],
+        ["Ctrl / ⌘ + Shift + E", "Export", "Export selected captures, or the currently visible results."],
+        ["Ctrl / ⌘ + Shift + L", "Toggle Read Later", "Mark selected captures for later or remove that status."],
+        ["Delete", "Move selection to Trash", "Works when items are selected and focus is not in a text field."]
+      ]
+    },
+    ru: {
+      title: "Горячие клавиши", subtitle: "Быстрые действия в Linka.", close: "Закрыть",
+      rows: [
+        ["Ctrl / ⌘ + K", "Открыть общий поиск", "Поиск по записям и локальным текстовым документам."],
+        ["Ctrl / ⌘ + Shift + P", "Открыть палитру команд", "Найди действие по словам; ↑ / ↓ выбирают пункт, Enter запускает. Также можно ввести > в общем поиске."],
+        ["/", "Поиск из любого раздела", "Открывает общий поиск, если фокус не находится в поле ввода."],
+        ["Ctrl / ⌘ + Enter", "Сохранить быструю запись", "Сохраняет текущий черновик без мыши."],
+        ["Ctrl / ⌘ + Shift + E", "Экспортировать", "Экспорт выбранных записей или текущих результатов."],
+        ["Ctrl / ⌘ + Shift + L", "Отложить на потом", "Меняет статус «Сохранить на потом» у выбранных записей."],
+        ["Delete", "Переместить в корзину", "Работает для выбранных записей, когда фокус не в текстовом поле."]
+      ]
+    },
+    az: {
+      title: "Klaviatura qısayolları", subtitle: "Linka-da sürətli əmrlər.", close: "Bağla",
+      rows: [
+        ["Ctrl / ⌘ + K", "Ümumi axtarışı aç", "Qeydlərdə və yerli mətn sənədlərində axtar."],
+        ["Ctrl / ⌘ + Shift + P", "Əmr panelini aç", "Əmrləri sözlərlə süz; ↑ / ↓ ilə seç, Enter ilə işə sal. Ümumi axtarışda > yazmaq da olar."],
+        ["/", "İstənilən yerdən axtar", "Fokus mətn sahəsində olmayanda ümumi axtarışı açır."],
+        ["Ctrl / ⌘ + Enter", "Sürətli qeydi saxla", "Cari qaralamanı siçansız saxlayır."],
+        ["Ctrl / ⌘ + Shift + E", "İxrac et", "Seçilmiş qeydləri və ya görünən nəticələri ixrac edir."],
+        ["Ctrl / ⌘ + Shift + L", "Sonra oxu", "Seçilmiş qeydlərin sonradan oxunma statusunu dəyişir."],
+        ["Delete", "Zibil qutusuna köçür", "Mətn sahəsində fokus olmayanda seçilmiş qeydlərlə işləyir."]
+      ]
+    },
+    tr: {
+      title: "Klavye kısayolları", subtitle: "Linka içinde hızlı işlemler.", close: "Kapat",
+      rows: [
+        ["Ctrl / ⌘ + K", "Genel aramayı aç", "Kayıtlarda ve yerel metin belgelerinde ara."],
+        ["Ctrl / ⌘ + Shift + P", "Komut paletini aç", "Eylemleri sözcüklerle filtrele; ↑ / ↓ ile seçip Enter’a bas. Genel aramada > da yazabilirsin."],
+        ["/", "Her yerden ara", "Odak bir metin alanında değilken genel aramayı açar."],
+        ["Ctrl / ⌘ + Enter", "Hızlı kaydı kaydet", "Geçerli taslağı fareye uzanmadan kaydeder."],
+        ["Ctrl / ⌘ + Shift + E", "Dışa aktar", "Seçilen kayıtları veya görünür sonuçları dışa aktarır."],
+        ["Ctrl / ⌘ + Shift + L", "Daha sonra oku", "Seçilen kayıtların daha sonra okunma durumunu değiştirir."],
+        ["Delete", "Çöp kutusuna taşı", "Odak bir metin alanında değilken seçilen kayıtlar için çalışır."]
+      ]
+    }
+  };
+  const copy = variants[langCode()] || variants.en;
+  const shortcutRows = copy.rows.slice();
+  if (isDesktopShell() && /Windows/i.test(navigator.userAgent)) {
+    const labels = {
+      en: ["Ctrl + Alt + Space", "Quick capture from anywhere", "Bring Linka to the front and focus the capture field."],
+      ru: ["Ctrl + Alt + Space", "Быстрое сохранение из любого приложения", "Открывает Linka поверх других окон и переводит фокус в поле записи."],
+      az: ["Ctrl + Alt + Space", "İstənilən tətbiqdən sürətli qeyd", "Linka-nı önə gətirir və qeyd sahəsinə fokus verir."],
+      tr: ["Ctrl + Alt + Space", "Her uygulamadan hızlı kayıt", "Linka'yı öne getirir ve kayıt alanına odaklanır."]
+    };
+    shortcutRows.unshift((labels[langCode()] || labels.en));
+  }
+  const dialog = modal(copy.title, copy.subtitle);
+  const rows = make("div", "linka-shortcuts-list");
+  shortcutRows.forEach(([keys, title, detail]) => {
+    const row = make("div", "linka-shortcut-row");
+    const description = make("div", "linka-shortcut-description");
+    description.append(make("strong", "", title), make("p", "", detail));
+    row.append(description, make("code", "linka-shortcut-keys", keys));
+    rows.append(row);
+  });
+  const footer = make("div", "linka-actions");
+  const close = button(copy.close, "linka-button linka-button-secondary");
+  close.addEventListener("click", dialog.close);
+  footer.append(close);
+  dialog.panel.append(rows, footer);
+}
 function showSettings() {
   const dialog = modal(tr("settings"), "Linka");
   const pickerLabel = make("label", "linka-field");
@@ -811,10 +921,10 @@ function showSettings() {
   dialog.panel.append(pickerLabel);
 
   const preferenceLabels = ({
-    en: { accent: "Accent color", density: "Interface density", compact: "Compact", standard: "Standard", spacious: "Spacious", effects: "Visual effects", quiet: "Quiet", balanced: "Balanced", atmosphere: "Atmosphere", forest: "Forest", oled: "OLED black", cloud: "Cloud sync", backdrop: "Atmosphere & music", agreement: "User agreement" },
-    ru: { accent: "Акцентный цвет", density: "Плотность интерфейса", compact: "Компактная", standard: "Стандартная", spacious: "Просторная", effects: "Визуальные эффекты", quiet: "Минимальные", balanced: "Сбалансированные", atmosphere: "Атмосфера", forest: "Лес", oled: "OLED-чёрная", cloud: "Облачная синхронизация", backdrop: "Атмосфера и музыка", agreement: "Пользовательское соглашение" },
-    az: { accent: "Vurğu rəngi", density: "İnterfeys sıxlığı", compact: "Yığcam", standard: "Standart", spacious: "Geniş", effects: "Vizual effektlər", quiet: "Sakit", balanced: "Balanslı", atmosphere: "Atmosfer", forest: "Meşə", oled: "OLED qara", cloud: "Bulud sinxronizasiyası", backdrop: "Atmosfer və musiqi", agreement: "İstifadəçi razılaşması" },
-    tr: { accent: "Vurgu rengi", density: "Arayüz yoğunluğu", compact: "Kompakt", standard: "Standart", spacious: "Geniş", effects: "Görsel efektler", quiet: "Sakin", balanced: "Dengeli", atmosphere: "Atmosfer", forest: "Orman", oled: "OLED siyahı", cloud: "Bulut eşitleme", backdrop: "Atmosfer ve müzik", agreement: "Kullanıcı sözleşmesi" }
+    en: { shortcuts: "Keyboard shortcuts", accent: "Accent color", density: "Interface density", compact: "Compact", standard: "Standard", spacious: "Spacious", effects: "Visual effects", quiet: "Quiet", balanced: "Balanced", atmosphere: "Atmosphere", forest: "Forest", oled: "OLED black", cloud: "Cloud sync", backdrop: "Atmosphere & music", agreement: "User agreement", closeToTray: "Close to tray", closeToTrayBody: "Closing the window hides Linka in the system tray. Use the tray menu to exit completely." },
+    ru: { shortcuts: "Горячие клавиши", accent: "Акцентный цвет", density: "Плотность интерфейса", compact: "Компактная", standard: "Стандартная", spacious: "Просторная", effects: "Визуальные эффекты", quiet: "Минимальные", balanced: "Сбалансированные", atmosphere: "Атмосфера", forest: "Лес", oled: "OLED-чёрная", cloud: "Облачная синхронизация", backdrop: "Атмосфера и музыка", agreement: "Пользовательское соглашение", closeToTray: "Сворачивать в трей при закрытии", closeToTrayBody: "При закрытии окна Linka останется в системном трее. Для полного выхода используй меню трея." },
+    az: { shortcuts: "Klaviatura qısayolları", accent: "Vurğu rəngi", density: "İnterfeys sıxlığı", compact: "Yığcam", standard: "Standart", spacious: "Geniş", effects: "Vizual effektlər", quiet: "Sakit", balanced: "Balanslı", atmosphere: "Atmosfer", forest: "Meşə", oled: "OLED qara", cloud: "Bulud sinxronizasiyası", backdrop: "Atmosfer və musiqi", agreement: "İstifadəçi razılaşması", closeToTray: "Bağlayanda sistem treyinə gizlət", closeToTrayBody: "Pəncərəni bağladıqda Linka sistem treyində qalır. Tam çıxış üçün trey menyusundan istifadə et." },
+    tr: { shortcuts: "Klavye kısayolları", accent: "Vurgu rengi", density: "Arayüz yoğunluğu", compact: "Kompakt", standard: "Standart", spacious: "Geniş", effects: "Görsel efektler", quiet: "Sakin", balanced: "Dengeli", atmosphere: "Atmosfer", forest: "Orman", oled: "OLED siyahı", cloud: "Bulut eşitleme", backdrop: "Atmosfer ve müzik", agreement: "Kullanıcı sözleşmesi", closeToTray: "Kapatınca sistem tepsisine küçült", closeToTrayBody: "Pencere kapatıldığında Linka sistem tepsisinde kalır. Tamamen çıkmak için tepsi menüsünü kullan." }
   })[langCode()] || {};
   const addPreference = (label, options, selected, apply) => {
     const field = make("label", "linka-field");
@@ -869,6 +979,38 @@ function showSettings() {
   });
   soundSection.append(soundToggle); dialog.panel.append(soundSection);
 
+  if (isDesktopShell() && /Windows/i.test(navigator.userAgent)) {
+    const closeTraySection = make("div", "linka-settings-block");
+    closeTraySection.append(
+      make("h3", "", preferenceLabels.closeToTray || "Close to tray"),
+      make("p", "linka-muted", preferenceLabels.closeToTrayBody || "Closing the window hides Linka in the system tray.")
+    );
+    const closeTrayToggle = button("", "linka-button linka-button-secondary");
+    const isCloseToTrayEnabled = () => localStorage.getItem("linka.closeToTray") !== "false";
+    const refreshCloseTrayLabel = () => {
+      closeTrayToggle.textContent = (isCloseToTrayEnabled() ? "✓ " : "") + (preferenceLabels.closeToTray || "Close to tray");
+      closeTrayToggle.setAttribute("aria-pressed", String(isCloseToTrayEnabled()));
+    };
+    refreshCloseTrayLabel();
+    closeTrayToggle.addEventListener("click", async () => {
+      const previous = isCloseToTrayEnabled();
+      const next = !previous;
+      closeTrayToggle.disabled = true;
+      try {
+        await invokeTauri("set_close_to_tray", { enabled: next });
+        localStorage.setItem("linka.closeToTray", String(next));
+        refreshCloseTrayLabel();
+      } catch (error) {
+        localStorage.setItem("linka.closeToTray", String(previous));
+        closeTraySection.append(make("p", "linka-muted", String(error?.message || "Could not update this setting.")));
+      } finally {
+        closeTrayToggle.disabled = false;
+      }
+    });
+    closeTraySection.append(closeTrayToggle);
+    dialog.panel.append(closeTraySection);
+  }
+
   const motionSection = make("div", "linka-settings-block");
   motionSection.append(make("h3", "", tr("reducedMotion")), make("p", "linka-muted", tr("reducedMotionBody")));
   const motionToggle = button("", "linka-button linka-button-secondary");
@@ -895,13 +1037,15 @@ function showSettings() {
   dialog.panel.append(actions);
 
   const utilityActions = make("div", "linka-actions");
+  const shortcutSettings = button(preferenceLabels.shortcuts || "Keyboard shortcuts", "linka-button linka-button-secondary");
+  shortcutSettings.addEventListener("click", () => { dialog.close(); setTimeout(showKeyboardShortcuts, 190); });
   const cloudSettings = button(preferenceLabels.cloud || "Cloud sync", "linka-button linka-button-secondary");
   cloudSettings.addEventListener("click", () => { dialog.close(); window.dispatchEvent(new Event("linka:open-cloud-settings")); });
   const atmosphereSettings = button(preferenceLabels.backdrop || "Atmosphere & music", "linka-button linka-button-secondary");
   atmosphereSettings.addEventListener("click", () => { dialog.close(); window.dispatchEvent(new Event("linka:open-atmosphere-settings")); });
   const agreementSettings = button(preferenceLabels.agreement || "User agreement", "linka-button linka-button-secondary");
   agreementSettings.addEventListener("click", () => { dialog.close(); window.dispatchEvent(new Event("linka:open-agreement")); });
-  utilityActions.append(cloudSettings, atmosphereSettings, agreementSettings);
+  utilityActions.append(shortcutSettings, cloudSettings, atmosphereSettings, agreementSettings);
   dialog.panel.append(utilityActions);
 
   showNotificationSettings(dialog.panel);
@@ -933,7 +1077,7 @@ function mountWebNavigation() {
   const nav = make("nav", "web-side-nav");
   nav.setAttribute("aria-label", "Library sections");
   const entries = [
-    ["all", "▦", tr("inbox")], ["pinned", "⌖", tr("pinned")], ["read-later", "◷", tr("later")], ["archive", "▤", tr("archive")], ["trash", "⌫", tr("trash")],
+    ["all", "▦", tr("inbox")], ["today", "◷", tr("today")], ["pinned", "⌖", tr("pinned")], ["read-later", "◷", tr("later")], ["archive", "▤", tr("archive")], ["trash", "⌫", tr("trash")],
     ["links", "↗", tr("links")], ["notes", "Aa", tr("notes")],
     ["search", "⌕", tr("search")], ["capture", "+", tr("quick")],
     ["account", "○", tr("account")], ["settings", "⚙", tr("settings")]
@@ -959,7 +1103,7 @@ function mountWebNavigation() {
     node.querySelector(".web-nav-glyph").textContent = glyph;
     node.querySelector(".web-nav-label").textContent = label;
     node.addEventListener("click", () => {
-      if (["all", "pinned", "read-later", "archive", "trash", "links", "notes"].includes(key)) {
+      if (["all", "today", "pinned", "read-later", "archive", "trash", "links", "notes"].includes(key)) {
         document.querySelector('[data-filter="' + key + '"]')?.click();
         activate(key);
         document.querySelector(".workspace")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -992,10 +1136,10 @@ function mountWebNavigation() {
 function updateWebNavLabels() {
   const lang = langCode();
   const labels = {
-    en: { all: "Inbox", pinned: "Pinned", "read-later": "Read later", archive: "Archive", trash: "Trash", links: "Links", notes: "Notes", search: "Search", capture: "New capture", account: "Account", settings: "Settings" },
-    ru: { all: "Входящие", pinned: "Закреплённое", "read-later": "Сохранить на потом", archive: "Архив", trash: "Корзина", links: "Ссылки", notes: "Заметки", search: "Поиск", capture: "Сохранить", account: "Аккаунт", settings: "Настройки" },
-    az: { all: "Gələnlər", pinned: "Sabitlənmiş", "read-later": "Sonra oxu", archive: "Arxiv", trash: "Zibil qutusu", links: "Linklər", notes: "Qeydlər", search: "Axtar", capture: "Yadda saxla", account: "Hesab", settings: "Parametrlər" },
-    tr: { all: "Gelen kutusu", pinned: "Sabitlenen", "read-later": "Daha sonra oku", archive: "Arşiv", trash: "Çöp kutusu", links: "Bağlantılar", notes: "Notlar", search: "Ara", capture: "Kaydet", account: "Hesap", settings: "Ayarlar" }
+    en: { all: "Inbox", today: "Today", pinned: "Pinned", "read-later": "Read later", archive: "Archive", trash: "Trash", links: "Links", notes: "Notes", search: "Search", capture: "New capture", account: "Account", settings: "Settings" },
+    ru: { all: "Входящие", today: "Сегодня", pinned: "Закреплённое", "read-later": "Сохранить на потом", archive: "Архив", trash: "Корзина", links: "Ссылки", notes: "Заметки", search: "Поиск", capture: "Сохранить", account: "Аккаунт", settings: "Настройки" },
+    az: { all: "Gələnlər", today: "Bu gün", pinned: "Sabitlənmiş", "read-later": "Sonra oxu", archive: "Arxiv", trash: "Zibil qutusu", links: "Linklər", notes: "Qeydlər", search: "Axtar", capture: "Yadda saxla", account: "Hesab", settings: "Parametrlər" },
+    tr: { all: "Gelen kutusu", today: "Bugün", pinned: "Sabitlenen", "read-later": "Daha sonra oku", archive: "Arşiv", trash: "Çöp kutusu", links: "Bağlantılar", notes: "Notlar", search: "Ara", capture: "Kaydet", account: "Hesap", settings: "Ayarlar" }
   };
   const selected = labels[lang] || labels.en;
   document.querySelectorAll(".web-nav-item[data-nav]").forEach(node => {
@@ -1082,6 +1226,7 @@ export function initLinkaExperience() {
     if (status) { status.textContent = String(event.detail || ""); status.style.opacity = "1"; }
   });
   document.addEventListener("linka:request-profile", () => openProfileEditor());
+  window.addEventListener("linka:open-keyboard-shortcuts", () => showKeyboardShortcuts());
   window.addEventListener("linka:capture-saved", notificationForSavedCapture);
   window.addEventListener("linka:profile-saved", () => window.dispatchEvent(new CustomEvent("linka:authenticated")));
   window.addEventListener("linka:oauth-complete", () => {
