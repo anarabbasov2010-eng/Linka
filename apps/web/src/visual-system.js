@@ -292,10 +292,12 @@ export function initVisualSystem() {
     if (palette.hidden || palette.classList.contains("is-closing")) return;
     root.classList.remove("palette-open");
     palette.setAttribute("aria-hidden", "true");
-    if (reducedMotion) {
+    if (reducedMotion || root.classList.contains("reduced-motion") || motionQuery?.matches) {
       palette.hidden = true;
+      palette.inert = true;
       return;
     }
+    palette.inert = false;
     palette.classList.add("is-closing");
     window.clearTimeout(paletteCloseTimer);
     paletteCloseTimer = window.setTimeout(() => {
@@ -312,6 +314,7 @@ export function initVisualSystem() {
     activeIndex = 0;
     renderCommands();
     palette.hidden = false;
+    palette.inert = false;
     palette.setAttribute("aria-hidden", "false");
     root.classList.add("palette-open");
     requestAnimationFrame(() => commandInput.focus());
