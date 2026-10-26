@@ -106,7 +106,7 @@ This file is the persistent project checklist for the Linka improvements audit. 
 
 - [~] Support tags and one collection label on captures.
 - [ ] Add nested tags and subtags.
-- [ ] Support collection colors and custom icons.
+- [~] Support a seven-color palette per collection; custom collection icons remain open.
 - [ ] Add smart collections based on filters and saved queries.
 - [ ] Add backlinks and a graph of related notes.
 - [~] Add a capture Timeline view grouped by local creation date; cross-document/project milestones and richer project timelines remain open.
