@@ -262,11 +262,26 @@ function modal(titleText, subtitleText, options = {}) {
   head.append(logo, copy);
   panel.append(head);
   layer.append(panel);
-  document.querySelector("#modal-root")?.replaceChildren(layer);
+  const modalRoot = document.querySelector("#modal-root");
+  if (modalRoot) {
+    for (const previous of Array.from(modalRoot.children)) {
+      if (previous.classList.contains("closing")) continue;
+      previous.classList.add("closing");
+      const reduced = Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches)
+        || document.documentElement.classList.contains("reduced-motion");
+      if (reduced) previous.remove();
+      else window.setTimeout(() => previous.remove(), 230);
+    }
+    modalRoot.append(layer);
+  }
   const close = () => {
+    if (!layer.isConnected || layer.classList.contains("closing")) return;
     layer.classList.add("closing");
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) layer.remove();
-    else setTimeout(() => layer.remove(), 180);
+    layer.setAttribute("aria-hidden", "true");
+    const reduced = Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches)
+      || document.documentElement.classList.contains("reduced-motion");
+    if (reduced) layer.remove();
+    else window.setTimeout(() => layer.remove(), 230);
   };
   return { layer, panel, close };
 }
@@ -806,7 +821,7 @@ function showSettings() {
   const picker = make("select", "linka-select");
   LANGUAGES.forEach(item => { const option=make("option","",item.label); option.value=item.value; picker.append(option); });
   picker.value = langCode();
-  picker.addEventListener("change", () => { setLanguage(picker.value); dialog.close(); setTimeout(showSettings, 190); });
+  picker.addEventListener("change", () => { setLanguage(picker.value); dialog.close(); setTimeout(showSettings, 240); });
   pickerLabel.append(picker);
   dialog.panel.append(pickerLabel);
 
