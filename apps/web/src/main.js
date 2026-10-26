@@ -49,6 +49,7 @@ if (!SORT_ORDERS.has(sortMode)) sortMode = "updated";
 if (sortOrder) sortOrder.value = sortMode;
 const count = $("#capture-count");
 const status = $("#status");
+const cloudStatusElement = $("#cloud-sync-status");
 const composeLabel = $("#compose-label");
 const filters = Array.from(document.querySelectorAll("[data-filter]"));
 const modalRoot = $("#modal-root");
@@ -186,6 +187,7 @@ let cloudSyncBusy = false;
 let cloudSyncQueued = false;
 let localDataRevision = 0;
 let cloudSyncStatus = "";
+const CLOUD_LAST_SUCCESS_KEY = "linka.cloud.lastSuccess.v1";
 let lastCloudRefreshAt = 0;
 const expandedCards = new Set();
 const desktopBuildVersion = String(import.meta.env.VITE_LINKA_DESKTOP_VERSION || "").trim();
@@ -441,8 +443,41 @@ function persist() {
   scheduleCloudSync();
   return true;
 }
+function updateCloudSyncStatus(state = "auto", detail = "") {
+  if (!cloudStatusElement) return;
+  const language = (() => {
+    try { return (localStorage.getItem("linka.language.v1") || "en").toLowerCase().slice(0, 2); }
+    catch { return "en"; }
+  })();
+  const copy = {
+    en: { local: "Local only", pending: "Changes pending", syncing: "Syncing…", success: "Synced at {time}", never: "Cloud connected", error: "Sync needs attention" },
+    ru: { local: "Только на устройстве", pending: "Ожидает синхронизации", syncing: "Синхронизация…", success: "Синхронизировано · {time}", never: "Облако подключено", error: "Ошибка синхронизации" },
+    az: { local: "Yalnız bu cihazda", pending: "Sinxronizasiya gözləyir", syncing: "Sinxronizasiya…", success: "Sinxronizasiya · {time}", never: "Bulud qoşulub", error: "Sinxronizasiya xətası" },
+    tr: { local: "Yalnızca bu cihazda", pending: "Eşitleme bekliyor", syncing: "Eşitleniyor…", success: "Eşitlendi · {time}", never: "Bulut bağlı", error: "Eşitleme hatası" }
+  };
+  let resolved = state;
+  let lastSuccess = 0;
+  try { lastSuccess = Number(localStorage.getItem(CLOUD_LAST_SUCCESS_KEY) || 0); } catch {}
+  if (resolved === "auto") {
+    if (!getCloudSession()) resolved = "local";
+    else resolved = lastSuccess > 0 ? "success" : "never";
+  }
+  const labels = copy[language] || copy.en;
+  let label = labels[resolved] || labels.local;
+  if (resolved === "success") {
+    let time = "";
+    try { time = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(new Date(lastSuccess)); }
+    catch { time = new Date(lastSuccess).toLocaleTimeString(); }
+    label = label.replace("{time}", time || "—");
+  }
+  cloudStatusElement.textContent = label;
+  cloudStatusElement.dataset.state = resolved;
+  cloudStatusElement.title = detail ? label + ": " + String(detail).slice(0, 180) : label;
+}
+
 function scheduleCloudSync() {
-  if (!getCloudSession()) return;
+  if (!getCloudSession()) { updateCloudSyncStatus("local"); return; }
+  updateCloudSyncStatus("pending");
   clearTimeout(cloudSyncTimer);
   cloudSyncTimer = setTimeout(() => {
     if (cloudSyncBusy) { cloudSyncQueued = true; return; }
@@ -450,8 +485,9 @@ function scheduleCloudSync() {
   }, 1400);
 }
 async function syncNow({ silent = false } = {}) {
-  if (cloudSyncBusy) { cloudSyncQueued = true; return null; }
+  if (cloudSyncBusy) { cloudSyncQueued = true; updateCloudSyncStatus("pending"); return null; }
   cloudSyncBusy = true;
+  updateCloudSyncStatus("syncing");
   const startRevision = localDataRevision;
   try {
     const localSnapshot = captures.map(item => ({ ...item }));
@@ -472,12 +508,15 @@ async function syncNow({ silent = false } = {}) {
     captures = latestCaptures;
     persistedCaptures = captures.map(item => ({ ...item }));
     cloudSyncStatus = result.message;
+    try { localStorage.setItem(CLOUD_LAST_SUCCESS_KEY, String(Date.now())); } catch {}
+    updateCloudSyncStatus("success", result.message);
     if (localDataRevision !== startRevision) cloudSyncQueued = true;
     render();
     if (!silent) say(result.message);
     return { ...result, captures: latestCaptures, deletedIds: latestDeleted };
   } catch (error) {
     cloudSyncStatus = error?.message || "Cloud sync failed";
+    updateCloudSyncStatus("error", cloudSyncStatus);
     if (!silent) say("Sync failed: " + cloudSyncStatus);
     throw error;
   } finally {
@@ -1084,6 +1123,7 @@ function showCloudSyncНастройки() {
   const profileSaveButton = makeButton("Сохранить профиль и синхронизировать", "primary", () => void saveProfileAndSync());
   const disconnectButton = makeButton("Выйти из аккаунта", "ghost", () => {
     disconnectCloud();
+    updateCloudSyncStatus("local");
     statusLine.textContent = "Выход выполнен. Локальные сохранения остались на устройстве.";
     modalRoot.replaceChildren();
   });
@@ -2282,6 +2322,8 @@ document.addEventListener("keydown",event=>{
   }
 });
 document.documentElement.classList.toggle("reduced-motion",reduceMotion);
+updateCloudSyncStatus("auto");
+$("#linka-language")?.addEventListener("change", () => updateCloudSyncStatus("auto"));
 render();
 if(getCloudSession()) setTimeout(() => { void syncNow({ silent: true }).catch(() => {}); }, 1200);
 function refreshCloudIfDue() {
@@ -2294,9 +2336,11 @@ window.addEventListener("focus", refreshCloudIfDue);
 setInterval(refreshCloudIfDue, 60000);
 if(localStorage.getItem("linka.termsAccepted")!==TERMS_VERSION)showAgreement({mustAccept:true});
 window.addEventListener("linka:authenticated", () => {
+  updateCloudSyncStatus(getCloudSession() ? "pending" : "local");
   if (getCloudSession()) void syncNow({ silent: true }).catch(error => say(error?.message || "Sync unavailable"));
 });
 window.addEventListener("linka:profile-saved", () => {
+  updateCloudSyncStatus(getCloudSession() ? "pending" : "local");
   if (getCloudSession()) void syncNow({ silent: true }).catch(error => say(error?.message || "Sync unavailable"));
 });
 void completeGoogleOAuthCallback().then(session => {
