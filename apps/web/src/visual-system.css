@@ -432,3 +432,198 @@ body { text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; 
   letter-spacing: .12em;
   text-transform: uppercase;
 }
+
+
+/* ==========================================================================
+   Forest Atelier — final shared visual layer for Web and Windows.
+   Twilight forest, bookish type, warm brass, quiet glass.
+   ========================================================================== */
+:root {
+  --atelier-ink:#08100B; --atelier-moss:#1A291D; --atelier-paper:#EEE7D4;
+  --atelier-brass:#C8AD79; --atelier-sage:#ADB5A3;
+  --atelier-radius-sm:11px; --atelier-radius-md:17px; --atelier-radius-lg:24px;
+  --atelier-glass:rgba(14,24,16,.78); --atelier-glass-heavy:rgba(12,20,13,.92);
+  --atelier-ease:cubic-bezier(.2,.8,.2,1);
+}
+html { scrollbar-color:rgba(200,173,121,.45) rgba(8,16,11,.55); scrollbar-width:thin; }
+html,body { min-height:100%; }
+body { background-color:var(--bg); color:var(--text); letter-spacing:-.008em; text-rendering:optimizeLegibility; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+body::before {
+  background:radial-gradient(560px circle at var(--pointer-x) var(--pointer-y),rgba(142,164,118,.09),transparent 72%),radial-gradient(ellipse at 86% 12%,rgba(200,173,121,.055),transparent 36%),linear-gradient(180deg,rgba(7,15,9,.12),transparent 38%);
+  opacity:.58;
+}
+body::after { opacity:.008; }
+::selection { background:rgba(200,173,121,.34); color:var(--atelier-paper); }
+
+/* Keep the forest film behind every usable surface in both shells. */
+#linka-atmosphere { z-index:0 !important; background:#08100B !important; }
+#linka-atmosphere .veil {
+  background:linear-gradient(180deg,rgba(5,12,7,.48),rgba(5,12,7,.54) 42%,rgba(4,9,5,.86)),linear-gradient(90deg,rgba(5,12,7,.22),transparent 42%,rgba(5,12,7,.20)) !important;
+}
+#linka-atmosphere .grain { opacity:.018; }
+#linka-atmosphere .wind { opacity:.10; }
+.shell { position:relative; z-index:1; }
+.ambient,.orb { display:none !important; }
+.linka-player-dock,.linka-player-panel,.linka-player-window,.linka-atmosphere-settings,.linka-doc-overlay { z-index:50; }
+
+/* Bookish display typography, with local fallbacks so the app remains offline-ready. */
+.hero h1,.modal-head h2,.modal h2,.section-title,.capture-title,.item-title,.linka-command-head-copy strong,.linka-appearance-title {
+  font-family:"Palatino Linotype","Book Antiqua","Iowan Old Style",Baskerville,Georgia,serif;
+  font-weight:500; letter-spacing:-.045em;
+}
+.hero h1 { line-height:.99; letter-spacing:-.058em; text-wrap:balance; }
+.hero h1 .second { background:linear-gradient(112deg,var(--text) 4%,#D8C49B 58%,var(--accent) 110%); background-clip:text; -webkit-background-clip:text; }
+.eyebrow { color:color-mix(in srgb,var(--atelier-paper) 72%,var(--muted)); letter-spacing:.19em; }
+.hero > p { max-width:58ch; margin-inline:auto; line-height:1.82; }
+.hero-sub { color:var(--atelier-sage) !important; }
+
+/* Utility header and capture canvas share one low-contrast glass material. */
+.topbar {
+  border:1px solid color-mix(in srgb,var(--line-strong) 70%,transparent);
+  background:color-mix(in srgb,var(--atelier-glass-heavy) 82%,transparent);
+  box-shadow:0 12px 36px rgba(0,0,0,.12),inset 0 1px rgba(255,248,224,.035);
+  backdrop-filter:blur(22px) saturate(125%); -webkit-backdrop-filter:blur(22px) saturate(125%);
+}
+.brand-name,.web-side-brand { font-family:"Palatino Linotype","Book Antiqua",Baskerville,Georgia,serif; font-weight:600; letter-spacing:-.045em; }
+.brand img,.web-side-brand img { border-color:color-mix(in srgb,var(--atelier-brass) 35%,var(--line)); box-shadow:0 8px 26px rgba(0,0,0,.24),inset 0 1px rgba(255,255,255,.08); }
+.capture {
+  border-color:color-mix(in srgb,var(--atelier-brass) 27%,var(--line-strong));
+  background:linear-gradient(135deg,rgba(255,248,224,.055),transparent 43%),color-mix(in srgb,var(--atelier-glass) 91%,transparent);
+  box-shadow:0 26px 74px rgba(0,0,0,.25),inset 0 1px rgba(255,248,224,.055);
+  backdrop-filter:blur(26px) saturate(120%); -webkit-backdrop-filter:blur(26px) saturate(120%);
+}
+.capture-head { padding-inline:4px; }
+.capture-title { font-size:16px; }
+.compose { border-color:rgba(232,223,200,.13); border-radius:15px; background:rgba(5,12,7,.39); line-height:1.75; }
+.compose:focus { border-color:color-mix(in srgb,var(--atelier-brass) 62%,var(--line-strong)); box-shadow:0 0 0 3px rgba(200,173,121,.10),inset 0 1px rgba(255,248,224,.025); }
+.compose::placeholder { color:#ABB3A2; opacity:.82; }
+.primary {
+  min-height:42px; border-radius:13px; background:linear-gradient(135deg,#D7C091,var(--atelier-brass));
+  color:#172014; box-shadow:0 7px 22px rgba(0,0,0,.18),inset 0 1px rgba(255,255,255,.28); font-size:11px; font-weight:700;
+}
+.primary:hover { box-shadow:0 10px 28px rgba(0,0,0,.24),0 0 0 1px rgba(200,173,121,.14); }
+.ghost,.icon-btn,.filter,.action { border-color:color-mix(in srgb,var(--line) 80%,transparent); }
+.ghost:hover,.icon-btn:hover,.action:hover { border-color:color-mix(in srgb,var(--atelier-brass) 34%,var(--line-strong)); background:rgba(200,173,121,.075); }
+.icon-btn { border-radius:13px; background:rgba(12,20,13,.60); }
+
+/* A curated reading library, not a generic dashboard. */
+.workspace { max-width:1180px; }
+.section-title { font-size:20px; }
+.count { display:inline-flex; align-items:center; min-height:23px; padding:2px 8px; border:1px solid var(--line); border-radius:999px; background:rgba(13,22,14,.58); color:var(--atelier-sage); font-size:10px; }
+.grid { gap:14px; }
+.item {
+  border-color:rgba(232,223,200,.105); border-radius:19px;
+  background:linear-gradient(145deg,rgba(255,248,224,.035),transparent 52%),rgba(13,22,14,.76);
+  box-shadow:inset 0 1px rgba(255,248,224,.035),0 12px 32px rgba(0,0,0,.12);
+  backdrop-filter:blur(18px) saturate(112%); -webkit-backdrop-filter:blur(18px) saturate(112%); transform:none;
+}
+.item:hover { transform:translateY(-2px); border-color:color-mix(in srgb,var(--atelier-brass) 31%,var(--line-strong)); box-shadow:inset 0 1px rgba(255,248,224,.055),0 18px 40px rgba(0,0,0,.19); }
+.item.pinned { border-color:color-mix(in srgb,var(--atelier-brass) 52%,var(--line-strong)); background:linear-gradient(145deg,rgba(200,173,121,.10),transparent 70%),rgba(16,27,18,.88); }
+.kind { font-size:9px; letter-spacing:.13em; }
+.kind::before { width:6px; height:6px; border-radius:50%; background:var(--atelier-brass); box-shadow:0 0 12px rgba(200,173,121,.22); }
+.item-title { font-size:16px; line-height:1.42; color:var(--text); }
+.item-text { color:color-mix(in srgb,var(--soft) 92%,transparent); font-size:12px; line-height:1.78; }
+.item-foot { border-color:rgba(232,223,200,.09); }
+.date { color:#9CA795; }
+.item-tag,.item-collection { border-color:rgba(200,173,121,.17); background:rgba(200,173,121,.065); color:#C5C9B7; }
+.item-collection { color:var(--atelier-brass); }
+.open-link { color:#B9BEAF; }
+.open-link:hover { color:var(--atelier-paper); }
+
+/* Disable per-card 3D transforms: keep motion subtle and inexpensive. */
+:root[data-effects="atmosphere"] .item,:root[data-effects="atmosphere"] .item:hover { transform:none !important; transform-style:flat !important; }
+:root[data-effects="atmosphere"] .item:hover { transform:translateY(-2px) !important; }
+
+/* Search, filters, dialogs, and controls share the same material language. */
+.search { min-height:40px; border-radius:12px; border-color:rgba(232,223,200,.13); background:rgba(8,16,11,.66); }
+.search:focus { border-color:color-mix(in srgb,var(--atelier-brass) 54%,var(--line-strong)); box-shadow:0 0 0 3px rgba(200,173,121,.10); }
+.filter { min-height:36px; border-radius:999px; padding-inline:13px; }
+.filter.active { color:var(--atelier-paper); border-color:rgba(200,173,121,.32); background:rgba(200,173,121,.11); }
+.modal {
+  border-color:color-mix(in srgb,var(--atelier-brass) 27%,var(--line-strong));
+  background:linear-gradient(145deg,rgba(255,248,224,.04),transparent 58%),rgba(12,20,13,.97);
+  box-shadow:0 36px 110px rgba(0,0,0,.50),inset 0 1px rgba(255,248,224,.045);
+  backdrop-filter:blur(24px) saturate(120%); -webkit-backdrop-filter:blur(24px) saturate(120%);
+}
+.modal-head h2 { font-size:26px; line-height:1.1; }
+.modal h3 { font-family:"Palatino Linotype","Book Antiqua",Baskerville,Georgia,serif; font-size:17px; font-weight:500; }
+.setting-row { border-color:rgba(232,223,200,.09); }
+.setting-row strong { font-size:12px; }
+.setting-row p { line-height:1.65; }
+.theme-options,.linka-select,.setting-row select { border-color:rgba(232,223,200,.14); background:rgba(6,13,8,.76); color:var(--text); }
+
+/* Replace redundant theme/accent pickers with one clear style identity. */
+.linka-appearance-card {
+  display:grid; gap:7px; margin:8px 0 17px; padding:16px 17px 17px;
+  border:1px solid rgba(200,173,121,.27); border-radius:18px;
+  background:radial-gradient(ellipse at 100% 0%,rgba(200,173,121,.10),transparent 52%),linear-gradient(140deg,rgba(255,248,224,.045),transparent 62%),rgba(13,22,14,.72);
+  box-shadow:inset 0 1px rgba(255,248,224,.045);
+}
+.linka-appearance-kicker { color:var(--atelier-brass); font-size:9px; font-weight:750; letter-spacing:.17em; }
+.linka-appearance-title { margin:0; color:var(--atelier-paper); font-size:25px; line-height:1.05; }
+.linka-appearance-description { margin:0; max-width:52ch; color:#AEB7A5; font-size:11px; line-height:1.72; }
+.linka-experience-panel,.linka-settings-block {
+  border-color:rgba(200,173,121,.18);
+  background:linear-gradient(145deg,rgba(255,248,224,.035),transparent 60%),rgba(13,22,14,.72);
+  box-shadow:inset 0 1px rgba(255,248,224,.035);
+}
+.linka-field,.linka-select { color:var(--text); }
+.linka-select,.linka-field input,.linka-field select { border:1px solid rgba(232,223,200,.15); border-radius:12px; background:rgba(6,13,8,.72); }
+.linka-button { min-height:39px; border-radius:12px; transition:background var(--motion-short) var(--ease-linka),border-color var(--motion-short) var(--ease-linka),transform var(--motion-micro) var(--ease-linka); }
+.linka-button:focus-visible,.linka-select:focus-visible,.linka-field input:focus-visible { outline:2px solid var(--atelier-brass); outline-offset:3px; }
+.linka-button-primary,.linka-button.primary { background:linear-gradient(135deg,#D7C091,var(--atelier-brass)); color:#172014; border-color:transparent; }
+.linka-muted { color:#AEB7A5; line-height:1.7; }
+
+.linka-command-dialog { border-color:rgba(200,173,121,.31); background:radial-gradient(ellipse at 100% 0%,rgba(200,173,121,.075),transparent 48%),rgba(10,18,11,.97); }
+.linka-command-mark { color:var(--atelier-brass); border-color:rgba(200,173,121,.28); background:linear-gradient(140deg,rgba(200,173,121,.17),rgba(26,41,29,.85)); }
+.linka-command-search { background:rgba(5,12,7,.76); }
+.linka-toast { border-color:rgba(200,173,121,.20); background:rgba(10,18,11,.94); }
+.linka-toast-action { color:var(--atelier-brass); }
+
+/* The document editor and player already use custom components; align their accents. */
+.linka-doc-window { border-color:rgba(200,173,121,.34) !important; }
+.linka-doc-mark { color:var(--atelier-brass) !important; border-color:rgba(200,173,121,.34) !important; }
+.linka-doc-btn.primary { background:var(--atelier-brass) !important; }
+.linka-doc-title:focus,.linka-doc-body-wrap:focus-within { border-color:rgba(200,173,121,.55) !important; box-shadow:0 0 0 3px rgba(200,173,121,.09); }
+.linka-player-dock { border-color:rgba(200,173,121,.30) !important; background:rgba(10,18,11,.91) !important; box-shadow:0 20px 56px rgba(0,0,0,.42),inset 0 1px rgba(255,248,224,.05) !important; }
+.linka-player-play { background:var(--atelier-brass) !important; color:#172014 !important; }
+
+/* Subtle scrollbars for long documents, dialogs and settings. */
+* { scrollbar-color:rgba(200,173,121,.36) rgba(8,16,11,.36); scrollbar-width:thin; }
+*::-webkit-scrollbar { width:9px; height:9px; }
+*::-webkit-scrollbar-track { background:rgba(8,16,11,.16); }
+*::-webkit-scrollbar-thumb { border:2px solid transparent; border-radius:999px; background:rgba(200,173,121,.36); background-clip:padding-box; }
+*::-webkit-scrollbar-thumb:hover { background:rgba(200,173,121,.58); background-clip:padding-box; }
+
+@media (min-width:1200px) {
+  html[data-platform="web"] .shell { max-width:1440px; }
+  html[data-platform="web"] .workspace { max-width:1240px; }
+  html[data-platform="desktop"] .shell { max-width:1680px; }
+  html[data-platform="desktop"] .workspace { max-width:none; }
+  html[data-platform="desktop"] .grid { gap:15px; }
+}
+@media (max-width:980px) { .hero h1 { font-size:clamp(42px,7vw,64px); } .capture { border-radius:21px; } }
+@media (max-width:760px) {
+  .shell { padding-bottom:max(100px,env(safe-area-inset-bottom)); }
+  .topbar { border-radius:16px; }
+  .hero h1 { font-size:clamp(42px,12vw,60px); }
+  .hero > p { max-width:38ch; }
+  .capture { padding:13px; border-radius:20px; }
+  .capture-head { align-items:flex-start; }
+  .capture-title { font-size:15px; }
+  .compose { min-height:96px; padding:14px; font-size:13px; }
+  .capture-foot { gap:12px; }
+  .workspace { margin-top:8px; }
+  .grid { grid-template-columns:minmax(0,1fr) !important; gap:10px; }
+  .item { padding:15px; border-radius:17px; }
+  .item-title { font-size:16px; }
+  .item-foot { align-items:flex-start; }
+  .actions { justify-content:flex-end; }
+  .modal { max-height:min(88dvh,820px); padding:18px; }
+  .linka-appearance-card { padding:14px; }
+  .linka-appearance-title { font-size:23px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  #linka-atmosphere video,#linka-atmosphere img { animation:none !important; transition:none !important; }
+  .item,.capture,.topbar,.linka-appearance-card,.linka-player-dock { transition:none !important; }
+}
