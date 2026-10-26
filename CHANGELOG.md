@@ -6,6 +6,7 @@
 - Refined the Web sidebar with a warmer moving active state, clearer icon emphasis and a quieter status footer.
 - Reworked the capture canvas, language picker, search field, filter chips, selection state, empty library, bulk-action toolbar and card actions to share the Forest Atelier control language.
 - Added more deliberate keyboard focus halos, themed scrollbars and responsive filter scrolling on narrow windows.
+- Refined document-editor typography, save status, input focus, music transport buttons, seek/volume controls, playlist rows and atmosphere toggles with the same forest-and-brass control language.
 - Polished hover and press feedback while preserving the reduced-motion and in-app reduced-motion settings.
 - Kept the Windows shell compact; shared component styling follows the same Forest Atelier tokens used by Web.
 
