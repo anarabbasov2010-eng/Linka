@@ -4,6 +4,7 @@ import { initVisualSystem } from "./visual-system.js";
 import { initLinkaAtmosphere, openAtmosphereSettings } from "./atmosphere.js";
 import { initLinkaDocuments, searchLinkaDocuments, openLinkaDocumentById } from "./documents.js";
 import { initLinkaSignature } from "./signature-theme.js";
+import { initLinkaUtilityPanel } from "./utility-panel.js";
 import {
   addDeletedId, addDeletedIds, removeDeletedIds, disconnectCloud, getCloudConfig, getCloudSession,
   getOtpCooldown, readDeletedIds, requestEmailOtp, saveCloudConfig, syncCloudCaptures, mergeCloudCaptures,
@@ -1258,6 +1259,7 @@ window.addEventListener("linka:open-agreement", () => showAgreement({ mustAccept
 initLinkaExperience();
 initLinkaSignature();
 initVisualSystem();
+initLinkaUtilityPanel();
 setTimeout(showCaptureRecoveryNotice, 700);
 void initLinkaAtmosphere().catch(error => console.warn("Linka atmosphere could not start", error));
 void initLinkaDocuments().catch(error => console.warn("Linka documents could not start", error));

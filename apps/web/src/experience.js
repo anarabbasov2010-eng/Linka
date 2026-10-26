@@ -688,6 +688,21 @@ function showAccount({ firstRun = false } = {}) {
 
   const dialog = modal(tr("startTitle"), tr("startBody"), { onboarding: firstRun });
   const panel = dialog.panel;
+  dialog.layer.classList.add("linka-auth-layer");
+  panel.classList.add("linka-auth-panel");
+  const authCopy = ({
+    en: ["A QUIET PLACE FOR WHAT MATTERS", "Your personal library, at your pace.", "Your library stays on this device unless you choose to sync."],
+    ru: ["ТИХОЕ МЕСТО ДЛЯ ВАЖНОГО", "Твоя личная библиотека — в своём ритме.", "Данные остаются на устройстве, пока ты сам не включишь синхронизацию."],
+    az: ["VACİB OLANLAR ÜÇÜN SAKİN MƏKAN", "Şəxsi kitabxanan, öz ritmində.", "Sinxronizasiyanı seçməyincə kitabxanan bu cihazda qalır."],
+    tr: ["ÖNEMLİ ŞEYLER İÇİN SAKİN BİR YER", "Kişisel kitaplığın, kendi ritminde.", "Eşitlemeyi seçmediğin sürece kitaplığın bu cihazda kalır."]
+  })[langCode()] || ["A QUIET PLACE FOR WHAT MATTERS", "Your personal library, at your pace.", "Your library stays on this device unless you choose to sync."];
+  const authIntro = make("div", "linka-auth-intro");
+  authIntro.append(
+    make("span", "linka-auth-eyebrow", authCopy[0]),
+    make("h3", "linka-auth-headline", authCopy[1]),
+    make("p", "linka-auth-description", authCopy[2])
+  );
+  panel.querySelector(".modal-head")?.insertAdjacentElement("afterend", authIntro);
   const service = configForm(panel, getCloudConfig(), true);
   const email = field(tr("email"), "email", "", "you@example.com");
   const code = field(tr("code"), "text", "", "000000");
@@ -701,7 +716,7 @@ function showAccount({ firstRun = false } = {}) {
   const sendLogin = button(tr("sendLogin"), "linka-button linka-button-secondary");
   const verify = button(tr("verify"));
   verify.hidden = true;
-  const offline = button(tr("continueOffline"), "linka-button linka-button-secondary");
+  const offline = button(tr("continueOffline"), "linka-button linka-button-secondary linka-auth-offline");
   const actions = make("div", "linka-actions");
   actions.append(sendCreate, sendLogin, verify);
   const form = make("form", "linka-form-stack");
@@ -710,12 +725,14 @@ function showAccount({ firstRun = false } = {}) {
     if (verify.hidden) sendLogin.click(); else verify.click();
   });
   form.append(email.wrap, code.wrap, status, actions);
-  const emailFallback = make("details", "linka-config linka-email-fallback");
+  const emailFallback = make("details", "linka-config linka-email-fallback linka-auth-email-fallback");
   const emailFallbackSummary = make("summary", "", tr("emailFallback"));
   emailFallback.append(emailFallbackSummary, form);
   const googleStatus = make("p", "linka-status");
-  const googleButton = button(tr("googleSignIn"));
+  const googleButton = button(tr("googleSignIn"), "linka-button linka-google-button");
   googleButton.setAttribute("data-auth-action", "google");
+  const googleLabel = googleButton.textContent;
+  googleButton.replaceChildren(make("span", "linka-google-mark", "G"), make("span", "linka-google-label", googleLabel));
   googleButton.addEventListener("click", async () => {
     googleButton.disabled = true;
     try {
@@ -918,6 +935,60 @@ function showSettings() {
   materialsSection.append(resetAppearance);
   dialog.panel.append(materialsSection);
 
+
+  const plansCopy = ({
+    en: {
+      title: "The future of Linka",
+      intro: "All features and appearance controls are free today. These tiers are a roadmap only — nothing is locked and no payment is being requested.",
+      badges: ["Included now", "Planned", "Planned"], names: ["Free", "Pro", "Ultimate"],
+      descriptions: ["The complete Linka experience, available now.", "More ways to shape colors, materials and saved looks.", "A deeply personal workspace with custom image and video atmospheres."],
+      features: [["All current tools are unlocked", "Glass and appearance controls", "Local library and optional cloud sync"], ["Expanded color and surface profiles", "Reusable themes and material presets", "More detailed layout personalization"], ["Custom image and video backgrounds", "Advanced atmosphere and motion controls", "Portable visual profiles"]]
+    },
+    ru: {
+      title: "Будущее Linka",
+      intro: "Сейчас все функции и настройки оформления бесплатны. Тарифы ниже — только план развития: ничего не заблокировано, оплата не требуется.",
+      badges: ["Доступно сейчас", "В планах", "В планах"], names: ["Free", "Pro", "Ultimate"],
+      descriptions: ["Полноценная Linka, доступная уже сейчас.", "Больше способов настраивать цвета, материалы и сохранённые стили.", "Персональное рабочее пространство с собственными фото- и видеофонами."],
+      features: [["Все текущие функции открыты", "Настройки стекла и оформления", "Локальная библиотека и облако по желанию"], ["Расширенные цветовые профили", "Сохраняемые темы и пресеты материалов", "Более тонкая настройка интерфейса"], ["Свои фото- и видеофоны", "Расширенные эффекты атмосферы и движения", "Переносимые профили оформления"]]
+    },
+    az: {
+      title: "Linka-nın gələcəyi",
+      intro: "Hazırda bütün funksiyalar və görünüş parametrləri pulsuzdur. Bu planlar yalnız gələcək yol xəritəsidir — heç nə kilidlənməyib və ödəniş tələb olunmur.",
+      badges: ["İndi daxildir", "Planlaşdırılır", "Planlaşdırılır"], names: ["Free", "Pro", "Ultimate"],
+      descriptions: ["Bütün imkanları ilə Linka artıq əlçatandır.", "Rəngləri, materialları və saxlanılan görünüşləri daha geniş fərdiləşdirmə.", "Şəxsi şəkil və video atmosferləri olan fərdi iş məkanı."],
+      features: [["Bütün hazırkı funksiyalar açıqdır", "Şüşə və görünüş parametrləri", "Lokal kitabxana və istəyə bağlı bulud"], ["Genişləndirilmiş rəng profilləri", "Saxlanılan mövzular və material presetləri", "Daha detallı interfeys fərdiləşdirməsi"], ["Şəxsi şəkil və video fonları", "Qabaqcıl atmosfer və hərəkət idarəsi", "Daşına bilən görünüş profilləri"]]
+    },
+    tr: {
+      title: "Linka'nın geleceği",
+      intro: "Şu anda tüm özellikler ve görünüm ayarları ücretsiz. Bu planlar yalnızca yol haritasıdır — hiçbir özellik kilitli değil ve ödeme gerekmiyor.",
+      badges: ["Şimdi dahil", "Planlanıyor", "Planlanıyor"], names: ["Free", "Pro", "Ultimate"],
+      descriptions: ["Tüm özellikleriyle Linka, şimdi kullanılabilir.", "Renkleri, malzemeleri ve kayıtlı görünümleri daha kapsamlı kişiselleştirme.", "Özel görsel ve video atmosferlerine sahip kişisel çalışma alanı."],
+      features: [["Mevcut tüm araçlar açık", "Cam ve görünüm kontrolleri", "Yerel kitaplık ve isteğe bağlı bulut"], ["Genişletilmiş renk profilleri", "Kaydedilebilir temalar ve malzeme hazır ayarları", "Daha ayrıntılı arayüz kişiselleştirme"], ["Özel görsel ve video arka planları", "Gelişmiş atmosfer ve hareket kontrolleri", "Taşınabilir görünüm profilleri"]]
+    }
+  })[langCode()] || null;
+  const planText = plansCopy || {
+    title: "The future of Linka",
+    intro: "All features and appearance controls are free today. These tiers are a roadmap only — nothing is locked and no payment is being requested.",
+    badges: ["Included now", "Planned", "Planned"], names: ["Free", "Pro", "Ultimate"],
+    descriptions: ["The complete Linka experience, available now.", "More ways to shape colors, materials and saved looks.", "A deeply personal workspace with custom image and video atmospheres."],
+    features: [["All current tools are unlocked", "Glass and appearance controls", "Local library and optional cloud sync"], ["Expanded color and surface profiles", "Reusable themes and material presets", "More detailed layout personalization"], ["Custom image and video backgrounds", "Advanced atmosphere and motion controls", "Portable visual profiles"]]
+  };
+  const plansSection = make("section", "linka-settings-block linka-plans-section");
+  plansSection.append(make("h3", "", planText.title), make("p", "linka-muted linka-plans-intro", planText.intro));
+  const plansGrid = make("div", "linka-plans-grid");
+  planText.names.forEach((name, index) => {
+    const card = make("article", "linka-plan-card" + (index === 0 ? " is-current" : " is-future"));
+    card.dataset.plan = name.toLowerCase();
+    const head = make("div", "linka-plan-head");
+    head.append(make("h4", "", name), make("span", "linka-plan-badge" + (index === 0 ? " is-current" : ""), planText.badges[index]));
+    card.append(head, make("p", "linka-plan-description", planText.descriptions[index]));
+    const list = make("ul", "linka-plan-features");
+    planText.features[index].forEach(feature => list.append(make("li", "", feature)));
+    card.append(list);
+    plansGrid.append(card);
+  });
+  plansSection.append(plansGrid);
+  dialog.panel.append(plansSection);
 
   const soundSection = make("div", "linka-settings-block");
   soundSection.append(make("h3", "", tr("ambientSound")), make("p", "linka-muted", tr("ambientSoundBody")));

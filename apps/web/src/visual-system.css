@@ -1442,3 +1442,136 @@ html.reduced-motion .linka-atmosphere-toggle,
 html.reduced-motion .linka-atmosphere-actions button {
   transition: none !important; animation: none !important;
 }
+
+
+/* Utility panel: the top edge quietly reveals the time, opt-in weather and account state. */
+.linka-utility-root { position:fixed; inset:0 0 auto; z-index:12000; height:0; pointer-events:none; isolation:isolate; }
+.linka-utility-edge {
+  position:fixed; z-index:2; top:0; left:50%; transform:translateX(-50%); display:grid; place-items:start center;
+  width:150px; height:18px; padding:0; border:0; border-radius:0 0 16px 16px; background:transparent;
+  color:var(--text); pointer-events:auto; cursor:pointer;
+}
+.linka-utility-handle {
+  display:block; width:66px; height:5px; margin-top:5px; border-radius:999px;
+  background:linear-gradient(90deg,rgba(200,173,121,.46),var(--atelier-brass),rgba(200,173,121,.46));
+  box-shadow:0 0 15px rgba(200,173,121,.22);
+  transition:width 280ms var(--ease-linka),height 200ms var(--ease-linka),margin 200ms var(--ease-linka),opacity 200ms var(--ease-linka);
+}
+.linka-utility-edge:hover .linka-utility-handle,.linka-utility-edge:focus-visible .linka-utility-handle,.linka-utility-root.is-open .linka-utility-handle { width:88px;height:4px;margin-top:3px;opacity:.95; }
+.linka-utility-edge:focus-visible { outline:2px solid var(--atelier-brass); outline-offset:2px; }
+.linka-utility-panel {
+  position:fixed; z-index:1; top:0; left:50%; display:grid; gap:15px; width:min(790px,calc(100vw - 28px));
+  max-height:min(72vh,540px); overflow:auto; padding:23px 22px 20px; border:1px solid rgba(200,173,121,.30);
+  border-top:0; border-radius:0 0 25px 25px; color:var(--text);
+  background:radial-gradient(ellipse at 5% 0%,rgba(200,173,121,.12),transparent 42%),radial-gradient(ellipse at 100% 0%,rgba(92,126,86,.18),transparent 48%),linear-gradient(145deg,rgba(255,248,224,.055),transparent 55%),rgba(8,16,11,.95);
+  box-shadow:0 28px 85px rgba(0,0,0,.40),0 1px 0 rgba(255,248,224,.07) inset;
+  backdrop-filter:blur(30px) saturate(135%); -webkit-backdrop-filter:blur(30px) saturate(135%);
+  opacity:0; visibility:hidden; pointer-events:none; transform:translate(-50%,-108%);
+  transition:transform 420ms cubic-bezier(.16,1,.3,1),opacity 260ms ease,visibility 0s linear 440ms; will-change:transform,opacity;
+}
+.linka-utility-root.is-open .linka-utility-panel {
+  opacity:1; visibility:visible; pointer-events:auto; transform:translate(-50%,0);
+  transition:transform 420ms cubic-bezier(.16,1,.3,1),opacity 260ms ease,visibility 0s;
+}
+.linka-utility-panel::before { content:"";position:absolute;top:0;left:12%;right:12%;height:1px;background:linear-gradient(90deg,transparent,rgba(200,173,121,.46),transparent);pointer-events:none; }
+.linka-utility-panel-top { display:flex;justify-content:space-between;align-items:center;gap:12px;min-width:0; }
+.linka-utility-brand { display:flex;align-items:center;gap:9px;color:var(--atelier-brass);font-size:9px;font-weight:800;letter-spacing:.18em; }
+.linka-utility-brand-mark { display:grid;place-items:center;width:25px;height:25px;border:1px solid rgba(200,173,121,.32);border-radius:9px;background:linear-gradient(145deg,rgba(200,173,121,.17),rgba(25,41,28,.75));color:var(--atelier-brass);font:14px Georgia,serif;letter-spacing:0; }
+.linka-utility-close { display:grid;place-items:center;flex:none;width:30px;height:30px;padding:0;border:1px solid rgba(232,223,200,.16);border-radius:10px;background:rgba(255,248,224,.045);color:var(--soft);cursor:pointer;transition:background 180ms var(--ease-linka),border-color 180ms var(--ease-linka),transform 180ms var(--ease-linka); }
+.linka-utility-close:hover { border-color:rgba(200,173,121,.38);background:rgba(200,173,121,.09);transform:rotate(3deg); }
+.linka-utility-close svg { width:14px;height:14px; }
+.linka-utility-grid { display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1.25fr) minmax(0,.95fr);gap:11px; }
+.linka-utility-card { position:relative;display:flex;flex-direction:column;justify-content:center;min-width:0;min-height:132px;padding:15px;border:1px solid rgba(232,223,200,.12);border-radius:18px;background:linear-gradient(145deg,rgba(255,248,224,.045),transparent 54%),rgba(255,255,255,.025);box-shadow:0 1px 0 rgba(255,248,224,.035) inset; }
+.linka-utility-label { color:#B5BCA9;font-size:9px;font-weight:780;letter-spacing:.14em;line-height:1.35; }
+.linka-utility-time { display:block;margin:10px 0 2px;color:#F0E8D4;font-size:clamp(30px,4vw,43px);font-variant-numeric:tabular-nums;letter-spacing:-.065em;line-height:1; }
+.linka-utility-date { margin-top:8px;color:#AEB7A5;font-size:11px;line-height:1.45;text-transform:capitalize; }
+.linka-utility-weather-main { display:flex;align-items:center;gap:12px;min-width:0;margin-top:8px; }
+.linka-utility-weather-icon { display:grid;place-items:center;flex:none;width:47px;height:47px;border:1px solid rgba(200,173,121,.22);border-radius:15px;background:rgba(200,173,121,.07);color:var(--atelier-brass); }
+.linka-utility-weather-icon svg { width:27px;height:27px; }
+.linka-utility-temperature { display:block;color:#F0E8D4;font-size:34px;font-weight:550;font-variant-numeric:tabular-nums;letter-spacing:-.055em;line-height:1; }
+.linka-utility-weather-copy { min-width:0; }
+.linka-utility-weather-description { display:block;overflow:hidden;margin-top:5px;color:#B5BCA9;font-size:11px;text-overflow:ellipsis;white-space:nowrap; }
+.linka-utility-weather-meta { margin-top:9px;color:#929D8E;font-size:10px;line-height:1.5; }
+.linka-utility-actions { display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:9px; }
+.linka-utility-action { min-height:28px;padding:5px 9px;border:1px solid rgba(200,173,121,.26);border-radius:9px;background:rgba(200,173,121,.08);color:var(--atelier-brass);font:inherit;font-size:10px;font-weight:700;cursor:pointer;transition:background 180ms var(--ease-linka),border-color 180ms var(--ease-linka),transform 180ms var(--ease-linka); }
+.linka-utility-action:hover:not(:disabled) { border-color:rgba(200,173,121,.52);background:rgba(200,173,121,.14);transform:translateY(-1px); }
+.linka-utility-action:disabled { opacity:.58;cursor:wait; }
+.linka-utility-action.is-subtle { border-color:transparent;background:transparent;color:#AEB7A5; }
+.linka-utility-action.is-subtle:hover { color:var(--atelier-brass);background:rgba(255,248,224,.045); }
+.linka-utility-footer { display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:2px; }
+.linka-utility-status { display:flex;align-items:flex-start;gap:9px;min-width:0; }
+.linka-utility-status-dot { flex:none;width:7px;height:7px;margin-top:5px;border-radius:50%;background:#9BAE83;box-shadow:0 0 0 4px rgba(155,174,131,.08),0 0 12px rgba(155,174,131,.18); }
+.linka-utility-status-copy { display:grid;gap:3px;min-width:0; }
+.linka-utility-status-copy strong { color:#DADCCB;font-size:11px;font-weight:650; }
+.linka-utility-status-copy small { color:#929D8E;font-size:10px;line-height:1.4; }
+.linka-utility-settings { flex:none;min-height:32px;padding:7px 11px;border:1px solid rgba(232,223,200,.13);border-radius:10px;background:rgba(255,248,224,.035);color:#CFD4C5;font:inherit;font-size:10px;font-weight:700;cursor:pointer; }
+.linka-utility-settings:hover { border-color:rgba(200,173,121,.36);color:var(--atelier-brass); }
+.linka-utility-panel button:focus-visible { outline:2px solid var(--atelier-brass);outline-offset:3px; }
+.linka-utility-panel [hidden] { display:none!important; }
+
+.linka-auth-layer .modal { width:min(490px,100%);padding:clamp(20px,4vw,30px); }
+.linka-auth-panel .modal-head { align-items:flex-start;gap:14px;margin-bottom:17px; }
+.linka-auth-panel .modal-logo { width:43px;height:43px;flex:none;border-radius:14px; }
+.linka-auth-panel .linka-modal-copy h2 { font-size:clamp(25px,4vw,30px);letter-spacing:-.055em; }
+.linka-auth-panel .linka-modal-copy p { font-size:12px;line-height:1.65; }
+.linka-auth-intro { position:relative;overflow:hidden;margin:0 0 18px;padding:17px 18px 16px;border:1px solid rgba(200,173,121,.24);border-radius:17px;background:radial-gradient(ellipse at 100% 0%,rgba(200,173,121,.14),transparent 50%),linear-gradient(135deg,rgba(255,248,224,.055),transparent 65%),rgba(5,13,8,.35); }
+.linka-auth-intro::after { content:"";position:absolute;right:-35px;bottom:-65px;width:135px;height:135px;border:1px solid rgba(200,173,121,.13);border-radius:50%;box-shadow:0 0 0 17px rgba(200,173,121,.025),0 0 0 36px rgba(200,173,121,.018);pointer-events:none; }
+.linka-auth-eyebrow { display:block;color:var(--atelier-brass);font-size:8px;font-weight:800;letter-spacing:.16em;line-height:1.6; }
+.linka-auth-headline { position:relative;z-index:1;margin:6px 0;color:#EEE7D4;font:500 21px/1.15 "Palatino Linotype","Book Antiqua",Baskerville,Georgia,serif;letter-spacing:-.035em; }
+.linka-auth-description { position:relative;z-index:1;max-width:43ch;margin:0;color:#AEB7A5;font-size:11px;line-height:1.65; }
+.linka-auth-panel .linka-google-button { display:flex;align-items:center;justify-content:center;gap:11px;width:100%;min-height:48px;margin:2px 0 8px;border:1px solid rgba(255,255,255,.68);border-radius:14px;background:#F6F4EE;color:#20231F;box-shadow:0 7px 22px rgba(0,0,0,.14),0 1px 0 rgba(255,255,255,.85) inset;font-size:12px;font-weight:750; }
+.linka-auth-panel .linka-google-button:hover:not(:disabled) { border-color:#fff;background:#fff;transform:translateY(-1px); }
+.linka-google-mark { display:grid;place-items:center;width:23px;height:23px;border-radius:50%;background:#fff;color:#4285F4;font:800 18px/1 Arial,sans-serif;text-shadow:1px 0 #34A853,-1px 1px #FBBC05; }
+.linka-auth-panel .linka-status { margin:2px 0 9px; }
+.linka-auth-email-fallback { margin:8px 0 10px;border:1px solid rgba(232,223,200,.12);border-radius:13px;background:rgba(255,248,224,.025); }
+.linka-auth-email-fallback > summary { padding:12px 13px;color:#D0D3C5;font-size:11px;font-weight:650; }
+.linka-auth-email-fallback[open] > summary { border-bottom:1px solid rgba(232,223,200,.09);color:var(--atelier-brass); }
+.linka-auth-email-fallback .linka-form-stack { padding:14px; }
+.linka-auth-panel .linka-config:not(.linka-auth-email-fallback) { margin:12px 0; }
+.linka-auth-offline { width:100%;min-height:40px;border-color:transparent;background:transparent;color:#AEB7A5;font-size:11px; }
+.linka-auth-offline:hover { color:var(--atelier-brass);background:rgba(255,248,224,.035); }
+
+.linka-plans-section { margin-top:18px; }
+.linka-plans-intro { margin:4px 0 14px;font-size:11px; }
+.linka-plans-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px; }
+.linka-plan-card { min-width:0;padding:13px;border:1px solid rgba(232,223,200,.12);border-radius:15px;background:rgba(5,13,8,.24); }
+.linka-plan-card.is-current { border-color:rgba(155,174,131,.38);background:linear-gradient(145deg,rgba(155,174,131,.075),transparent 65%),rgba(5,13,8,.28); }
+.linka-plan-card.is-future { border-style:dashed;border-color:rgba(200,173,121,.23); }
+.linka-plan-head { display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:7px; }
+.linka-plan-head h4 { margin:0;color:var(--text);font:600 16px/1.2 "Palatino Linotype","Book Antiqua",Baskerville,Georgia,serif; }
+.linka-plan-badge { display:inline-flex;padding:4px 6px;border:1px solid rgba(200,173,121,.2);border-radius:999px;color:var(--atelier-brass);font-size:8px;font-weight:750;line-height:1.2; }
+.linka-plan-badge.is-current { border-color:rgba(155,174,131,.26);background:rgba(155,174,131,.08);color:#BBD1A0; }
+.linka-plan-description { min-height:55px;margin:10px 0 11px;color:#AEB7A5;font-size:10px;line-height:1.55; }
+.linka-plan-features { display:grid;gap:7px;margin:0;padding:0;list-style:none; }
+.linka-plan-features li { position:relative;padding-left:12px;color:#D0D3C5;font-size:10px;line-height:1.45; }
+.linka-plan-features li::before { content:"";position:absolute;left:0;top:.48em;width:4px;height:4px;border-radius:50%;background:var(--atelier-brass); }
+
+@media (max-width:700px) {
+  .linka-utility-panel { width:calc(100vw - 18px);max-height:min(80dvh,650px);padding:22px 13px 14px;border-radius:0 0 20px 20px;gap:12px; }
+  .linka-utility-grid { grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px; }
+  .linka-utility-card { min-height:118px;padding:12px;border-radius:15px; }
+  .linka-utility-card-weather { grid-column:1/-1; }
+  .linka-utility-weather-main { margin-top:10px; }
+  .linka-utility-temperature { font-size:31px; }
+  .linka-utility-weather-icon { width:42px;height:42px; }
+  .linka-utility-weather-meta { margin-top:7px; }
+  .linka-utility-actions { margin-top:7px; }
+  .linka-utility-footer { align-items:flex-start; }
+  .linka-auth-layer { padding:10px!important; }
+  .linka-auth-layer .modal { padding:19px; }
+  .linka-plans-grid { grid-template-columns:minmax(0,1fr); }
+  .linka-plan-description { min-height:0; }
+}
+@media (max-width:390px) {
+  .linka-utility-grid { grid-template-columns:minmax(0,1fr); }
+  .linka-utility-card { min-height:105px; }
+  .linka-utility-card-weather { grid-column:auto; }
+  .linka-utility-time { font-size:36px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .linka-utility-panel,.linka-utility-handle,.linka-utility-action,.linka-utility-close { transition:none!important; }
+  .linka-utility-panel { transform:translate(-50%,0); }
+}
+@media (prefers-reduced-transparency:reduce) {
+  .linka-utility-panel { background:rgba(8,16,11,.99);backdrop-filter:none;-webkit-backdrop-filter:none; }
+}
