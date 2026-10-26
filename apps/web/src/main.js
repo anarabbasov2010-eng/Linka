@@ -162,6 +162,7 @@ function showCaptureRecoveryNotice() {
 
   const panel = document.createElement("section");
   panel.id = "linka-capture-recovery";
+  panel.classList.add("linka-recovery-panel");
   panel.setAttribute("role", "alertdialog");
   panel.setAttribute("aria-modal", "false");
   panel.setAttribute("aria-labelledby", "linka-capture-recovery-title");
@@ -203,7 +204,10 @@ function showCaptureRecoveryNotice() {
     }
     captures = [];
     persistedCaptures = [];
-    panel.remove();
+    panel.classList.add("is-leaving");
+    panel.inert = true;
+    panel.setAttribute("aria-hidden", "true");
+    window.setTimeout(() => panel.remove(), motionIsReduced() ? 0 : 220);
     render();
     say(copy.freshDone);
   });
