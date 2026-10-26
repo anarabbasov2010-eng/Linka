@@ -216,6 +216,7 @@ export function initVisualSystem() {
   let currentCommands = [];
   let activeIndex = 0;
   let previousFocus = null;
+  let paletteCloseTimer = 0;
 
   const notify = text => toast(text);
   const commands = [
@@ -288,17 +289,30 @@ export function initVisualSystem() {
     });
   }
   function closePalette() {
-    if (palette.hidden) return;
-    palette.hidden = true;
+    if (palette.hidden || palette.classList.contains("is-closing")) return;
     root.classList.remove("palette-open");
+    palette.setAttribute("aria-hidden", "true");
+    if (reducedMotion) {
+      palette.hidden = true;
+      return;
+    }
+    palette.classList.add("is-closing");
+    window.clearTimeout(paletteCloseTimer);
+    paletteCloseTimer = window.setTimeout(() => {
+      palette.hidden = true;
+      palette.classList.remove("is-closing");
+    }, 190);
     if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
   }
   function openPalette() {
+    window.clearTimeout(paletteCloseTimer);
+    palette.classList.remove("is-closing");
     previousFocus = document.activeElement;
     commandInput.value = "";
     activeIndex = 0;
     renderCommands();
     palette.hidden = false;
+    palette.setAttribute("aria-hidden", "false");
     root.classList.add("palette-open");
     requestAnimationFrame(() => commandInput.focus());
   }
