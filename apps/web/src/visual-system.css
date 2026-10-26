@@ -811,3 +811,62 @@ html.reduced-motion .linka-command-root.is-closing .linka-command-dialog,
 html.reduced-motion .linka-command-root.is-closing .linka-command-backdrop {
   animation: none !important;
 }
+
+
+/* Registered material tokens interpolate instead of snapping when sliders move. */
+@property --atelier-glass-opacity {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: .78;
+}
+@property --atelier-glass-blur {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 20px;
+}
+@property --atelier-glass-saturation {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 115%;
+}
+@property --atelier-background-dim {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: .72;
+}
+:root {
+  transition:
+    --atelier-glass-opacity 190ms var(--atelier-ease),
+    --atelier-glass-blur 190ms var(--atelier-ease),
+    --atelier-glass-saturation 190ms var(--atelier-ease),
+    --atelier-background-dim 190ms var(--atelier-ease);
+}
+.topbar,.capture,.item,.modal,.linka-settings-block,.linka-experience-panel {
+  transition:
+    background 260ms var(--atelier-ease),
+    border-color 260ms var(--atelier-ease),
+    box-shadow 260ms var(--atelier-ease),
+    backdrop-filter 260ms var(--atelier-ease),
+    -webkit-backdrop-filter 260ms var(--atelier-ease),
+    transform 320ms var(--atelier-ease);
+}
+#linka-atmosphere .veil { transition: opacity 260ms var(--atelier-ease); }
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    transition: none !important;
+  }
+  .topbar,.capture,.item,.modal,.linka-settings-block,.linka-experience-panel,
+  #linka-atmosphere .veil {
+    transition: none !important;
+  }
+}
+html.reduced-motion :root,
+html.reduced-motion .topbar,
+html.reduced-motion .capture,
+html.reduced-motion .item,
+html.reduced-motion .modal,
+html.reduced-motion .linka-settings-block,
+html.reduced-motion .linka-experience-panel,
+html.reduced-motion #linka-atmosphere .veil {
+  transition: none !important;
+}
