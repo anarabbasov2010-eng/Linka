@@ -2,6 +2,7 @@
 
 ## Next — Navigation and component polish
 
+- Replaced font-dependent sidebar glyphs with a consistent SVG stroke icon set and localized the privacy/status footer across English, Russian, Azerbaijani and Turkish.
 - Refined the Web sidebar with a warmer moving active state, clearer icon emphasis and a quieter status footer.
 - Reworked the capture canvas, language picker, search field, filter chips, selection state, empty library, bulk-action toolbar and card actions to share the Forest Atelier control language.
 - Added more deliberate keyboard focus halos, themed scrollbars and responsive filter scrolling on narrow windows.
