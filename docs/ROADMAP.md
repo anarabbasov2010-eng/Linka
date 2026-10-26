@@ -251,3 +251,16 @@ This file is the persistent project checklist for the Linka improvements audit. 
 3. Treat any item marked [~] as incomplete until the missing integration or verification is performed.
 4. Update this roadmap whenever a stage materially changes status.
 5. Prioritize data integrity and recoverability, then reliable Windows/web build and release flows, then navigation/search/editor, then advanced surfaces and optional AI.
+
+## Resume trigger
+
+When the user writes **ХАЙ** in a new chat, resume Linka work from this repository and this roadmap without asking them to repeat the project brief.
+
+- Repository: https://github.com/anarabbasov2010-eng/Linka
+- Working branch: `enhancements/library-workflows`
+- Pull request: https://github.com/anarabbasov2010-eng/Linka/pull/11
+- Scope: Windows desktop + Web; do not spend effort on Android.
+- Read this roadmap and inspect the current branch state, recent commits, open checks, and PR before editing.
+- Continue from the highest-priority incomplete item; inspect current code first, implement, run the most relevant available tests, inspect the diff, and update this checklist.
+- Do not merge to `main` without the user's explicit permission.
+- The checklist consolidates the audit details available to the project; if the original full prompt is supplied again, reconcile every item against this file so nothing is lost.
