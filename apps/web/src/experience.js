@@ -5,7 +5,7 @@ import {
   requestEmailOtp, saveCloudConfig, saveLinkaProfile, verifyEmailOtp,
   startGoogleOAuth, completeGoogleOAuthCallback
 } from "./cloud-sync.js";
-import { setLinkaTheme, setLinkaAccent, setLinkaDensity, setLinkaEffects } from "./visual-system.js";
+import { setLinkaDensity, setLinkaEffects } from "./visual-system.js";
 
 const LANG_KEY = "linka.language.v1";
 const ONBOARDED_KEY = "linka.experience.onboarded.v1";
@@ -831,20 +831,20 @@ function showSettings() {
     dialog.panel.append(field);
     return select;
   };
-  addPreference(tr("theme"), [
-    { value: "forest", label: preferenceLabels.forest || "Forest" },
-    { value: "dark", label: tr("dark") },
-    { value: "light", label: tr("light") },
-    { value: "system", label: tr("system") },
-    { value: "oled", label: preferenceLabels.oled || "OLED black" }
-  ], localStorage.getItem("linka.theme") || "forest", setLinkaTheme);
-  addPreference(preferenceLabels.accent || "Accent color", [
-    { value: "forest", label: preferenceLabels.forest || "Forest" },
-    { value: "violet", label: "Violet" },
-    { value: "blue", label: "Blue" },
-    { value: "mint", label: "Mint" },
-    { value: "rose", label: "Rose" }
-  ], localStorage.getItem("linka.accent") || "forest", setLinkaAccent);
+  const appearanceCopy = ({
+    en: ["THE LINKA SIGNATURE", "Forest Atelier", "One signature look: a twilight forest, bookish typography and restrained brass accents."],
+    ru: ["ФИРМЕННЫЙ СТИЛЬ LINKA", "Forest Atelier", "Единое оформление: сумеречный лес, книжная типографика и мягкие латунные акценты."],
+    az: ["LINKA-NIN İMZA ÜSLUBU", "Forest Atelier", "Vahid görünüş: alaqaranlıq meşə, kitab tipografiyası və zərif latun vurğuları."],
+    tr: ["LINKA'NIN İMZA STİLİ", "Forest Atelier", "Tek bir görünüm: alacakaranlık ormanı, kitap karakterli tipografi ve ölçülü pirinç vurgular."]
+  })[langCode()] || ["THE LINKA SIGNATURE", "Forest Atelier", "A twilight forest, bookish typography and restrained brass accents."];
+  const appearanceCard = make("section", "linka-appearance-card");
+  appearanceCard.append(
+    make("span", "linka-appearance-kicker", appearanceCopy[0]),
+    make("h3", "linka-appearance-title", appearanceCopy[1]),
+    make("p", "linka-appearance-description", appearanceCopy[2])
+  );
+  dialog.panel.append(appearanceCard);
+
   addPreference(preferenceLabels.density || "Interface density", [
     { value: "compact", label: preferenceLabels.compact || "Compact" },
     { value: "standard", label: preferenceLabels.standard || "Standard" },
