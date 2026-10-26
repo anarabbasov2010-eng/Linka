@@ -1,5 +1,12 @@
 export const STORAGE_KEY = "linka.captures.v1";
 export const RECOVERY_KEY = "linka.captures.recovery.v1";
+export const COLLECTION_COLORS = Object.freeze(["violet", "blue", "mint", "rose", "amber", "slate", "teal"]);
+const COLLECTION_COLOR_SET = new Set(COLLECTION_COLORS);
+
+export function normalizeCollectionColor(value) {
+  const color = String(value || "").trim().toLowerCase();
+  return COLLECTION_COLOR_SET.has(color) ? color : "";
+}
 
 export function normalizePreviewImageUrl(value) {
   const raw = String(value || "").trim();
@@ -47,6 +54,7 @@ export function normalizeCapture(item) {
     trashedAt: Math.max(0, Number(item.trashedAt) || 0),
     tags: normalizeTags(item.tags),
     collection: String(item.collection || "").trim().slice(0, 80),
+    collectionColor: normalizeCollectionColor(item.collectionColor),
     previewTitle: String(item.previewTitle || "").slice(0, 180),
     previewDescription: String(item.previewDescription || "").slice(0, 320),
     previewImageUrl: normalizePreviewImageUrl(item.previewImageUrl),
@@ -408,7 +416,7 @@ export function makeCapture(text, existing = {}) {
     id:existing.id || `capture-${now}-${Math.random().toString(36).slice(2,8)}`,
     text, createdAt:existing.createdAt || now, updatedAt:now, pinned:existing.pinned || false,
     readLater: Boolean(existing.readLater), archivedAt: Number(existing.archivedAt) || 0, trashedAt: Number(existing.trashedAt) || 0,
-    tags: existing.tags || [], collection: existing.collection || "",
+    tags: existing.tags || [], collection: existing.collection || "", collectionColor: normalizeCollectionColor(existing.collectionColor),
     previewTitle: existing.previewTitle || "", previewDescription: existing.previewDescription || "", previewImageUrl: existing.previewImageUrl || ""
   });
 }
