@@ -74,7 +74,7 @@ This file is the persistent project checklist for the Linka improvements audit. 
 
 - [ ] Add a reliable sidebar with Inbox, Today, Read Later, Collections, Archive and Trash.
 - [~] Keep Today, Read Later, Archive and Trash states available and searchable.
-- [ ] Add undo for destructive and bulk actions.
+- [~] Add bounded local Undo/Redo for capture mutations, including tombstone reconciliation for permanent removals/restores. Import/backup restore operations are not yet part of the undo stack.
 - [ ] Add item history and restore previous versions where practical.
 - [ ] Add tabs for multiple open documents or views.
 - [ ] Add split view for comparing or referencing two items.
