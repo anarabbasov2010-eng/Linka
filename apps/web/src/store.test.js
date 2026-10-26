@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { loadCaptures, saveCaptures, makeCapture, normalizeCapture, fuzzyTextMatch, normalizePreviewImageUrl, visibleCaptures, sortCaptures, normalizeDuplicateKey, findDuplicateCapture, STORAGE_KEY, RECOVERY_KEY, getCaptureRecovery, startFreshCaptureLibrary, reopenCaptureRecovery } from "./store.js";
+import { loadCaptures, saveCaptures, makeCapture, normalizeCapture, fuzzyTextMatch, groupCapturesByDate, captureDateKey, normalizePreviewImageUrl, visibleCaptures, sortCaptures, normalizeDuplicateKey, findDuplicateCapture, STORAGE_KEY, RECOVERY_KEY, getCaptureRecovery, startFreshCaptureLibrary, reopenCaptureRecovery } from "./store.js";
 
 function memoryStorage() {
   const data = new Map();
@@ -313,4 +313,32 @@ test("fuzzy search catches limited single-word typos without making short querie
     makeCapture("Cookbook for dinner", { id: "food" })
   ];
   assert.deepEqual(visibleCaptures(items, "all", "javascrip").map(item => item.id), ["js"]);
+});
+
+
+test("timeline groups captures by the device-local calendar date in newest-first order", () => {
+  const yesterday = new Date();
+  yesterday.setHours(12, 0, 0, 0);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const today = new Date();
+  today.setHours(9, 0, 0, 0);
+  const laterToday = new Date(today.getTime() + 60 * 60 * 1000);
+  const input = [
+    makeCapture("Yesterday note", { id: "yesterday", createdAt: yesterday.getTime() }),
+    makeCapture("Today note", { id: "today-first", createdAt: today.getTime() }),
+    makeCapture("Latest today", { id: "today-latest", createdAt: laterToday.getTime() })
+  ];
+  const groups = groupCapturesByDate(input);
+  assert.equal(groups.length, 2);
+  assert.equal(groups[0].dateKey, captureDateKey(input[2]));
+  assert.deepEqual(groups[0].captures.map(item => item.id), ["today-latest", "today-first"]);
+  assert.deepEqual(groups[1].captures.map(item => item.id), ["yesterday"]);
+  assert.equal(input[0].id, "yesterday", "grouping must not mutate the original order");
+});
+
+test("timeline date key consistently uses local year, month and day", () => {
+  const saved = new Date(2024, 0, 2, 23, 59, 0, 0).getTime();
+  assert.equal(captureDateKey({ createdAt: saved }), "2024-01-02");
+  assert.equal(captureDateKey({ id: "missing" }), "unknown");
+  assert.deepEqual(groupCapturesByDate(null), []);
 });
