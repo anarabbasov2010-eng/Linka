@@ -737,7 +737,6 @@ body::after { opacity:.008; }
 .linka-appearance-card,
 .linka-appearance-control,
 .linka-atmosphere-setting,
-.linka-command-row,
 .linka-doc-recent-item {
   animation: linka-soft-enter 300ms var(--ease-linka-enter) both;
 }
@@ -780,7 +779,6 @@ html.reduced-motion .linka-card-exit {
   .linka-appearance-card,
   .linka-appearance-control,
   .linka-atmosphere-setting,
-  .linka-command-row,
   .linka-doc-recent-item,
   .linka-player-dock {
     animation: none !important;
@@ -881,3 +879,19 @@ html.reduced-motion #linka-atmosphere .veil {
   .linka-card-enter { animation: none !important; }
 }
 html.reduced-motion .linka-card-enter { animation: none !important; }
+
+
+/* Storage-recovery notice also enters/exits gently without delaying recovery actions. */
+.linka-recovery-panel {
+  animation: linka-soft-enter 340ms var(--ease-linka-enter) both;
+}
+.linka-recovery-panel.is-leaving {
+  pointer-events: none !important;
+  animation: linka-panel-exit 210ms var(--ease-linka-exit) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .linka-recovery-panel,
+  .linka-recovery-panel.is-leaving { animation: none !important; }
+}
+html.reduced-motion .linka-recovery-panel,
+html.reduced-motion .linka-recovery-panel.is-leaving { animation: none !important; }
