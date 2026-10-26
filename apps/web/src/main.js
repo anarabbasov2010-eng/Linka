@@ -303,6 +303,13 @@ function animateLeavingCards(cards) {
   for (const { node, rect } of cards.slice(0, maxAnimatedDepartures)) {
     if (!rect || rect.width < 2 || rect.height < 2) continue;
     const ghost = node.cloneNode(true);
+    // Keep the card's shape but don't restart third-party preview-image requests
+    // just to draw a 220 ms exit ghost.
+    ghost.querySelectorAll("img").forEach(image => {
+      image.removeAttribute("src");
+      image.removeAttribute("srcset");
+      image.alt = "";
+    });
     ghost.classList.add("linka-card-exit");
     ghost.setAttribute("aria-hidden", "true");
     ghost.inert = true;
