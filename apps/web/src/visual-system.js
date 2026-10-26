@@ -1,15 +1,11 @@
 import "./visual-system.css";
 
 const ACCENTS = {
-  forest: { dark: "#B59A69", light: "#80652F", darkText: "#12170F", lightText: "#FFFFFF", glowDark: "rgba(181,154,105,.11)", glowLight: "rgba(128,101,47,.09)" },
-  violet: { dark: "#C9C0FF", light: "#6554A6", darkText: "#171323", lightText: "#FFFFFF", glowDark: "rgba(169,154,255,.13)", glowLight: "rgba(101,84,166,.09)" },
-  blue: { dark: "#9CC5FF", light: "#356BB4", darkText: "#101A2A", lightText: "#FFFFFF", glowDark: "rgba(111,169,255,.13)", glowLight: "rgba(53,107,180,.09)" },
-  mint: { dark: "#8FE3CF", light: "#237A68", darkText: "#0C2420", lightText: "#FFFFFF", glowDark: "rgba(92,220,188,.11)", glowLight: "rgba(35,122,104,.08)" },
-  rose: { dark: "#FFB6D2", light: "#B14E78", darkText: "#29121E", lightText: "#FFFFFF", glowDark: "rgba(255,145,191,.11)", glowLight: "rgba(177,78,120,.08)" }
+  forest: { dark: "#C8AD79", light: "#80643A", darkText: "#172014", lightText: "#FFFFFF", glowDark: "rgba(146,169,123,.13)", glowLight: "rgba(128,100,58,.10)" }
 };
 const DENSITIES = ["compact", "standard", "spacious"];
 const EFFECTS = ["quiet", "balanced", "atmosphere"];
-const THEMES = ["forest", "dark", "light", "system", "oled"];
+const THEMES = ["forest"];
 const THEME_PRESETS = {
   forest: {
     "--bg": "#0B120D", "--panel": "rgba(18,28,20,.88)", "--panel-solid": "#121C14", "--panel-raised": "#1B291D",
@@ -57,7 +53,7 @@ export function setLinkaTheme(value = storageGet("linka.theme", "forest")) {
     root.style.setProperty(property, color);
   });
   storageSet("linka.theme", key);
-  setLinkaAccent(storageGet("linka.accent", "forest"));
+  setLinkaAccent("forest");
   window.dispatchEvent(new CustomEvent("linka:appearance-theme", { detail: { theme: key, resolvedTheme: resolved } }));
   return key;
 }
@@ -105,7 +101,7 @@ export function initVisualSystem() {
   if (root.dataset.visualSystemReady === "true") return;
   root.dataset.visualSystemReady = "true";
 
-  setLinkaTheme(storageGet("linka.theme", "forest"));
+  setLinkaTheme("forest");
   setLinkaAccent(storageGet("linka.accent", "forest"));
   setLinkaDensity(storageGet("linka.density", "standard"));
   setLinkaEffects(storageGet("linka.effects", "atmosphere"));
