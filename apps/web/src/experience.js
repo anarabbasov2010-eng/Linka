@@ -5,7 +5,7 @@ import {
   requestEmailOtp, saveCloudConfig, saveLinkaProfile, verifyEmailOtp,
   startGoogleOAuth, completeGoogleOAuthCallback
 } from "./cloud-sync.js";
-import { setLinkaDensity, setLinkaEffects, setLinkaAppearanceControl, getLinkaAppearanceControl, resetLinkaAppearance } from "./visual-system.js";
+import { setLinkaDensity, setLinkaEffects, setLinkaAppearanceControl, getLinkaAppearanceControl, setLinkaCustomColor, getLinkaCustomColor, resetLinkaAppearance } from "./visual-system.js";
 
 const LANG_KEY = "linka.language.v1";
 const ONBOARDED_KEY = "linka.experience.onboarded.v1";
@@ -845,10 +845,10 @@ function showSettings() {
   dialog.panel.append(pickerLabel);
 
   const preferenceLabels = ({
-    en: { accent: "Accent color", density: "Interface density", compact: "Compact", standard: "Standard", spacious: "Spacious", effects: "Visual effects", quiet: "Quiet", balanced: "Balanced", atmosphere: "Atmosphere", forest: "Forest", oled: "OLED black", cloud: "Cloud sync", backdrop: "Atmosphere & music", agreement: "User agreement", glassOpacity: "Glass transparency", glassBlur: "Glass blur", glassSaturation: "Glass saturation", backgroundDim: "Background dimming", appearanceReset: "Reset appearance", glassOpacityHelp: "Lower values make panels more transparent.", glassBlurHelp: "Higher blur softens what sits behind panels.", glassSaturationHelp: "Adjust the richness of colors seen through glass.", backgroundDimHelp: "Controls how dark the background scene appears." },
-    ru: { accent: "Акцентный цвет", density: "Плотность интерфейса", compact: "Компактная", standard: "Стандартная", spacious: "Просторная", effects: "Визуальные эффекты", quiet: "Минимальные", balanced: "Сбалансированные", atmosphere: "Атмосфера", forest: "Лес", oled: "OLED-чёрная", cloud: "Облачная синхронизация", backdrop: "Атмосфера и музыка", agreement: "Пользовательское соглашение", glassOpacity: "Прозрачность стекла", glassBlur: "Размытие стекла", glassSaturation: "Насыщенность стекла", backgroundDim: "Затемнение фона", appearanceReset: "Сбросить оформление", glassOpacityHelp: "Чем ниже значение, тем прозрачнее панели.", glassBlurHelp: "Сильное размытие смягчает изображение за панелями.", glassSaturationHelp: "Настраивает насыщенность цветов, видимых сквозь стекло.", backgroundDimHelp: "Управляет затемнением фоновой сцены." },
-    az: { accent: "Vurğu rəngi", density: "İnterfeys sıxlığı", compact: "Yığcam", standard: "Standart", spacious: "Geniş", effects: "Vizual effektlər", quiet: "Sakit", balanced: "Balanslı", atmosphere: "Atmosfer", forest: "Meşə", oled: "OLED qara", cloud: "Bulud sinxronizasiyası", backdrop: "Atmosfer və musiqi", agreement: "İstifadəçi razılaşması", glassOpacity: "Şüşə şəffaflığı", glassBlur: "Şüşə bulanıqlığı", glassSaturation: "Şüşə rəng doyumu", backgroundDim: "Fonun qaraldılması", appearanceReset: "Görünüşü sıfırla", glassOpacityHelp: "Dəyər azaldıqca panellər daha şəffaf olur.", glassBlurHelp: "Bulanıqlıq panellərin arxasındakı təsviri yumşaldır.", glassSaturationHelp: "Şüşədən görünən rənglərin doyumunu tənzimləyir.", backgroundDimHelp: "Fon səhnəsinin nə qədər qaralacağını idarə edir." },
-    tr: { accent: "Vurgu rengi", density: "Arayüz yoğunluğu", compact: "Kompakt", standard: "Standart", spacious: "Geniş", effects: "Görsel efektler", quiet: "Sakin", balanced: "Dengeli", atmosphere: "Atmosfer", forest: "Orman", oled: "OLED siyahı", cloud: "Bulut eşitleme", backdrop: "Atmosfer ve müzik", agreement: "Kullanıcı sözleşmesi", glassOpacity: "Cam şeffaflığı", glassBlur: "Cam bulanıklığı", glassSaturation: "Cam doygunluğu", backgroundDim: "Arka plan karartma", appearanceReset: "Görünümü sıfırla", glassOpacityHelp: "Değer azaldıkça paneller daha şeffaf olur.", glassBlurHelp: "Bulanıklık, panellerin arkasındaki görüntüyü yumuşatır.", glassSaturationHelp: "Camın arkasından görünen renklerin yoğunluğunu ayarlar.", backgroundDimHelp: "Arka plan sahnesinin ne kadar karartılacağını ayarlar." }
+    en: { accent: "Accent color", density: "Interface density", compact: "Compact", standard: "Standard", spacious: "Spacious", effects: "Visual effects", quiet: "Quiet", balanced: "Balanced", atmosphere: "Atmosphere", forest: "Forest", oled: "OLED black", cloud: "Cloud sync", backdrop: "Atmosphere & music", agreement: "User agreement", glassOpacity: "Glass transparency", glassBlur: "Glass blur", glassSaturation: "Glass saturation", backgroundDim: "Background dimming", appearanceReset: "Reset appearance", glassOpacityHelp: "Lower values make panels more transparent.", glassBlurHelp: "Higher blur softens what sits behind panels.", glassSaturationHelp: "Adjust the richness of colors seen through glass.", accentColorCustom: "Accent color", blockColorCustom: "Panel tint", accentColorHelp: "Sets the highlight color across the interface.", blockColorHelp: "Adds a personal tint to glass panels while preserving contrast.", backgroundDimHelp: "Controls how dark the background scene appears." },
+    ru: { accent: "Акцентный цвет", density: "Плотность интерфейса", compact: "Компактная", standard: "Стандартная", spacious: "Просторная", effects: "Визуальные эффекты", quiet: "Минимальные", balanced: "Сбалансированные", atmosphere: "Атмосфера", forest: "Лес", oled: "OLED-чёрная", cloud: "Облачная синхронизация", backdrop: "Атмосфера и музыка", agreement: "Пользовательское соглашение", glassOpacity: "Прозрачность стекла", glassBlur: "Размытие стекла", glassSaturation: "Насыщенность стекла", backgroundDim: "Затемнение фона", appearanceReset: "Сбросить оформление", glassOpacityHelp: "Чем ниже значение, тем прозрачнее панели.", glassBlurHelp: "Сильное размытие смягчает изображение за панелями.", glassSaturationHelp: "Настраивает насыщенность цветов, видимых сквозь стекло.", accentColorCustom: "Цвет акцента", blockColorCustom: "Оттенок блоков", accentColorHelp: "Меняет цвет акцентов по всему интерфейсу.", blockColorHelp: "Добавляет панелям собственный оттенок, сохраняя читаемость.", backgroundDimHelp: "Управляет затемнением фоновой сцены." },
+    az: { accent: "Vurğu rəngi", density: "İnterfeys sıxlığı", compact: "Yığcam", standard: "Standart", spacious: "Geniş", effects: "Vizual effektlər", quiet: "Sakit", balanced: "Balanslı", atmosphere: "Atmosfer", forest: "Meşə", oled: "OLED qara", cloud: "Bulud sinxronizasiyası", backdrop: "Atmosfer və musiqi", agreement: "İstifadəçi razılaşması", glassOpacity: "Şüşə şəffaflığı", glassBlur: "Şüşə bulanıqlığı", glassSaturation: "Şüşə rəng doyumu", backgroundDim: "Fonun qaraldılması", appearanceReset: "Görünüşü sıfırla", glassOpacityHelp: "Dəyər azaldıqca panellər daha şəffaf olur.", glassBlurHelp: "Bulanıqlıq panellərin arxasındakı təsviri yumşaldır.", glassSaturationHelp: "Şüşədən görünən rənglərin doyumunu tənzimləyir.", accentColorCustom: "Vurğu rəngi", blockColorCustom: "Blokların tonu", accentColorHelp: "İnterfeys boyunca vurğu rəngini dəyişir.", blockColorHelp: "Oxunaqlılığı qoruyaraq şüşə panellərə rəng tonu verir.", backgroundDimHelp: "Fon səhnəsinin nə qədər qaralacağını idarə edir." },
+    tr: { accent: "Vurgu rengi", density: "Arayüz yoğunluğu", compact: "Kompakt", standard: "Standart", spacious: "Geniş", effects: "Görsel efektler", quiet: "Sakin", balanced: "Dengeli", atmosphere: "Atmosfer", forest: "Orman", oled: "OLED siyahı", cloud: "Bulut eşitleme", backdrop: "Atmosfer ve müzik", agreement: "Kullanıcı sözleşmesi", glassOpacity: "Cam şeffaflığı", glassBlur: "Cam bulanıklığı", glassSaturation: "Cam doygunluğu", backgroundDim: "Arka plan karartma", appearanceReset: "Görünümü sıfırla", glassOpacityHelp: "Değer azaldıkça paneller daha şeffaf olur.", glassBlurHelp: "Bulanıklık, panellerin arkasındaki görüntüyü yumuşatır.", glassSaturationHelp: "Camın arkasından görünen renklerin yoğunluğunu ayarlar.", accentColorCustom: "Vurgu rengi", blockColorCustom: "Panel tonu", accentColorHelp: "Arayüzdeki vurgu rengini değiştirir.", blockColorHelp: "Okunabilirliği koruyarak cam panellere kişisel bir ton verir.", backgroundDimHelp: "Arka plan sahnesinin ne kadar karartılacağını ayarlar." }
   })[langCode()] || {};
   const addPreference = (label, options, selected, apply) => {
     const field = make("label", "linka-field");
@@ -920,12 +920,40 @@ function showSettings() {
   addAppearanceSlider("glassBlur", "glassBlur", 0, 32, 1, " px", "glassBlurHelp");
   addAppearanceSlider("glassSaturation", "glassSaturation", 80, 150, 1, "%", "glassSaturationHelp");
   addAppearanceSlider("backgroundDim", "backgroundDim", 25, 100, 1, "%", "backgroundDimHelp");
+  const addAppearanceColor = (name, labelKey, helpKey) => {
+    const wrap = make("div", "linka-appearance-control linka-appearance-color");
+    const head = make("div", "linka-appearance-control-head");
+    const id = "linka-color-" + name;
+    const label = make("label", "", preferenceLabels[labelKey] || labelKey);
+    label.htmlFor = id;
+    const output = make("output", "");
+    const input = make("input", "");
+    input.type = "color";
+    input.id = id;
+    input.value = getLinkaCustomColor(name);
+    input.setAttribute("aria-describedby", id + "-help");
+    const renderValue = () => { output.value = input.value.toUpperCase(); output.textContent = output.value; };
+    input.addEventListener("input", () => { setLinkaCustomColor(name, input.value); renderValue(); });
+    head.append(label, output);
+    const help = make("small", "", preferenceLabels[helpKey] || "");
+    help.id = id + "-help";
+    wrap.append(head, input, help);
+    materialsSection.append(wrap);
+    renderValue();
+  };
+  addAppearanceColor("accentColor", "accentColorCustom", "accentColorHelp");
+  addAppearanceColor("blockColor", "blockColorCustom", "blockColorHelp");
   const resetAppearance = button(preferenceLabels.appearanceReset || "Reset appearance", "linka-button linka-button-secondary linka-appearance-reset");
   resetAppearance.addEventListener("click", () => {
     resetLinkaAppearance();
     materialsSection.querySelectorAll('input[type="range"]').forEach(input => {
       const name = input.id.replace("linka-appearance-", "");
       input.value = String(getLinkaAppearanceControl(name));
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    materialsSection.querySelectorAll('input[type="color"]').forEach(input => {
+      const name = input.id.replace("linka-color-", "");
+      input.value = getLinkaCustomColor(name);
       input.dispatchEvent(new Event("input", { bubbles: true }));
     });
     const density = dialog.panel.querySelectorAll("select.linka-select");
@@ -942,28 +970,28 @@ function showSettings() {
       intro: "All features and appearance controls are free today. These tiers are a roadmap only — nothing is locked and no payment is being requested.",
       badges: ["Included now", "Planned", "Planned"], names: ["Free", "Pro", "Ultimate"],
       descriptions: ["The complete Linka experience, available now.", "More ways to shape colors, materials and saved looks.", "A deeply personal workspace with custom image and video atmospheres."],
-      features: [["All current tools are unlocked", "Glass and appearance controls", "Local library and optional cloud sync"], ["Expanded color and surface profiles", "Reusable themes and material presets", "More detailed layout personalization"], ["Custom image and video backgrounds", "Advanced atmosphere and motion controls", "Portable visual profiles"]]
+      features: [["All current tools are unlocked", "Glass, block-color and accent controls", "Custom photo/video backgrounds; optional cloud sync"], ["More accent and surface palettes", "Saved themes and material presets", "Expanded layout personalization"], ["Advanced atmosphere presets", "Additional animated background treatments", "Portable visual profiles"]]
     },
     ru: {
       title: "Будущее Linka",
       intro: "Сейчас все функции и настройки оформления бесплатны. Тарифы ниже — только план развития: ничего не заблокировано, оплата не требуется.",
       badges: ["Доступно сейчас", "В планах", "В планах"], names: ["Free", "Pro", "Ultimate"],
       descriptions: ["Полноценная Linka, доступная уже сейчас.", "Больше способов настраивать цвета, материалы и сохранённые стили.", "Персональное рабочее пространство с собственными фото- и видеофонами."],
-      features: [["Все текущие функции открыты", "Настройки стекла и оформления", "Локальная библиотека и облако по желанию"], ["Расширенные цветовые профили", "Сохраняемые темы и пресеты материалов", "Более тонкая настройка интерфейса"], ["Свои фото- и видеофоны", "Расширенные эффекты атмосферы и движения", "Переносимые профили оформления"]]
+      features: [["Все текущие функции открыты", "Настройка акцента, цвета блоков и стекла", "Свои фото/видео-фоны и облако по желанию"], ["Расширенные палитры акцентов и поверхностей", "Сохраняемые темы и пресеты материалов", "Более тонкая настройка интерфейса"], ["Расширенные наборы атмосферы", "Дополнительные эффекты фоновой сцены", "Переносимые профили оформления"]]
     },
     az: {
       title: "Linka-nın gələcəyi",
       intro: "Hazırda bütün funksiyalar və görünüş parametrləri pulsuzdur. Bu planlar yalnız gələcək yol xəritəsidir — heç nə kilidlənməyib və ödəniş tələb olunmur.",
       badges: ["İndi daxildir", "Planlaşdırılır", "Planlaşdırılır"], names: ["Free", "Pro", "Ultimate"],
       descriptions: ["Bütün imkanları ilə Linka artıq əlçatandır.", "Rəngləri, materialları və saxlanılan görünüşləri daha geniş fərdiləşdirmə.", "Şəxsi şəkil və video atmosferləri olan fərdi iş məkanı."],
-      features: [["Bütün hazırkı funksiyalar açıqdır", "Şüşə və görünüş parametrləri", "Lokal kitabxana və istəyə bağlı bulud"], ["Genişləndirilmiş rəng profilləri", "Saxlanılan mövzular və material presetləri", "Daha detallı interfeys fərdiləşdirməsi"], ["Şəxsi şəkil və video fonları", "Qabaqcıl atmosfer və hərəkət idarəsi", "Daşına bilən görünüş profilləri"]]
+      features: [["Bütün hazırkı funksiyalar açıqdır", "Vurğu, blok rəngi və şüşə parametrləri", "Şəxsi foto/video fonları və istəyə bağlı bulud"], ["Geniş rəng və səth palitraları", "Saxlanılan mövzular və material presetləri", "Daha detallı interfeys fərdiləşdirməsi"], ["Qabaqcıl atmosfer paketləri", "Əlavə animasiyalı fon effektləri", "Daşına bilən görünüş profilləri"]]
     },
     tr: {
       title: "Linka'nın geleceği",
       intro: "Şu anda tüm özellikler ve görünüm ayarları ücretsiz. Bu planlar yalnızca yol haritasıdır — hiçbir özellik kilitli değil ve ödeme gerekmiyor.",
       badges: ["Şimdi dahil", "Planlanıyor", "Planlanıyor"], names: ["Free", "Pro", "Ultimate"],
       descriptions: ["Tüm özellikleriyle Linka, şimdi kullanılabilir.", "Renkleri, malzemeleri ve kayıtlı görünümleri daha kapsamlı kişiselleştirme.", "Özel görsel ve video atmosferlerine sahip kişisel çalışma alanı."],
-      features: [["Mevcut tüm araçlar açık", "Cam ve görünüm kontrolleri", "Yerel kitaplık ve isteğe bağlı bulut"], ["Genişletilmiş renk profilleri", "Kaydedilebilir temalar ve malzeme hazır ayarları", "Daha ayrıntılı arayüz kişiselleştirme"], ["Özel görsel ve video arka planları", "Gelişmiş atmosfer ve hareket kontrolleri", "Taşınabilir görünüm profilleri"]]
+      features: [["Mevcut tüm araçlar açık", "Vurgu, panel rengi ve cam kontrolleri", "Özel foto/video arka planları ve isteğe bağlı bulut"], ["Daha geniş vurgu ve yüzey paletleri", "Kaydedilebilir temalar ve malzeme hazır ayarları", "Daha ayrıntılı arayüz kişiselleştirme"], ["Gelişmiş atmosfer paketleri", "Ek animasyonlu arka plan efektleri", "Taşınabilir görünüm profilleri"]]
     }
   })[langCode()] || null;
   const planText = plansCopy || {
@@ -971,7 +999,7 @@ function showSettings() {
     intro: "All features and appearance controls are free today. These tiers are a roadmap only — nothing is locked and no payment is being requested.",
     badges: ["Included now", "Planned", "Planned"], names: ["Free", "Pro", "Ultimate"],
     descriptions: ["The complete Linka experience, available now.", "More ways to shape colors, materials and saved looks.", "A deeply personal workspace with custom image and video atmospheres."],
-    features: [["All current tools are unlocked", "Glass and appearance controls", "Local library and optional cloud sync"], ["Expanded color and surface profiles", "Reusable themes and material presets", "More detailed layout personalization"], ["Custom image and video backgrounds", "Advanced atmosphere and motion controls", "Portable visual profiles"]]
+    features: [["All current tools are unlocked", "Glass, block-color and accent controls", "Custom photo/video backgrounds; optional cloud sync"], ["More accent and surface palettes", "Saved themes and material presets", "Expanded layout personalization"], ["Advanced atmosphere presets", "Additional animated background treatments", "Portable visual profiles"]]
   };
   const plansSection = make("section", "linka-settings-block linka-plans-section");
   plansSection.append(make("h3", "", planText.title), make("p", "linka-muted linka-plans-intro", planText.intro));

@@ -5,7 +5,7 @@
 - Added a top-edge utility panel that reveals local time, date, optional current weather and Linka's account/local-first state with a calm slide-down motion.
 - Weather access is opt-in: geolocation is requested only after the user selects it, coordinates stay in local storage, and the weather provider receives no account or library data.
 - Restyled the Google-first account entry and email-code fallback in the Forest Atelier visual language without replacing the existing Google OAuth flow.
-- Added a transparent Free / Pro / Ultimate roadmap card: all current features and appearance controls remain free and unlocked; future tiers are informational only.
+- Added a transparent Free / Pro / Ultimate roadmap card: all current features remain free and unlocked, including photo/video backgrounds, glass controls and custom accent/panel colors; future tiers are informational only.
 
 ## Next — Navigation and component polish
 

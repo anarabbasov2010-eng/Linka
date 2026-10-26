@@ -79,6 +79,44 @@ const APPEARANCE_CONTROLS = {
   glassSaturation: { key: "linka.glassSaturation", css: "--atelier-glass-saturation", min: 80, max: 150, fallback: 115, unit: "%" },
   backgroundDim: { key: "linka.backgroundDim", css: "--atelier-background-dim", min: 25, max: 100, fallback: 72, unit: "%" }
 };
+const CUSTOM_COLORS = {
+  accentColor: { key: "linka.customAccentColor", css: "--atelier-brass", fallback: "#C8AD79" },
+  blockColor: { key: "linka.customBlockColor", css: "--atelier-block-color", rgbCss: "--atelier-block-rgb", fallback: "#0D160E" }
+};
+function normalizeHexColor(value, fallback) {
+  let color = String(value || "").trim();
+  if (/^#[0-9a-f]{3}$/i.test(color)) color = "#" + Array.from(color.slice(1)).map(ch => ch + ch).join("");
+  return /^#[0-9a-f]{6}$/i.test(color) ? color.toUpperCase() : fallback;
+}
+function colorChannels(hex) {
+  const normalized = normalizeHexColor(hex, "#000000");
+  return [1, 3, 5].map(offset => parseInt(normalized.slice(offset, offset + 2), 16)).join(", ");
+}
+export function setLinkaCustomColor(name, value) {
+  const config = CUSTOM_COLORS[name];
+  if (!config) return null;
+  const color = normalizeHexColor(value, config.fallback);
+  const root = document.documentElement;
+  root.style.setProperty(config.css, color);
+  const channels = colorChannels(color);
+  if (name === "accentColor") {
+    const [r, g, b] = channels.split(", ").map(Number);
+    const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    root.style.setProperty("--accent", color);
+    root.style.setProperty("--accent-text", luminance > 0.58 ? "#172014" : "#F7F3E7");
+    root.style.setProperty("--glow", "rgba(" + channels + ", .14)");
+    root.style.setProperty("--line-strong", "rgba(" + channels + ", .34)");
+  } else {
+    root.style.setProperty(config.rgbCss, channels);
+  }
+  storageSet(config.key, color);
+  window.dispatchEvent(new CustomEvent("linka:custom-color-changed", { detail: { colorName: name, value: color } }));
+  return color;
+}
+export function getLinkaCustomColor(name) {
+  const config = CUSTOM_COLORS[name];
+  return config ? normalizeHexColor(storageGet(config.key, config.fallback), config.fallback) : null;
+}
 
 export function setLinkaAppearanceControl(name, value) {
   const config = APPEARANCE_CONTROLS[name];
@@ -96,6 +134,7 @@ export function setLinkaAppearanceControl(name, value) {
 
 export function resetLinkaAppearance() {
   Object.entries(APPEARANCE_CONTROLS).forEach(([name, config]) => setLinkaAppearanceControl(name, config.fallback));
+  Object.entries(CUSTOM_COLORS).forEach(([name, config]) => setLinkaCustomColor(name, config.fallback));
   setLinkaDensity("standard");
   setLinkaEffects("balanced");
 }
@@ -126,6 +165,7 @@ export function initVisualSystem() {
   setLinkaDensity(storageGet("linka.density", "standard"));
   setLinkaEffects(storageGet("linka.effects", "balanced"));
   Object.keys(APPEARANCE_CONTROLS).forEach(name => setLinkaAppearanceControl(name, getLinkaAppearanceControl(name)));
+  Object.keys(CUSTOM_COLORS).forEach(name => setLinkaCustomColor(name, getLinkaCustomColor(name)));
 
   const savedMotion = storageGet("linka.reduceMotion", "");
   let reducedMotion = savedMotion === "true";
