@@ -73,6 +73,41 @@ export function setLinkaEffects(value = storageGet("linka.effects", "balanced"))
   return key;
 }
 
+const APPEARANCE_CONTROLS = {
+  glassOpacity: { key: "linka.glassOpacity", css: "--atelier-glass-opacity", min: 25, max: 95, fallback: 78, unit: "%" },
+  glassBlur: { key: "linka.glassBlur", css: "--atelier-glass-blur", min: 0, max: 32, fallback: 20, unit: "px" },
+  glassSaturation: { key: "linka.glassSaturation", css: "--atelier-glass-saturation", min: 80, max: 150, fallback: 115, unit: "%" },
+  backgroundDim: { key: "linka.backgroundDim", css: "--atelier-background-dim", min: 25, max: 100, fallback: 72, unit: "%" }
+};
+
+export function setLinkaAppearanceControl(name, value) {
+  const config = APPEARANCE_CONTROLS[name];
+  if (!config) return null;
+  const numeric = Number(value);
+  const safe = Number.isFinite(numeric)
+    ? Math.round(Math.min(config.max, Math.max(config.min, numeric)))
+    : config.fallback;
+  const root = document.documentElement;
+  root.style.setProperty(config.css, name === "glassBlur" ? safe + "px" : (name === "glassOpacity" || name === "backgroundDim" ? String(safe / 100) : String(safe) + "%"));
+  storageSet(config.key, String(safe));
+  window.dispatchEvent(new CustomEvent("linka:appearance-changed", { detail: { control: name, value: safe } }));
+  return safe;
+}
+
+export function resetLinkaAppearance() {
+  Object.entries(APPEARANCE_CONTROLS).forEach(([name, config]) => setLinkaAppearanceControl(name, config.fallback));
+  setLinkaDensity("standard");
+  setLinkaEffects("balanced");
+}
+
+export function getLinkaAppearanceControl(name) {
+  const config = APPEARANCE_CONTROLS[name];
+  if (!config) return null;
+  const stored = Number(storageGet(config.key, String(config.fallback)));
+  return Number.isFinite(stored) ? Math.min(config.max, Math.max(config.min, stored)) : config.fallback;
+}
+
+
 function makeButton(text, className) {
   const button = document.createElement("button");
   button.type = "button";
@@ -90,6 +125,7 @@ export function initVisualSystem() {
   setLinkaAccent(storageGet("linka.accent", "forest"));
   setLinkaDensity(storageGet("linka.density", "standard"));
   setLinkaEffects(storageGet("linka.effects", "balanced"));
+  Object.keys(APPEARANCE_CONTROLS).forEach(name => setLinkaAppearanceControl(name, getLinkaAppearanceControl(name)));
 
   const savedMotion = storageGet("linka.reduceMotion", "");
   let reducedMotion = savedMotion === "true";
