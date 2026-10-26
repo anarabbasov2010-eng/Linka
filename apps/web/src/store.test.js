@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { loadCaptures, saveCaptures, makeCapture, normalizeCapture, normalizePreviewImageUrl, visibleCaptures, sortCaptures, normalizeDuplicateKey, findDuplicateCapture, STORAGE_KEY, RECOVERY_KEY, getCaptureRecovery, startFreshCaptureLibrary, reopenCaptureRecovery } from "./store.js";
+import { loadCaptures, saveCaptures, makeCapture, normalizeCapture, fuzzyTextMatch, normalizePreviewImageUrl, visibleCaptures, sortCaptures, normalizeDuplicateKey, findDuplicateCapture, STORAGE_KEY, RECOVERY_KEY, getCaptureRecovery, startFreshCaptureLibrary, reopenCaptureRecovery } from "./store.js";
 
 function memoryStorage() {
   const data = new Map();
@@ -269,4 +269,48 @@ test("preview cover URLs allow only valid HTTPS URLs without embedded credential
   assert.equal(normalizePreviewImageUrl("not a url"), "");
   assert.equal(normalizePreviewImageUrl(""), "");
   assert.equal(normalizeCapture({ id: "cover", text: "https://example.com", previewImageUrl: "javascript:alert(1)" }).previewImageUrl, "");
+});
+
+
+test("capture timestamp normalization falls back safely when stored timestamps are invalid", () => {
+  const item = normalizeCapture({
+    id: "  capture-id  ",
+    text: "Record",
+    createdAt: "not-a-time",
+    updatedAt: "also-not-a-time"
+  });
+  assert.equal(item.id, "capture-id");
+  assert.ok(Number.isFinite(item.createdAt) && item.createdAt > 0);
+  assert.equal(item.updatedAt, item.createdAt);
+
+  const longId = "i".repeat(500);
+  assert.equal(normalizeCapture({ id: longId, text: "Record" }).id.length, 200);
+  assert.ok(Number.isFinite(normalizeCapture({ id: {}, text: "Record" }).createdAt));
+});
+
+test("search supports explicit content-presence filters", () => {
+  const items = [
+    makeCapture("Tagged link", { id: "tags", tags: ["design"] }),
+    makeCapture("Covered link", { id: "cover", previewImageUrl: "https://example.com/cover.png" }),
+    makeCapture("Described link", { id: "description", previewDescription: "A helpful summary" }),
+    makeCapture("Plain note", { id: "plain" })
+  ];
+  assert.deepEqual(visibleCaptures(items, "all", "has:tags").map(item => item.id), ["tags"]);
+  assert.deepEqual(visibleCaptures(items, "all", "is:untagged").map(item => item.id).sort(), ["cover", "description", "plain"]);
+  assert.deepEqual(visibleCaptures(items, "all", "has:cover").map(item => item.id), ["cover"]);
+  assert.deepEqual(visibleCaptures(items, "all", "has:description").map(item => item.id), ["description"]);
+});
+
+test("fuzzy search catches limited single-word typos without making short queries fuzzy", () => {
+  assert.equal(fuzzyTextMatch("The quick brown fox jumps", "quik"), true);
+  assert.equal(fuzzyTextMatch("A searchable JavaScript guide", "javascrip"), true);
+  assert.equal(fuzzyTextMatch("A searchable JavaScript guide", "js"), false);
+  assert.equal(fuzzyTextMatch("An unrelated word", "wordx"), true);
+  assert.equal(fuzzyTextMatch("A phrase with two words", "phr ase"), false);
+
+  const items = [
+    makeCapture("JavaScript reference", { id: "js" }),
+    makeCapture("Cookbook for dinner", { id: "food" })
+  ];
+  assert.deepEqual(visibleCaptures(items, "all", "javascrip").map(item => item.id), ["js"]);
 });
