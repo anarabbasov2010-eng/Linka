@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { loadCaptures, saveCaptures, makeCapture, normalizeCapture, fuzzyTextMatch, groupCapturesByDate, captureDateKey, normalizePreviewImageUrl, visibleCaptures, sortCaptures, normalizeDuplicateKey, findDuplicateCapture, STORAGE_KEY, RECOVERY_KEY, getCaptureRecovery, startFreshCaptureLibrary, reopenCaptureRecovery } from "./store.js";
+import { loadCaptures, saveCaptures, makeCapture, normalizeCapture, fuzzyTextMatch, groupCapturesByDate, captureDateKey, COLLECTION_COLORS, normalizeCollectionColor, normalizePreviewImageUrl, visibleCaptures, sortCaptures, normalizeDuplicateKey, findDuplicateCapture, STORAGE_KEY, RECOVERY_KEY, getCaptureRecovery, startFreshCaptureLibrary, reopenCaptureRecovery } from "./store.js";
 
 function memoryStorage() {
   const data = new Map();
@@ -341,4 +341,19 @@ test("timeline date key consistently uses local year, month and day", () => {
   assert.equal(captureDateKey({ createdAt: saved }), "2024-01-02");
   assert.equal(captureDateKey({ id: "missing" }), "unknown");
   assert.deepEqual(groupCapturesByDate(null), []);
+});
+
+
+test("collection colors are allowlisted, normalized and persisted with captures", () => {
+  assert.deepEqual(COLLECTION_COLORS, ["violet", "blue", "mint", "rose", "amber", "slate", "teal"]);
+  assert.equal(normalizeCollectionColor(" BLUE "), "blue");
+  assert.equal(normalizeCollectionColor("#fff"), "");
+  assert.equal(normalizeCollectionColor("url(javascript:alert(1))"), "");
+
+  const storage = memoryStorage();
+  const capture = makeCapture("A saved note", { id: "colorful", collection: "Research", collectionColor: "mint" });
+  assert.equal(capture.collectionColor, "mint");
+  assert.equal(saveCaptures([capture], storage), true);
+  assert.equal(loadCaptures(storage)[0].collectionColor, "mint");
+  assert.equal(normalizeCapture({ text: "Unsafe", collectionColor: "red" }).collectionColor, "");
 });
