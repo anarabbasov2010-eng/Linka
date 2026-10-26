@@ -191,9 +191,15 @@ export function saveCaptures(items, storage = globalThis.localStorage) {
     if (!storage || typeof storage.setItem !== "function") return false;
     const recovery = getCaptureRecovery(storage);
     if (recovery && !recovery.acknowledged) return false;
-    // Never silently truncate a user's library. Quota errors are reported to
-    // the caller while the previous value remains intact.
-    storage.setItem(STORAGE_KEY, JSON.stringify(items.map(normalizeCapture).filter(Boolean)));
+    // Reject invalid input as a whole. Filtering invalid records here could
+    // silently delete data while reporting a successful save.
+    if (!Array.isArray(items)) return false;
+    const normalized = items.map(normalizeCapture);
+    if (normalized.some(item => !item)) return false;
+
+    // Never silently truncate a user's library. localStorage.setItem is atomic
+    // for a single key: quota errors leave the previous value intact.
+    storage.setItem(STORAGE_KEY, JSON.stringify(normalized));
     return true;
   } catch { return false; }
 }
