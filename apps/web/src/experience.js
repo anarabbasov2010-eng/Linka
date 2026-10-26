@@ -1018,7 +1018,9 @@ function mountWebNavigation() {
   const activePill = make("span", "web-nav-active-pill");
   activePill.setAttribute("aria-hidden", "true");
   nav.append(activePill);
+  let activeKey = "all";
   const activate = key => {
+    activeKey = key;
     for (const [value, node] of itemButtons) {
       const active = value === key;
       node.classList.toggle("active", active);
@@ -1031,6 +1033,8 @@ function mountWebNavigation() {
     const node = make("button", "web-nav-item");
     node.type = "button";
     node.dataset.nav = key;
+    node.setAttribute("aria-label", label);
+    node.title = label;
     node.innerHTML = '<span class="web-nav-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></svg></span><span class="web-nav-label"></span>';
     node.querySelector(".web-nav-glyph svg").innerHTML = navIcons[key];
     node.querySelector(".web-nav-label").textContent = label;
@@ -1057,6 +1061,12 @@ function mountWebNavigation() {
     itemButtons.set(key, node);
     nav.append(node);
   }
+  window.addEventListener("resize", () => {
+    const target = itemButtons.get(activeKey);
+    if (!target || !activePill.isConnected) return;
+    activePill.style.height = target.offsetHeight + "px";
+    activePill.style.transform = "translate3d(0," + target.offsetTop + "px,0)";
+  }, { passive: true });
   const foot = make("div", "web-side-foot");
   foot.innerHTML = '<span class="web-side-status-dot" aria-hidden="true"></span><span><strong></strong><small></small></span>';
   sidebar.append(brand, caption, nav, foot);
@@ -1075,8 +1085,11 @@ function updateWebNavLabels() {
   };
   const selected = labels[lang] || labels.en;
   document.querySelectorAll(".web-nav-item[data-nav]").forEach(node => {
-    const label = node.querySelector(".web-nav-label");
-    if (label) label.textContent = selected[node.dataset.nav] || labels.en[node.dataset.nav] || "";
+    const label = selected[node.dataset.nav] || labels.en[node.dataset.nav] || "";
+    const labelNode = node.querySelector(".web-nav-label");
+    if (labelNode) labelNode.textContent = label;
+    node.setAttribute("aria-label", label);
+    node.title = label;
   });
   const sidebar = document.querySelector(".web-sidebar");
   if (sidebar) {
