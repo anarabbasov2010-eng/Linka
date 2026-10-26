@@ -28,6 +28,7 @@ This file is the persistent project checklist for the Linka improvements audit. 
 - [ ] Add sync diagnostics that redact session tokens and private capture content.
 - [~] Keep local-only mode usable when cloud credentials are not configured.
 - [~] Audit all storage reads/writes for silent parse, quota and permission failures.
+- [x] Reject an entire local capture save when any record is invalid; preserve the last known-good library instead of filtering malformed records out.
 - [x] On malformed local JSON, preserve the raw source instead of replacing it with an empty library; block writes until the user exports the source or explicitly starts a new library.
 - [x] Detect a new corruption event even when an older acknowledged recovery record exists; reject valid-JSON arrays containing malformed records rather than silently dropping them on save.
 - [x] Block cloud sync before any network request while malformed local capture data is awaiting explicit recovery; preserve the damaged source and explain safe next steps.
