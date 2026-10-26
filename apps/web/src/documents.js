@@ -1,14 +1,15 @@
 import { linkaFilename, normalizeLinkaDocument, parseLinkaDocument, serializeLinkaDocument } from "./linka-format.js";
 import { readEmergencyDocumentDraft, writeEmergencyDocumentDraft, clearEmergencyDocumentDraft, clearEmergencyDocumentDraftIfMatches } from "./document-recovery.js";
+import { renderMarkdownToHtml } from "./markdown-preview.js";
 
 const DB_NAME = "linka-documents-v1";
 const STORE_NAME = "documents";
 const MAX_RECENT = 8;
 const labels = {
-  ru: { documents: "Текстовые документы", newDoc: "Новый документ", open: "Открыть .linka", save: "Сохранить .linka", saved: "Черновик сохранён на этом устройстве", unsaved: "Есть несохранённые изменения", saving: "Сохраняем…", savedAt: "Сохранено в {time}", recoverFound: "Найден несохранённый черновик «{title}». Можно восстановить его или удалить.", restoreDraft: "Восстановить черновик", discardDraft: "Удалить черновик", discardDraftConfirm: "Удалить несохранённый черновик? Это действие нельзя отменить.", draftDiscarded: "Несохранённый черновик удалён.", draftRecovered: "Несохранённый черновик восстановлен и сохранён.", failed: "Не удалось сохранить черновик", untitled: "Новый документ", placeholder: "Начни писать…", close: "Закрыть", recent: "Недавние документы", local: "Локально · не отправляется в облако", openFailed: "Не удалось открыть файл .linka", fileSaved: "Файл .linka подготовлен", content: "Текст документа", title: "Название документа", help: "Файл можно открыть в Linka на другом устройстве.", },
-  en: { documents: "Text documents", newDoc: "New document", open: "Open .linka", save: "Save .linka", saved: "Draft saved on this device", unsaved: "Unsaved changes", saving: "Saving…", savedAt: "Saved at {time}", recoverFound: "An unsaved draft “{title}” was found. Restore or discard it.", restoreDraft: "Restore draft", discardDraft: "Discard draft", discardDraftConfirm: "Discard this unsaved draft? This cannot be undone.", draftDiscarded: "Unsaved draft discarded.", draftRecovered: "Unsaved draft restored and saved.", failed: "Could not save draft", untitled: "New document", placeholder: "Start writing…", close: "Close", recent: "Recent documents", local: "Local only · not sent to cloud sync", openFailed: "Could not open this .linka file", fileSaved: ".linka file prepared", content: "Document text", title: "Document title", help: "Open this file in Linka on another device.", },
-  az: { documents: "Mətn sənədləri", newDoc: "Yeni sənəd", open: ".linka aç", save: ".linka saxla", saved: "Qaralama bu cihazda saxlanıldı", unsaved: "Saxlanmamış dəyişikliklər var", saving: "Saxlanılır…", savedAt: "{time} vaxtı saxlanıldı", recoverFound: "Saxlanmamış “{title}” qaralaması tapıldı. Onu bərpa et və ya sil.", restoreDraft: "Qaralamanı bərpa et", discardDraft: "Qaralamanı sil", discardDraftConfirm: "Saxlanmamış qaralama silinsin? Bu əməliyyat geri qaytarılmır.", draftDiscarded: "Saxlanmamış qaralama silindi.", draftRecovered: "Qaralama bərpa edildi və saxlanıldı.", failed: "Qaralamanı saxlamaq olmadı", untitled: "Yeni sənəd", placeholder: "Yazmağa başla…", close: "Bağla", recent: "Son sənədlər", local: "Yalnız cihazda · buludla paylaşılmır", openFailed: ".linka faylını açmaq olmadı", fileSaved: ".linka faylı hazırdır", content: "Sənədin mətni", title: "Sənədin adı", help: "Bu faylı başqa cihazda Linka ilə aça bilərsən.", },
-  tr: { documents: "Metin belgeleri", newDoc: "Yeni belge", open: ".linka aç", save: ".linka kaydet", saved: "Taslak bu cihazda kaydedildi", unsaved: "Kaydedilmemiş değişiklikler", saving: "Kaydediliyor…", savedAt: "Kaydedildi · {time}", recoverFound: "Kaydedilmemiş “{title}” taslağı bulundu. Geri yükleyebilir veya silebilirsin.", restoreDraft: "Taslağı geri yükle", discardDraft: "Taslağı sil", discardDraftConfirm: "Kaydedilmemiş taslak silinsin mi? Bu işlem geri alınamaz.", draftDiscarded: "Kaydedilmemiş taslak silindi.", draftRecovered: "Taslak geri yüklendi ve kaydedildi.", failed: "Taslak kaydedilemedi", untitled: "Yeni belge", placeholder: "Yazmaya başla…", close: "Kapat", recent: "Son belgeler", local: "Yalnızca cihazda · bulut eşitlemesine gönderilmez", openFailed: ".linka dosyası açılamadı", fileSaved: ".linka dosyası hazır", content: "Belge metni", title: "Belge başlığı", help: "Bu dosyayı başka bir cihazda Linka ile açabilirsin.", }
+  ru: { documents: "Текстовые документы", newDoc: "Новый документ", open: "Открыть .linka", save: "Сохранить .linka", saved: "Черновик сохранён на этом устройстве", unsaved: "Есть несохранённые изменения", saving: "Сохраняем…", savedAt: "Сохранено в {time}", recoverFound: "Найден несохранённый черновик «{title}». Можно восстановить его или удалить.", restoreDraft: "Восстановить черновик", discardDraft: "Удалить черновик", discardDraftConfirm: "Удалить несохранённый черновик? Это действие нельзя отменить.", draftDiscarded: "Несохранённый черновик удалён.", draftRecovered: "Несохранённый черновик восстановлен и сохранён.", failed: "Не удалось сохранить черновик", untitled: "Новый документ", placeholder: "Начни писать…", close: "Закрыть", recent: "Недавние документы", local: "Локально · не отправляется в облако", openFailed: "Не удалось открыть файл .linka", fileSaved: "Файл .linka подготовлен", content: "Текст документа", title: "Название документа", help: "Файл можно открыть в Linka на другом устройстве.", previewMarkdown: "Предпросмотр Markdown", editMarkdown: "Вернуться к редактированию", previewLabel: "Предпросмотр Markdown-документа", },
+  en: { documents: "Text documents", newDoc: "New document", open: "Open .linka", save: "Save .linka", saved: "Draft saved on this device", unsaved: "Unsaved changes", saving: "Saving…", savedAt: "Saved at {time}", recoverFound: "An unsaved draft “{title}” was found. Restore or discard it.", restoreDraft: "Restore draft", discardDraft: "Discard draft", discardDraftConfirm: "Discard this unsaved draft? This cannot be undone.", draftDiscarded: "Unsaved draft discarded.", draftRecovered: "Unsaved draft restored and saved.", failed: "Could not save draft", untitled: "New document", placeholder: "Start writing…", close: "Close", recent: "Recent documents", local: "Local only · not sent to cloud sync", openFailed: "Could not open this .linka file", fileSaved: ".linka file prepared", content: "Document text", title: "Document title", help: "Open this file in Linka on another device.", previewMarkdown: "Preview Markdown", editMarkdown: "Edit Markdown", previewLabel: "Markdown document preview", },
+  az: { documents: "Mətn sənədləri", newDoc: "Yeni sənəd", open: ".linka aç", save: ".linka saxla", saved: "Qaralama bu cihazda saxlanıldı", unsaved: "Saxlanmamış dəyişikliklər var", saving: "Saxlanılır…", savedAt: "{time} vaxtı saxlanıldı", recoverFound: "Saxlanmamış “{title}” qaralaması tapıldı. Onu bərpa et və ya sil.", restoreDraft: "Qaralamanı bərpa et", discardDraft: "Qaralamanı sil", discardDraftConfirm: "Saxlanmamış qaralama silinsin? Bu əməliyyat geri qaytarılmır.", draftDiscarded: "Saxlanmamış qaralama silindi.", draftRecovered: "Qaralama bərpa edildi və saxlanıldı.", failed: "Qaralamanı saxlamaq olmadı", untitled: "Yeni sənəd", placeholder: "Yazmağa başla…", close: "Bağla", recent: "Son sənədlər", local: "Yalnız cihazda · buludla paylaşılmır", openFailed: ".linka faylını açmaq olmadı", fileSaved: ".linka faylı hazırdır", content: "Sənədin mətni", title: "Sənədin adı", help: "Bu faylı başqa cihazda Linka ilə aça bilərsən.", previewMarkdown: "Markdown önbaxış", editMarkdown: "Redaktəyə qayıt", previewLabel: "Markdown sənədinin önbaxışı", },
+  tr: { documents: "Metin belgeleri", newDoc: "Yeni belge", open: ".linka aç", save: ".linka kaydet", saved: "Taslak bu cihazda kaydedildi", unsaved: "Kaydedilmemiş değişiklikler", saving: "Kaydediliyor…", savedAt: "Kaydedildi · {time}", recoverFound: "Kaydedilmemiş “{title}” taslağı bulundu. Geri yükleyebilir veya silebilirsin.", restoreDraft: "Taslağı geri yükle", discardDraft: "Taslağı sil", discardDraftConfirm: "Kaydedilmemiş taslak silinsin mi? Bu işlem geri alınamaz.", draftDiscarded: "Kaydedilmemiş taslak silindi.", draftRecovered: "Taslak geri yüklendi ve kaydedildi.", failed: "Taslak kaydedilemedi", untitled: "Yeni belge", placeholder: "Yazmaya başla…", close: "Kapat", recent: "Son belgeler", local: "Yalnızca cihazda · bulut eşitlemesine gönderilmez", openFailed: ".linka dosyası açılamadı", fileSaved: ".linka dosyası hazır", content: "Belge metni", title: "Belge başlığı", help: "Bu dosyayı başka bir cihazda Linka ile açabilirsin.", previewMarkdown: "Markdown önizleme", editMarkdown: "Düzenlemeye dön", previewLabel: "Markdown belge önizlemesi", }
 };
 let initialized = false;
 let dbPromise = null;
@@ -16,6 +17,10 @@ let overlay = null;
 let currentDocument = null;
 let titleField = null;
 let bodyField = null;
+let markdownPreviewPane = null;
+let markdownPreviewButton = null;
+let markdownBodyLabel = null;
+let markdownPreviewMode = false;
 let statusLine = null;
 let recentList = null;
 let saveTimer = 0;
@@ -35,6 +40,26 @@ const lang = () => {
   return labels[v] ? v : "ru";
 };
 const t = key => labels[lang()][key] || labels.ru[key] || key;
+
+function setMarkdownPreviewMode(enabled) {
+  if (!markdownPreviewPane || !markdownPreviewButton || !markdownBodyLabel) return;
+  markdownPreviewMode = Boolean(enabled);
+  if (markdownPreviewMode) {
+    markdownPreviewPane.innerHTML = renderMarkdownToHtml(bodyField?.value || "");
+    markdownPreviewPane.hidden = false;
+    markdownBodyLabel.hidden = true;
+    markdownPreviewPane.setAttribute("aria-label", t("previewLabel"));
+    markdownPreviewButton.textContent = t("editMarkdown");
+    markdownPreviewButton.setAttribute("aria-label", t("editMarkdown"));
+    markdownPreviewButton.setAttribute("aria-pressed", "true");
+  } else {
+    markdownPreviewPane.hidden = true;
+    markdownBodyLabel.hidden = false;
+    markdownPreviewButton.textContent = t("previewMarkdown");
+    markdownPreviewButton.setAttribute("aria-label", t("previewMarkdown"));
+    markdownPreviewButton.setAttribute("aria-pressed", "false");
+  }
+}
 
 function addStyles() {
   if (document.getElementById("linka-documents-styles")) return;
@@ -62,6 +87,29 @@ function addStyles() {
     .linka-doc-btn.primary:hover { background:#c8b184; }
     .linka-doc-btn:focus-visible,.linka-doc-title:focus-visible,.linka-doc-body:focus-visible { outline:2px solid #d7c39a; outline-offset:3px; }
     .linka-doc-fields { display:flex; flex-direction:column; gap:12px; min-height:0; padding:16px 21px 10px; }
+    .linka-doc-markdown-preview { box-sizing:border-box; width:100%; min-height:220px; max-height:45vh; overflow:auto; padding:17px; border:1px solid rgba(232,223,200,.14); border-radius:15px; color:#e8dfc8; background:rgba(4,10,6,.28); font:400 15px/1.86 "Palatino Linotype","Book Antiqua",Georgia,serif; overflow-wrap:anywhere; }
+    .linka-doc-markdown-preview[hidden] { display:none; }
+    .linka-doc-markdown-preview > :first-child { margin-top:0; }
+    .linka-doc-markdown-preview > :last-child { margin-bottom:0; }
+    .linka-doc-markdown-preview h1,.linka-doc-markdown-preview h2,.linka-doc-markdown-preview h3,.linka-doc-markdown-preview h4 { color:#f0e8d7; line-height:1.35; letter-spacing:-.02em; }
+    .linka-doc-markdown-preview h1 { font-size:1.7em; }
+    .linka-doc-markdown-preview h2 { font-size:1.4em; }
+    .linka-doc-markdown-preview h3 { font-size:1.18em; }
+    .linka-doc-markdown-preview p { margin:.7em 0; }
+    .linka-doc-markdown-preview ul,.linka-doc-markdown-preview ol { padding-left:1.6em; margin:.6em 0; }
+    .linka-doc-markdown-preview li { padding-left:.12em; }
+    .linka-doc-markdown-preview blockquote { margin:.8em 0; padding:.1em .9em; border-left:3px solid var(--linka-brass); color:#c8c4b4; }
+    .linka-doc-markdown-preview code { padding:.12em .32em; border-radius:5px; background:rgba(232,223,200,.1); font: .88em/1.6 ui-monospace,SFMono-Regular,Consolas,monospace; }
+    .linka-doc-markdown-preview pre { overflow:auto; padding:13px; border:1px solid rgba(232,223,200,.12); border-radius:11px; background:rgba(0,0,0,.22); }
+    .linka-doc-markdown-preview pre code { padding:0; background:transparent; }
+    .linka-doc-markdown-preview a { color:#d9c18e; text-decoration:underline; text-underline-offset:3px; }
+    .linka-doc-markdown-preview hr { border:0; border-top:1px solid rgba(232,223,200,.18); margin:1em 0; }
+    .linka-doc-markdown-preview .linka-md-task { display:flex; align-items:baseline; gap:8px; list-style:none; margin-left:-1.35em; }
+    .linka-doc-markdown-preview .linka-md-task input { accent-color:var(--linka-brass); }
+    :root[data-color-scheme="light"] .linka-doc-markdown-preview { color:var(--text)!important; background:color-mix(in srgb,var(--bg) 62%,var(--panel-solid))!important; border-color:var(--line)!important; }
+    :root[data-color-scheme="light"] .linka-doc-markdown-preview h1,:root[data-color-scheme="light"] .linka-doc-markdown-preview h2,:root[data-color-scheme="light"] .linka-doc-markdown-preview h3,:root[data-color-scheme="light"] .linka-doc-markdown-preview h4 { color:var(--text)!important; }
+    :root[data-color-scheme="light"] .linka-doc-markdown-preview a { color:var(--accent)!important; }
+    @media(max-width:600px) { .linka-doc-markdown-preview { min-height:190px; max-height:38vh; padding:13px; } }
     .linka-doc-label { display:block; color:#c1c8ba; font-size:10px; font-weight:650; letter-spacing:.09em; text-transform:uppercase; }
     .linka-doc-title { width:100%; margin-top:7px; padding:12px 14px; border:1px solid rgba(232,223,200,.15); border-radius:12px; outline:none; color:#f0e8d7; background:rgba(4,10,6,.28); font:500 18px/1.35 "Palatino Linotype","Book Antiqua",Georgia,serif; }
     .linka-doc-body-wrap { position:relative; flex:1; min-height:220px; max-height:45vh; overflow:hidden; border:1px solid rgba(232,223,200,.14); border-radius:15px; background:rgba(4,10,6,.28); }
@@ -517,7 +565,7 @@ function buildEditorUI() {
   overlay = document.createElement("div");
   overlay.className = "linka-doc-overlay";
   overlay.setAttribute("role", "presentation");
-  overlay.innerHTML = '<section class="linka-doc-window" role="dialog" aria-modal="true" aria-labelledby="linka-doc-heading"><header class="linka-doc-header"><div class="linka-doc-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3.8h7l4 4V20H7z"/><path d="M14 3.8V8h4M10 12h5M10 15.5h5M10 18.5h3"/></svg></div><div class="linka-doc-headcopy"><h2 id="linka-doc-heading"></h2><p></p></div><button class="linka-doc-btn" type="button" data-close></button></header><div class="linka-doc-actions"><button class="linka-doc-btn primary" type="button" data-new></button><button class="linka-doc-btn" type="button" data-open></button><button class="linka-doc-btn" type="button" data-save></button></div><div class="linka-doc-fields"><label class="linka-doc-label"><span data-title-label></span><input class="linka-doc-title" type="text" maxlength="180" autocomplete="off"></label><label class="linka-doc-label"><span data-body-label></span><div class="linka-doc-body-wrap"><div class="linka-doc-type-mirror" aria-hidden="true"></div><textarea class="linka-doc-body" spellcheck="true" maxlength="5000000"></textarea></div></label></div><div class="linka-doc-footer"><span class="linka-doc-footer-status" role="status" aria-live="polite"></span><span data-help></span></div><div class="linka-doc-recent"><h3></h3><div class="linka-doc-recent-list"></div></div></section>';
+  overlay.innerHTML = '<section class="linka-doc-window" role="dialog" aria-modal="true" aria-labelledby="linka-doc-heading"><header class="linka-doc-header"><div class="linka-doc-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3.8h7l4 4V20H7z"/><path d="M14 3.8V8h4M10 12h5M10 15.5h5M10 18.5h3"/></svg></div><div class="linka-doc-headcopy"><h2 id="linka-doc-heading"></h2><p></p></div><button class="linka-doc-btn" type="button" data-close></button></header><div class="linka-doc-actions"><button class="linka-doc-btn primary" type="button" data-new></button><button class="linka-doc-btn" type="button" data-open></button><button class="linka-doc-btn" type="button" data-save></button><button class="linka-doc-btn" type="button" data-preview aria-pressed="false"></button></div><div class="linka-doc-fields"><label class="linka-doc-label"><span data-title-label></span><input class="linka-doc-title" type="text" maxlength="180" autocomplete="off"></label><label class="linka-doc-label" data-body-field><span data-body-label></span><div class="linka-doc-body-wrap"><div class="linka-doc-type-mirror" aria-hidden="true"></div><textarea class="linka-doc-body" spellcheck="true" maxlength="5000000"></textarea></div></label><div class="linka-doc-markdown-preview" data-markdown-preview hidden role="region"></div></div><div class="linka-doc-footer"><span class="linka-doc-footer-status" role="status" aria-live="polite"></span><span data-help></span></div><div class="linka-doc-recent"><h3></h3><div class="linka-doc-recent-list"></div></div></section>';
   const panel = overlay.querySelector(".linka-doc-window");
   const q = selector => panel.querySelector(selector);
   recoveryBanner = document.createElement("div");
@@ -582,6 +630,13 @@ function buildEditorUI() {
   q(".linka-doc-recent h3").textContent = t("recent");
   titleField = q(".linka-doc-title");
   bodyField = q(".linka-doc-body");
+  markdownPreviewPane = q("[data-markdown-preview]");
+  markdownPreviewButton = q("[data-preview]");
+  markdownBodyLabel = q("[data-body-field]");
+  markdownPreviewMode = false;
+  markdownPreviewButton.textContent = t("previewMarkdown");
+  markdownPreviewButton.setAttribute("aria-label", t("previewMarkdown"));
+  markdownPreviewButton.addEventListener("click", () => setMarkdownPreviewMode(!markdownPreviewMode));
   statusLine = q(".linka-doc-footer-status");
   recentList = q(".linka-doc-recent-list");
   q("[data-close]").addEventListener("click", closeEditor);
@@ -594,6 +649,7 @@ function buildEditorUI() {
     titleField.value = currentDocument.title;
     bodyField.value = "";
     dispatchEditorInputWithoutSaving();
+    setMarkdownPreviewMode(false);
     try {
       currentDocument = await storeDocument(currentDocument);
       lastSavedAt = currentDocument.updatedAt;
@@ -623,6 +679,7 @@ async function openEditor(documentValue = null) {
   if (overlay && titleField && bodyField) {
     if (!documentValue) { titleField.focus(); return; }
     if (!(await persistCurrent(true))) return;
+    setMarkdownPreviewMode(false);
     currentDocument = normalizeLinkaDocument(documentValue);
     editRevision = 0;
     lastSavedAt = Number(currentDocument.updatedAt || 0);
@@ -651,6 +708,7 @@ async function openEditor(documentValue = null) {
   titleField.value = currentDocument.title;
   bodyField.value = currentDocument.text;
   dispatchEditorInputWithoutSaving();
+  setMarkdownPreviewMode(false);
   try {
     currentDocument = await storeDocument(currentDocument);
     lastSavedAt = currentDocument.updatedAt;
