@@ -658,3 +658,15 @@ mark.search-highlight {
   .history-toolbar { flex:1 1 auto; }
   .history-toolbar .history-action { flex:1 1 60px; }
 }
+
+
+/* Library-wide focus mode; the controls and sync indicator remain available. */
+:root[data-app-focus="true"] .hero,
+:root[data-app-focus="true"] .footer,
+:root[data-app-focus="true"] .privacy { display:none !important; }
+:root[data-app-focus="true"] body::before { opacity:.14; }
+:root[data-app-focus="true"] body::after { opacity:0; }
+:root[data-app-focus="true"] .orb { animation:none !important; opacity:.015; }
+:root[data-app-focus="true"] .capture { max-width:1000px; margin-inline:auto; }
+:root[data-app-focus="true"] .grid:not(.timeline-mode) { max-width:1120px; margin-inline:auto; }
+#focus-mode-button.focus-mode-active { color:var(--accent); border-color:color-mix(in srgb,var(--accent) 46%,var(--line-strong)); background:color-mix(in srgb,var(--accent) 11%,var(--panel-solid)); }
