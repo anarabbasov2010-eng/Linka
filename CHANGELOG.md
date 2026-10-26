@@ -1,5 +1,14 @@
 # Changelog
 
+
+## Next — Forest Atelier design completion
+
+- Unified Windows and Web around one signature appearance: twilight forest, bookish system-serif headings, warm brass accents, paper-toned text and translucent moss-glass surfaces.
+- Removed legacy theme and accent selectors from Settings; old saved preferences migrate to Forest Atelier at startup.
+- Rebalanced the capture canvas, library cards, search, filters, dialogs, command palette, document editor and music dock for one coherent visual language.
+- Refined responsive spacing, focus states, scrollbars and reduced-motion handling; removed per-card 3D tilt to keep library browsing calmer and less GPU-intensive.
+- Added a localized Forest Atelier identity panel in Settings. Density, visual-effects, background-media, music and reduced-motion controls remain available.
+
 ## Next — Unified twilight theme correction
 
 - Removed the pulsing sphere and old generated ambient audio; the twilight forest is now Linka's single built-in appearance across Android, Web, and Windows.
