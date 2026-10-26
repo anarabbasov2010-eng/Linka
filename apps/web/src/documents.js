@@ -276,6 +276,11 @@ function closeEditor() {
   }
   overlay?.classList.remove("is-open");
   const old = overlay;
+  if (old) {
+    old.setAttribute("aria-hidden", "true");
+    old.inert = true;
+    old.style.pointerEvents = "none";
+  }
   overlay = null;
   currentDocument = null;
   titleField = null; bodyField = null; statusLine = null; recentList = null; inputPicker = null;
