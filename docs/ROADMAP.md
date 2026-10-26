@@ -172,7 +172,7 @@ This file is the persistent project checklist for the Linka improvements audit. 
 - [ ] Design and build Linka Canvas as a visual map of notes and links.
 - [ ] Design and build Linka Timeline for time-based exploration.
 - [ ] Design and build Linka Research for questions over the user's library with citations.
-- [ ] Design and build Linka Focus for distraction-reduced work.
+- [~] Add a distraction-reduced library-wide Focus mode and a document-editor Focus mode. Session timers, focus analytics and dedicated workflow controls remain open.
 - [ ] Design and build Linka Vault for protected local content.
 - [ ] Keep these surfaces modular so core capture, editing and search remain reliable without them.
 
