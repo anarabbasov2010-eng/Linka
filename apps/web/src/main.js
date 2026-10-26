@@ -30,6 +30,7 @@ const form = $("#capture-form");
 const draft = $("#capture-text");
 const tagsDraft = $("#capture-tags");
 const collectionDraft = $("#capture-collection");
+const collectionColorDraft = $("#capture-collection-color");
 const previewTitleDraft = $("#capture-preview-title");
 const previewDescriptionDraft = $("#capture-preview-description");
 const previewImageDraft = $("#capture-preview-image");
@@ -164,6 +165,7 @@ let persistedCaptures = captures.map(item => ({ ...item }));
 const QUICK_DRAFT_KEY = "linka.captureDraft.v1";
 const QUICK_DRAFT_TAGS_KEY = "linka.captureDraft.tags.v1";
 const QUICK_DRAFT_COLLECTION_KEY = "linka.captureDraft.collection.v1";
+const QUICK_DRAFT_COLLECTION_COLOR_KEY = "linka.captureDraft.collectionColor.v1";
 const QUICK_DRAFT_PREVIEW_TITLE_KEY = "linka.captureDraft.previewTitle.v1";
 const QUICK_DRAFT_PREVIEW_DESCRIPTION_KEY = "linka.captureDraft.previewDescription.v1";
 const QUICK_DRAFT_PREVIEW_IMAGE_KEY = "linka.captureDraft.previewImage.v1";
@@ -222,6 +224,8 @@ function saveCaptureMetadataDraft() {
     else localStorage.removeItem(QUICK_DRAFT_TAGS_KEY);
     if (collectionDraft.value) localStorage.setItem(QUICK_DRAFT_COLLECTION_KEY, collectionDraft.value);
     else localStorage.removeItem(QUICK_DRAFT_COLLECTION_KEY);
+    if (collectionColorDraft.value) localStorage.setItem(QUICK_DRAFT_COLLECTION_COLOR_KEY, collectionColorDraft.value);
+    else localStorage.removeItem(QUICK_DRAFT_COLLECTION_COLOR_KEY);
     if (previewTitleDraft.value) localStorage.setItem(QUICK_DRAFT_PREVIEW_TITLE_KEY, previewTitleDraft.value);
     else localStorage.removeItem(QUICK_DRAFT_PREVIEW_TITLE_KEY);
     if (previewDescriptionDraft.value) localStorage.setItem(QUICK_DRAFT_PREVIEW_DESCRIPTION_KEY, previewDescriptionDraft.value);
@@ -234,12 +238,14 @@ try {
   const savedDraft = localStorage.getItem(QUICK_DRAFT_KEY);
   const savedTags = localStorage.getItem(QUICK_DRAFT_TAGS_KEY);
   const savedCollection = localStorage.getItem(QUICK_DRAFT_COLLECTION_KEY);
+  const savedCollectionColor = localStorage.getItem(QUICK_DRAFT_COLLECTION_COLOR_KEY);
   const savedPreviewTitle = localStorage.getItem(QUICK_DRAFT_PREVIEW_TITLE_KEY);
   const savedPreviewDescription = localStorage.getItem(QUICK_DRAFT_PREVIEW_DESCRIPTION_KEY);
   const savedPreviewImage = localStorage.getItem(QUICK_DRAFT_PREVIEW_IMAGE_KEY);
   if (savedDraft && !draft.value) draft.value = savedDraft;
   if (savedTags && !tagsDraft.value) tagsDraft.value = savedTags;
   if (savedCollection && !collectionDraft.value) collectionDraft.value = savedCollection;
+  if (savedCollectionColor && !collectionColorDraft.value) collectionColorDraft.value = normalizeCollectionColor(savedCollectionColor);
   if (savedPreviewTitle && !previewTitleDraft.value) previewTitleDraft.value = savedPreviewTitle;
   if (savedPreviewDescription && !previewDescriptionDraft.value) previewDescriptionDraft.value = savedPreviewDescription;
   if (savedPreviewImage && !previewImageDraft.value) previewImageDraft.value = savedPreviewImage;
@@ -788,7 +794,7 @@ function render() {
       }
       if (item.collection) {
         const collectionButton = document.createElement("button");
-        collectionButton.type = "button"; collectionButton.className = "item-collection"; collectionButton.textContent = item.collection;
+        collectionButton.type = "button"; collectionButton.className = "item-collection"; collectionButton.dataset.collectionColor = normalizeCollectionColor(item.collectionColor) || "default"; collectionButton.textContent = item.collection;
         collectionButton.title = captureUiText("collectionSearch");
         collectionButton.addEventListener("click", () => {
           search.value = "in:" + item.collection; activeFilter = "all";
@@ -1111,11 +1117,12 @@ function makeAction(label, action, id) {
   return button;
 }
 function resetEditor() {
-  editingId = null; draft.value = ""; tagsDraft.value = ""; collectionDraft.value = ""; composeLabel.textContent = "Quick capture";
+  editingId = null; draft.value = ""; tagsDraft.value = ""; collectionDraft.value = ""; collectionColorDraft.value = ""; composeLabel.textContent = "Quick capture";
   try {
     localStorage.removeItem(QUICK_DRAFT_KEY);
     localStorage.removeItem(QUICK_DRAFT_TAGS_KEY);
     localStorage.removeItem(QUICK_DRAFT_COLLECTION_KEY);
+    localStorage.removeItem(QUICK_DRAFT_COLLECTION_COLOR_KEY);
     localStorage.removeItem(QUICK_DRAFT_PREVIEW_TITLE_KEY);
     localStorage.removeItem(QUICK_DRAFT_PREVIEW_DESCRIPTION_KEY);
     localStorage.removeItem(QUICK_DRAFT_PREVIEW_IMAGE_KEY);
@@ -1466,7 +1473,13 @@ draft.addEventListener("input",()=>{
   } catch {}
 });
 tagsDraft.addEventListener("input", saveCaptureMetadataDraft);
-collectionDraft.addEventListener("input", saveCaptureMetadataDraft);
+collectionDraft.addEventListener("input", () => {
+  const name = collectionDraft.value.trim().toLocaleLowerCase();
+  const knownColor = captures.find(item => String(item.collection || "").toLocaleLowerCase() === name && normalizeCollectionColor(item.collectionColor))?.collectionColor || "";
+  if (name && !collectionColorDraft.value && knownColor) collectionColorDraft.value = knownColor;
+  saveCaptureMetadataDraft();
+});
+collectionColorDraft.addEventListener("change", saveCaptureMetadataDraft);
 previewTitleDraft.addEventListener("input", saveCaptureMetadataDraft);
 previewDescriptionDraft.addEventListener("input", saveCaptureMetadataDraft);
 previewImageDraft.addEventListener("input", saveCaptureMetadataDraft);
@@ -1481,9 +1494,15 @@ form.addEventListener("submit",event=>{
     previewImageDraft.focus();
     return;
   }
+  const collectionName = collectionDraft.value.trim().slice(0, 80);
+  const chosenCollectionColor = normalizeCollectionColor(collectionColorDraft.value);
+  const existingCollectionColor = collectionName
+    ? captures.find(item => String(item.collection || "").toLocaleLowerCase() === collectionName.toLocaleLowerCase() && normalizeCollectionColor(item.collectionColor))?.collectionColor || ""
+    : "";
   const metadata = {
     tags: parseTagInput(tagsDraft.value),
-    collection: collectionDraft.value.trim().slice(0, 80),
+    collection: collectionName,
+    collectionColor: collectionName ? (chosenCollectionColor || existingCollectionColor) : "",
     previewTitle: previewTitleDraft.value.trim().slice(0, 180),
     previewDescription: previewDescriptionDraft.value.trim().slice(0, 320),
     previewImageUrl
@@ -1495,6 +1514,13 @@ form.addEventListener("submit",event=>{
       say(captureUiText("duplicateSkipped"));
       return;
     }
+  }
+  if (metadata.collection && metadata.collectionColor) {
+    const collectionKey = metadata.collection.toLocaleLowerCase();
+    const now = Date.now();
+    captures = captures.map(item => String(item.collection || "").toLocaleLowerCase() === collectionKey && item.collectionColor !== metadata.collectionColor
+      ? { ...item, collectionColor: metadata.collectionColor, updatedAt: now }
+      : item);
   }
   if(existing){
     captures=captures.map(item=>item.id===editingId?{...item,...metadata,text:text.slice(0,100000),updatedAt:Date.now()}:item);
@@ -2247,7 +2273,7 @@ list.addEventListener("click",async event=>{
       }
     }}));
   }
-  else if(action==="edit"){editingId=id;draft.value=item.text;tagsDraft.value=(item.tags||[]).join(", ");collectionDraft.value=item.collection||"";previewTitleDraft.value=item.previewTitle||"";previewDescriptionDraft.value=item.previewDescription||"";previewImageDraft.value=item.previewImageUrl||"";const previewDetails=document.querySelector(".capture-preview-details");if(previewDetails)previewDetails.open=Boolean(item.previewTitle||item.previewDescription||item.previewImageUrl);composeLabel.textContent="Edit capture";saveButton.textContent="Save changes ↗";saveButton.disabled=false;saveCaptureMetadataDraft();draft.focus();window.scrollTo({top:0,behavior:"smooth"});}
+  else if(action==="edit"){editingId=id;draft.value=item.text;tagsDraft.value=(item.tags||[]).join(", ");collectionDraft.value=item.collection||"";collectionColorDraft.value=normalizeCollectionColor(item.collectionColor);previewTitleDraft.value=item.previewTitle||"";previewDescriptionDraft.value=item.previewDescription||"";previewImageDraft.value=item.previewImageUrl||"";const previewDetails=document.querySelector(".capture-preview-details");if(previewDetails)previewDetails.open=Boolean(item.previewTitle||item.previewDescription||item.previewImageUrl);composeLabel.textContent="Edit capture";saveButton.textContent="Save changes ↗";saveButton.disabled=false;saveCaptureMetadataDraft();draft.focus();window.scrollTo({top:0,behavior:"smooth"});}
   else if(action==="copy"){try{await navigator.clipboard.writeText(item.text);say("Скопировано");}catch{draft.value=item.text;draft.focus();draft.select();say("Текст выделен для копирования вручную");}}
 });
 $("#backup-history-button").addEventListener("click", () => { void showBackupHistory(); });
