@@ -295,6 +295,7 @@ export function initVisualSystem() {
     if (reducedMotion || root.classList.contains("reduced-motion") || motionQuery?.matches) {
       palette.hidden = true;
       palette.inert = true;
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
       return;
     }
     palette.inert = true;
