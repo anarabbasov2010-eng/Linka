@@ -1,5 +1,15 @@
 # Changelog
 
+## Next — Consistent motion and graceful exits
+
+- Unified modal, settings, atmosphere-player and library-card entrance/exit timing into one restrained Forest Atelier motion system.
+- Modal layers now fade and soften out instead of disappearing immediately; opening a new Linka settings panel lets the previous panel finish closing underneath it.
+- Library cards that leave the active filter or search results animate out without blocking input or retaining interactive ghost controls.
+- Atmosphere settings and player panels now close with a coordinated fade, blur and short movement rather than an abrupt removal.
+- Both the operating-system reduced-motion preference and Linka's in-app reduced-motion setting suppress non-essential animation.
+- Web CI and Windows desktop PR validation are running; builds must finish successfully before this branch is release-ready.
+
+
 
 ## Next — Forest Atelier design completion
 
