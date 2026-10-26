@@ -721,7 +721,7 @@ function showAgreement({mustAccept = false} = {}) {
     actions.append(decline, accept);
   } else {
     const close=document.createElement("button"); close.className="primary"; close.textContent="Готово";
-    close.addEventListener("click", () => modalRoot.replaceChildren());
+    close.addEventListener("click", dismissModalRoot);
     actions.append(close);
   }
   content.append(actions);
