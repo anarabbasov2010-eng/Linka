@@ -109,7 +109,7 @@ This file is the persistent project checklist for the Linka improvements audit. 
 - [ ] Support collection colors and custom icons.
 - [ ] Add smart collections based on filters and saved queries.
 - [ ] Add backlinks and a graph of related notes.
-- [ ] Add a timeline view of captures, documents and project milestones.
+- [~] Add a capture Timeline view grouped by local creation date; cross-document/project milestones and richer project timelines remain open.
 - [ ] Add domain grouping and domain-specific dashboards.
 - [ ] Add statuses, reminders, due dates and priority.
 - [~] Detect likely duplicate URLs and text notes before saving.
