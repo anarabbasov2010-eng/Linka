@@ -860,7 +860,7 @@ html.reduced-motion .linka-command-root.is-closing .linka-command-backdrop {
     transition: none !important;
   }
 }
-html.reduced-motion :root,
+html.reduced-motion,
 html.reduced-motion .topbar,
 html.reduced-motion .capture,
 html.reduced-motion .item,
