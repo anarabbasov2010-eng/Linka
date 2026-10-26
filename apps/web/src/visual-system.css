@@ -606,3 +606,45 @@ mark.search-highlight {
 .cloud-sync-status[data-state="error"] { color:#d97070; border-color:color-mix(in srgb,#d97070 35%,var(--line)); }
 @media(max-width:760px) { .cloud-sync-status { max-width:132px; font-size:9px; padding:4px 6px; } }
 @media(max-width:520px) { .cloud-sync-status { max-width:100px; white-space:normal; } }
+
+
+/* Chronological capture timeline view. Existing card actions remain available. */
+.grid.timeline-mode {
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  gap:11px;
+  position:relative;
+  max-width:860px;
+  margin-inline:auto;
+}
+.timeline-day {
+  grid-column:1 / -1;
+  margin:13px 0 2px;
+  padding:0 0 8px 4px;
+  border-bottom:1px solid var(--line);
+  color:var(--muted);
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:.04em;
+}
+.timeline-day:first-child { margin-top:0; }
+.timeline-item {
+  position:relative;
+  margin-left:13px;
+  border-left:2px solid color-mix(in srgb,var(--accent) 40%,var(--line));
+  border-radius:0 16px 16px 0;
+}
+.timeline-item::before {
+  content:"";
+  position:absolute;
+  left:-7px;
+  top:22px;
+  width:10px;
+  height:10px;
+  border:2px solid var(--panel-solid);
+  border-radius:50%;
+  background:var(--accent);
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 35%,var(--line));
+}
+.timeline-item .date { font-variant-numeric:tabular-nums; }
+.timeline-mode .empty { max-width:640px; margin-inline:auto; }
