@@ -286,6 +286,35 @@ function compareVersions(a, b) {
   }
   return 0;
 }
+function motionIsReduced() {
+  return Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches)
+    || document.documentElement.classList.contains("reduced-motion");
+}
+function animateLeavingCards(cards) {
+  if (!cards.length || motionIsReduced()) return;
+  for (const { node, rect } of cards) {
+    if (!rect || rect.width < 2 || rect.height < 2) continue;
+    const ghost = node.cloneNode(true);
+    ghost.classList.add("linka-card-exit");
+    ghost.setAttribute("aria-hidden", "true");
+    ghost.inert = true;
+    Object.assign(ghost.style, {
+      position: "fixed",
+      left: rect.left + "px",
+      top: rect.top + "px",
+      width: rect.width + "px",
+      height: rect.height + "px",
+      maxHeight: rect.height + "px",
+      overflow: "hidden",
+      margin: "0",
+      zIndex: "10",
+      pointerEvents: "none"
+    });
+    document.body.append(ghost);
+    window.setTimeout(() => ghost.remove(), 240);
+  }
+}
+
 function render() {
   for (const id of selectedIds) if (!captures.some(item => item.id === id)) selectedIds.delete(id);
   const shown = visibleCaptures(captures, activeFilter, search.value);
@@ -335,6 +364,10 @@ function render() {
       bulkButton(captureUiText("trash"), "delete", true);
     }
   }
+  const visibleIds = new Set(shown.map(item => item.id));
+  const leavingCards = Array.from(list.querySelectorAll(".item[data-item-id]"))
+    .filter(node => !visibleIds.has(node.dataset.itemId))
+    .map(node => ({ node, rect: node.getBoundingClientRect() }));
   list.replaceChildren();
   if (!shown.length) {
     const empty = document.createElement("div");
@@ -346,6 +379,7 @@ function render() {
     description.textContent = captures.length ? "Try another search or switch the filter." : "Paste a link or write a thought above. It will stay in this browser profile until you remove it.";
     empty.append(title, description);
     list.append(empty);
+    animateLeavingCards(leavingCards);
     return;
   }
   shown.forEach((item, index) => {
@@ -431,6 +465,7 @@ function render() {
     card.append(foot);
     list.append(card);
   });
+  animateLeavingCards(leavingCards);
 }
 function showSearchSpace(initial = "") {
   const content = document.createElement("div"); content.className = "search-space";
@@ -548,7 +583,7 @@ function showSearchSpace(initial = "") {
       row.addEventListener("click", () => {
         search.value = input.value; activeFilter = "all";
         filters.forEach(button => button.classList.toggle("active", button.dataset.filter === activeFilter));
-        render(); modalRoot.replaceChildren();
+        render(); dismissModalRoot();
         requestAnimationFrame(() => {
           const match = Array.from(list.querySelectorAll("[data-item-id]")).find(node => node.dataset.itemId === item.id);
           if (match) { match.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" }); match.classList.add("spotlight"); setTimeout(() => match.classList.remove("spotlight"), 950); }
@@ -571,7 +606,7 @@ function showSearchSpace(initial = "") {
         const type = document.createElement("span"); type.className = "search-result-type"; type.textContent = "Document";
         copy.append(rowTitle, detail); row.append(thumb, copy, type);
         row.addEventListener("click", async () => {
-          modalRoot.replaceChildren();
+          dismissModalRoot();
           const opened = await openLinkaDocumentById(item.id).catch(() => false);
           if (!opened) say("Could not open this document. It may have been deleted.");
         });
@@ -601,17 +636,38 @@ function resetEditor() {
   saveButton.innerHTML = 'Save to inbox <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg>';
   saveButton.disabled = true;
 }
+function modalMotionReduced() {
+  return Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches)
+    || document.documentElement.classList.contains("reduced-motion");
+}
+function dismissModalLayer(layer) {
+  if (!layer?.isConnected || layer.classList.contains("closing")) return;
+  layer.classList.add("closing");
+  layer.setAttribute("aria-hidden", "true");
+  if (modalMotionReduced()) layer.remove();
+  else window.setTimeout(() => layer.remove(), 230);
+}
+function dismissModalRoot() {
+  Array.from(modalRoot?.children || []).forEach(dismissModalLayer);
+}
+
 function modalShell(content, { dismissable = false } = {}) {
   const layer = document.createElement("div");
   layer.className = "modal-layer";
   layer.innerHTML = '<section class="modal" role="dialog" aria-modal="true"></section>';
   layer.firstElementChild.append(content);
   if (dismissable) {
-    layer.addEventListener("click", event => { if (event.target === layer) layer.remove(); });
-    const esc = event => { if (event.key === "Escape") { layer.remove(); document.removeEventListener("keydown", esc); } };
+    let esc = null;
+    const close = () => {
+      dismissModalLayer(layer);
+      if (esc) document.removeEventListener("keydown", esc);
+    };
+    layer.addEventListener("click", event => { if (event.target === layer) close(); });
+    esc = event => { if (event.key === "Escape") close(); };
     document.addEventListener("keydown", esc);
   }
-  modalRoot.replaceChildren(layer);
+  Array.from(modalRoot.children).forEach(dismissModalLayer);
+  modalRoot.append(layer);
   return layer;
 }
 function addTermsBody(container) {
@@ -639,7 +695,7 @@ function showAgreement({mustAccept = false} = {}) {
   if (mustAccept) {
     const decline=document.createElement("button"); decline.className="ghost"; decline.textContent="Decline";
     decline.addEventListener("click", () => {
-      modalRoot.replaceChildren();
+      dismissModalRoot();
       $("#app").replaceChildren();
       const panel=document.createElement("section"); panel.className="declined";
       const h=document.createElement("h1"); h.textContent="Linka is paused";
@@ -647,7 +703,7 @@ function showAgreement({mustAccept = false} = {}) {
       panel.append(h,p); $("#app").append(panel);
     });
     const accept=document.createElement("button"); accept.className="primary"; accept.textContent="I agree and continue";
-    accept.addEventListener("click", () => { localStorage.setItem("linka.termsAccepted", TERMS_VERSION); modalRoot.replaceChildren(); say("Agreement saved on this device"); window.dispatchEvent(new Event("linka:agreement-accepted")); });
+    accept.addEventListener("click", () => { localStorage.setItem("linka.termsAccepted", TERMS_VERSION); dismissModalRoot(); say("Agreement saved on this device"); window.dispatchEvent(new Event("linka:agreement-accepted")); });
     actions.append(decline, accept);
   } else {
     const close=document.createElement("button"); close.className="primary"; close.textContent="Готово";
@@ -710,7 +766,7 @@ function showCloudSyncНастройки() {
   const actions = document.createElement("div"); actions.className = "modal-actions";
   const close = document.createElement("button"); close.type = "button"; close.className = "ghost"; close.textContent = "Закрыть";
   let pairingCancelled = false;
-  close.addEventListener("click", () => { pairingCancelled = true; if (cooldownTimer) clearInterval(cooldownTimer); modalRoot.replaceChildren(); });
+  close.addEventListener("click", () => { pairingCancelled = true; if (cooldownTimer) clearInterval(cooldownTimer); dismissModalRoot(); });
   const makeButton = (label, cls, fn) => {
     const button = document.createElement("button"); button.type = "button"; button.className = cls; button.textContent = label;
     button.addEventListener("click", fn); actions.append(button); return button;
@@ -728,7 +784,7 @@ function showCloudSyncНастройки() {
   const disconnectButton = makeButton("Выйти из аккаунта", "ghost", () => {
     disconnectCloud();
     statusLine.textContent = "Выход выполнен. Локальные сохранения остались на устройстве.";
-    modalRoot.replaceChildren();
+    dismissModalRoot();
   });
   if (session) {
     form.hidden = true; advanced.hidden = true;
