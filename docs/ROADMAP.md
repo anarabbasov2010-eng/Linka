@@ -26,7 +26,7 @@ This file is the persistent project checklist for the Linka improvements audit. 
 - [x] Retry transient cloud sync network/HTTP failures with bounded exponential backoff and respect a capped Retry-After header.
 - [ ] Keep deletes as tombstones until every relevant device has observed them or a retention policy expires.
 - [ ] Add sync diagnostics that redact session tokens and private capture content.
-- [~] Keep local-only mode usable when cloud credentials are not configured.
+- [~] Keep local-only mode usable when cloud credentials are not configured. A persistent UI status now distinguishes local-only, pending, syncing, last successful sync and error states.
 - [~] Audit all storage reads/writes for silent parse, quota and permission failures.
 - [x] Reject an entire local capture save when any record is invalid; preserve the last known-good library instead of filtering malformed records out.
 - [x] On malformed local JSON, preserve the raw source instead of replacing it with an empty library; block writes until the user exports the source or explicitly starts a new library.
@@ -122,9 +122,9 @@ This file is the persistent project checklist for the Linka improvements audit. 
 ## Search and retrieval
 
 - [~] Provide global search across captures and local text documents.
-- [~] Support filters and operators such as type, tag, collection, read-later, pinned, domain and date.
+- [x] Support filters and operators for type, tag, collection, read-later, pinned, domain, date, untagged records and metadata presence (`has:tags`, `has:cover`, `has:description`).
 - [x] Highlight matches in capture cards and global-search results (titles, descriptions and document excerpts) using safe text nodes; literal markup is never injected as HTML.
-- [ ] Add fuzzy matching and language-aware morphology.
+- [~] Add typo-tolerant fuzzy matching for single-word queries; language-aware morphology and multiword fuzzy search remain open.
 - [ ] Search extracted PDF text and offline snapshots.
 - [~] Keep named saved searches and a bounded local search history.
 - [ ] Add advanced filter builder and combined query groups.
@@ -138,10 +138,10 @@ This file is the persistent project checklist for the Linka improvements audit. 
 - [~] Autosave documents locally.
 - [x] Show an explicit unsaved-changes state and the time of the latest successful local document save.
 - [~] Save a bounded local emergency draft (up to 200,000 characters) on edits and expose explicit restore/discard controls after reload; very large drafts still rely on the regular IndexedDB autosave.
-- [ ] Add Markdown preview, formatting tools and document outline.
+- [~] Provide a safe local Markdown preview (raw HTML is escaped; only credential-free HTTP(S) links are active) and clickable heading outline navigation; formatting tools remain open.
 - [ ] Add reusable templates.
 - [ ] Add document version history, diff and restore.
-- [ ] Add word/character statistics and focus mode.
+- [x] Add word/character/reading-time statistics and a distraction-reduced focus mode with Escape to exit.
 - [ ] Add split editor/preview and find/replace.
 - [ ] Add export to Markdown, plain text, HTML and portable Linka format.
 - [~] Keep the .linka file format versioned and document its schema.
@@ -237,7 +237,7 @@ This file is the persistent project checklist for the Linka improvements audit. 
 - [~] Explain local-first storage and optional cloud sync.
 - [ ] Explain backup and recovery options during first-run onboarding.
 - [ ] Add a searchable shortcut reference and shortcut conflict handling.
-- [ ] Clearly indicate local save, cloud sync and backup status.
+- [~] Show local-only/sync-pending/syncing/last-success/error state; a unified backup status and all-string localization remain to be completed.
 - [ ] Explain when a document is too large for animated rendering or import.
 - [ ] Explain updater availability, signing limitations and recovery from failed updates.
 - [ ] Clarify delete-to-Trash versus permanent deletion.
