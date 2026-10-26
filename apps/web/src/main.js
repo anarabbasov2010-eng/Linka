@@ -51,6 +51,9 @@ if (sortOrder) sortOrder.value = sortMode;
 const count = $("#capture-count");
 const status = $("#status");
 const cloudStatusElement = $("#cloud-sync-status");
+const focusModeButton = $("#focus-mode-button");
+const APP_FOCUS_STORAGE_KEY = "linka.appFocusMode.v1";
+let appFocusMode = false;
 const composeLabel = $("#compose-label");
 const filters = Array.from(document.querySelectorAll("[data-filter]"));
 const modalRoot = $("#modal-root");
@@ -512,6 +515,33 @@ function persist() {
   scheduleCloudSync();
   return true;
 }
+function setAppFocusMode(enabled, { persist = true, announce = false } = {}) {
+  appFocusMode = Boolean(enabled);
+  document.documentElement.dataset.appFocus = appFocusMode ? "true" : "false";
+  const language = (() => {
+    try { return (localStorage.getItem("linka.language.v1") || "en").toLowerCase().slice(0, 2); }
+    catch { return "en"; }
+  })();
+  const labels = {
+    en: { on: "Exit focus mode", off: "Enter focus mode", enabled: "Focus mode enabled", disabled: "Focus mode disabled" },
+    ru: { on: "Выйти из режима фокуса", off: "Включить режим фокуса", enabled: "Режим фокуса включён", disabled: "Режим фокуса выключен" },
+    az: { on: "Fokus rejimindən çıx", off: "Fokus rejimini aktiv et", enabled: "Fokus rejimi aktivdir", disabled: "Fokus rejimi söndürüldü" },
+    tr: { on: "Odak modundan çık", off: "Odak modunu aç", enabled: "Odak modu açıldı", disabled: "Odak modu kapatıldı" }
+  };
+  const copy = labels[language] || labels.en;
+  const buttonLabel = appFocusMode ? copy.on : copy.off;
+  if (focusModeButton) {
+    focusModeButton.setAttribute("aria-label", buttonLabel);
+    focusModeButton.title = buttonLabel + " (Ctrl+Shift+F)";
+    focusModeButton.setAttribute("aria-pressed", String(appFocusMode));
+    focusModeButton.classList.toggle("focus-mode-active", appFocusMode);
+  }
+  if (persist) {
+    try { localStorage.setItem(APP_FOCUS_STORAGE_KEY, String(appFocusMode)); } catch {}
+  }
+  if (announce) say(appFocusMode ? copy.enabled : copy.disabled);
+}
+
 function updateCloudSyncStatus(state = "auto", detail = "") {
   if (!cloudStatusElement) return;
   const language = (() => {
@@ -2382,6 +2412,8 @@ document.addEventListener("keydown",event=>{
   const command = event.ctrlKey || event.metaKey;
   const key = event.key.toLowerCase();
   const typingTarget = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement || event.target?.isContentEditable;
+  if (command && !typingTarget && event.shiftKey && key === "f") { event.preventDefault(); setAppFocusMode(!appFocusMode); return; }
+  if (event.key === "Escape" && appFocusMode && !typingTarget) { event.preventDefault(); setAppFocusMode(false); return; }
   if (command && !typingTarget && key === "z" && event.shiftKey && redoStack.length) {
     event.preventDefault(); restoreCaptureHistory(redoStack, undoStack, "redoDone"); return;
   }
@@ -2427,6 +2459,8 @@ document.addEventListener("keydown",event=>{
   }
 });
 document.documentElement.classList.toggle("reduced-motion",reduceMotion);
+setAppFocusMode(localStorage.getItem(APP_FOCUS_STORAGE_KEY) === "true", { persist: false });
+focusModeButton?.addEventListener("click", () => setAppFocusMode(!appFocusMode));
 updateHistoryControls();
 updateCloudSyncStatus("auto");
 $("#linka-language")?.addEventListener("change", () => updateCloudSyncStatus("auto"));
