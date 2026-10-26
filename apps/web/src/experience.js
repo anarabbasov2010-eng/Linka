@@ -5,7 +5,7 @@ import {
   requestEmailOtp, saveCloudConfig, saveLinkaProfile, verifyEmailOtp,
   startGoogleOAuth, completeGoogleOAuthCallback
 } from "./cloud-sync.js";
-import { setLinkaDensity, setLinkaEffects } from "./visual-system.js";
+import { setLinkaDensity, setLinkaEffects, setLinkaAppearanceControl, getLinkaAppearanceControl, resetLinkaAppearance } from "./visual-system.js";
 
 const LANG_KEY = "linka.language.v1";
 const ONBOARDED_KEY = "linka.experience.onboarded.v1";
@@ -811,10 +811,10 @@ function showSettings() {
   dialog.panel.append(pickerLabel);
 
   const preferenceLabels = ({
-    en: { accent: "Accent color", density: "Interface density", compact: "Compact", standard: "Standard", spacious: "Spacious", effects: "Visual effects", quiet: "Quiet", balanced: "Balanced", atmosphere: "Atmosphere", forest: "Forest", oled: "OLED black", cloud: "Cloud sync", backdrop: "Atmosphere & music", agreement: "User agreement" },
-    ru: { accent: "Акцентный цвет", density: "Плотность интерфейса", compact: "Компактная", standard: "Стандартная", spacious: "Просторная", effects: "Визуальные эффекты", quiet: "Минимальные", balanced: "Сбалансированные", atmosphere: "Атмосфера", forest: "Лес", oled: "OLED-чёрная", cloud: "Облачная синхронизация", backdrop: "Атмосфера и музыка", agreement: "Пользовательское соглашение" },
-    az: { accent: "Vurğu rəngi", density: "İnterfeys sıxlığı", compact: "Yığcam", standard: "Standart", spacious: "Geniş", effects: "Vizual effektlər", quiet: "Sakit", balanced: "Balanslı", atmosphere: "Atmosfer", forest: "Meşə", oled: "OLED qara", cloud: "Bulud sinxronizasiyası", backdrop: "Atmosfer və musiqi", agreement: "İstifadəçi razılaşması" },
-    tr: { accent: "Vurgu rengi", density: "Arayüz yoğunluğu", compact: "Kompakt", standard: "Standart", spacious: "Geniş", effects: "Görsel efektler", quiet: "Sakin", balanced: "Dengeli", atmosphere: "Atmosfer", forest: "Orman", oled: "OLED siyahı", cloud: "Bulut eşitleme", backdrop: "Atmosfer ve müzik", agreement: "Kullanıcı sözleşmesi" }
+    en: { accent: "Accent color", density: "Interface density", compact: "Compact", standard: "Standard", spacious: "Spacious", effects: "Visual effects", quiet: "Quiet", balanced: "Balanced", atmosphere: "Atmosphere", forest: "Forest", oled: "OLED black", cloud: "Cloud sync", backdrop: "Atmosphere & music", agreement: "User agreement", glassOpacity: "Glass transparency", glassBlur: "Glass blur", glassSaturation: "Glass saturation", backgroundDim: "Background dimming", appearanceReset: "Reset appearance", glassOpacityHelp: "Lower values make panels more transparent.", glassBlurHelp: "Higher blur softens what sits behind panels.", glassSaturationHelp: "Adjust the richness of colors seen through glass.", backgroundDimHelp: "Controls how dark the background scene appears." },
+    ru: { accent: "Акцентный цвет", density: "Плотность интерфейса", compact: "Компактная", standard: "Стандартная", spacious: "Просторная", effects: "Визуальные эффекты", quiet: "Минимальные", balanced: "Сбалансированные", atmosphere: "Атмосфера", forest: "Лес", oled: "OLED-чёрная", cloud: "Облачная синхронизация", backdrop: "Атмосфера и музыка", agreement: "Пользовательское соглашение", glassOpacity: "Прозрачность стекла", glassBlur: "Размытие стекла", glassSaturation: "Насыщенность стекла", backgroundDim: "Затемнение фона", appearanceReset: "Сбросить оформление", glassOpacityHelp: "Чем ниже значение, тем прозрачнее панели.", glassBlurHelp: "Сильное размытие смягчает изображение за панелями.", glassSaturationHelp: "Настраивает насыщенность цветов, видимых сквозь стекло.", backgroundDimHelp: "Управляет затемнением фоновой сцены." },
+    az: { accent: "Vurğu rəngi", density: "İnterfeys sıxlığı", compact: "Yığcam", standard: "Standart", spacious: "Geniş", effects: "Vizual effektlər", quiet: "Sakit", balanced: "Balanslı", atmosphere: "Atmosfer", forest: "Meşə", oled: "OLED qara", cloud: "Bulud sinxronizasiyası", backdrop: "Atmosfer və musiqi", agreement: "İstifadəçi razılaşması", glassOpacity: "Şüşə şəffaflığı", glassBlur: "Şüşə bulanıqlığı", glassSaturation: "Şüşə rəng doyumu", backgroundDim: "Fonun qaraldılması", appearanceReset: "Görünüşü sıfırla", glassOpacityHelp: "Dəyər azaldıqca panellər daha şəffaf olur.", glassBlurHelp: "Bulanıqlıq panellərin arxasındakı təsviri yumşaldır.", glassSaturationHelp: "Şüşədən görünən rənglərin doyumunu tənzimləyir.", backgroundDimHelp: "Fon səhnəsinin nə qədər qaralacağını idarə edir." },
+    tr: { accent: "Vurgu rengi", density: "Arayüz yoğunluğu", compact: "Kompakt", standard: "Standart", spacious: "Geniş", effects: "Görsel efektler", quiet: "Sakin", balanced: "Dengeli", atmosphere: "Atmosfer", forest: "Orman", oled: "OLED siyahı", cloud: "Bulut eşitleme", backdrop: "Atmosfer ve müzik", agreement: "Kullanıcı sözleşmesi", glassOpacity: "Cam şeffaflığı", glassBlur: "Cam bulanıklığı", glassSaturation: "Cam doygunluğu", backgroundDim: "Arka plan karartma", appearanceReset: "Görünümü sıfırla", glassOpacityHelp: "Değer azaldıkça paneller daha şeffaf olur.", glassBlurHelp: "Bulanıklık, panellerin arkasındaki görüntüyü yumuşatır.", glassSaturationHelp: "Camın arkasından görünen renklerin yoğunluğunu ayarlar.", backgroundDimHelp: "Arka plan sahnesinin ne kadar karartılacağını ayarlar." }
   })[langCode()] || {};
   const addPreference = (label, options, selected, apply) => {
     const field = make("label", "linka-field");
@@ -855,6 +855,52 @@ function showSettings() {
     { value: "balanced", label: preferenceLabels.balanced || "Balanced" },
     { value: "atmosphere", label: preferenceLabels.atmosphere || "Atmosphere" }
   ], localStorage.getItem("linka.effects") || "atmosphere", setLinkaEffects);
+
+  const materialsSection = make("section", "linka-settings-block");
+  materialsSection.append(make("h3", "", langCode() === "ru" ? "Настройка материалов" : langCode() === "az" ? "Materialların tənzimlənməsi" : langCode() === "tr" ? "Malzeme ayarları" : "Material tuning"));
+  const addAppearanceSlider = (name, labelKey, min, max, step, unit, helpKey) => {
+    const wrap = make("div", "linka-appearance-control");
+    const head = make("div", "linka-appearance-control-head");
+    const id = "linka-appearance-" + name;
+    const label = make("label", "", preferenceLabels[labelKey] || labelKey);
+    label.htmlFor = id;
+    const output = make("output", "");
+    const input = make("input", "");
+    input.id = id;
+    input.type = "range";
+    input.min = String(min);
+    input.max = String(max);
+    input.step = String(step);
+    input.value = String(getLinkaAppearanceControl(name));
+    input.setAttribute("aria-describedby", id + "-help");
+    const renderValue = () => { output.value = input.value + unit; output.textContent = output.value; };
+    input.addEventListener("input", () => { setLinkaAppearanceControl(name, input.value); renderValue(); });
+    head.append(label, output);
+    const help = make("small", "", preferenceLabels[helpKey] || "");
+    help.id = id + "-help";
+    wrap.append(head, input, help);
+    materialsSection.append(wrap);
+    renderValue();
+  };
+  addAppearanceSlider("glassOpacity", "glassOpacity", 25, 95, 1, "%", "glassOpacityHelp");
+  addAppearanceSlider("glassBlur", "glassBlur", 0, 32, 1, " px", "glassBlurHelp");
+  addAppearanceSlider("glassSaturation", "glassSaturation", 80, 150, 1, "%", "glassSaturationHelp");
+  addAppearanceSlider("backgroundDim", "backgroundDim", 25, 100, 1, "%", "backgroundDimHelp");
+  const resetAppearance = button(preferenceLabels.appearanceReset || "Reset appearance", "linka-button linka-button-secondary linka-appearance-reset");
+  resetAppearance.addEventListener("click", () => {
+    resetLinkaAppearance();
+    materialsSection.querySelectorAll('input[type="range"]').forEach(input => {
+      const name = input.id.replace("linka-appearance-", "");
+      input.value = String(getLinkaAppearanceControl(name));
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const density = dialog.panel.querySelectorAll("select.linka-select");
+    if (density[1]) density[1].value = "standard";
+    if (density[2]) density[2].value = "balanced";
+  });
+  materialsSection.append(resetAppearance);
+  dialog.panel.append(materialsSection);
+
 
   const soundSection = make("div", "linka-settings-block");
   soundSection.append(make("h3", "", tr("ambientSound")), make("p", "linka-muted", tr("ambientSoundBody")));
