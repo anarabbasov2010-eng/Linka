@@ -297,11 +297,12 @@ export function initVisualSystem() {
       palette.inert = true;
       return;
     }
-    palette.inert = false;
+    palette.inert = true;
     palette.classList.add("is-closing");
     window.clearTimeout(paletteCloseTimer);
     paletteCloseTimer = window.setTimeout(() => {
       palette.hidden = true;
+      palette.inert = true;
       palette.classList.remove("is-closing");
     }, 190);
     if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
@@ -338,7 +339,7 @@ export function initVisualSystem() {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
       event.preventDefault();
       event.stopImmediatePropagation();
-      if (palette.hidden) openPalette(); else closePalette();
+      if (palette.hidden || palette.classList.contains("is-closing")) openPalette(); else closePalette();
       return;
     }
     if (!palette.hidden && event.key === "Escape") {
