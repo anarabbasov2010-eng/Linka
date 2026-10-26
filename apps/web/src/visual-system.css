@@ -870,3 +870,14 @@ html.reduced-motion .linka-experience-panel,
 html.reduced-motion #linka-atmosphere .veil {
   transition: none !important;
 }
+
+
+/* New library items enter softly; the amount is capped in JavaScript for large libraries. */
+.linka-card-enter {
+  animation: linka-soft-enter 300ms var(--ease-linka-enter) both;
+  will-change: opacity, transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .linka-card-enter { animation: none !important; }
+}
+html.reduced-motion .linka-card-enter { animation: none !important; }
