@@ -10,7 +10,7 @@ async function openLinka(page, { reducedMotion = "no-preference", disableVideo =
     localStorage.setItem("linka.termsAccepted", acceptedTerms);
     if (hasOnboarded) localStorage.setItem("linka.experience.onboarded.v1", "true");
     if (disableForestVideo) {
-      localStorage.setItem("linka.atmosphere.themeVersion", "forest-studio-v3");
+      localStorage.setItem("linka.atmosphere.themeVersion", JSON.stringify("forest-studio-v3"));
       localStorage.setItem("linka.atmosphere.video", "false");
     }
   }, { acceptedTerms: ACCEPTED_TERMS, disableForestVideo: disableVideo, hasOnboarded: onboarded });
