@@ -340,22 +340,67 @@ body{background:var(--bg);background-image:radial-gradient(ellipse at 8% 0%,rgba
     .linka-release-notes strong {display:block;color:var(--text);font-size:12px;margin-bottom:6px;font-weight:650}
     .linka-release-notes ul {margin:0;padding-left:18px;display:grid;gap:5px}
     .linka-release-notes li::marker {color:var(--accent)}
+  
+    /* Stable hit-testing: decorative layers and closed overlays must never eat clicks. */
+    [hidden] { display: none !important; }
+    #linka-atmosphere, #linka-atmosphere * { pointer-events: none !important; }
+    .web-nav-active-pill { pointer-events: none !important; }
+    .modal-layer.closing,
+    .modal-layer[aria-hidden="true"],
+    .linka-player-panel[aria-hidden="true"],
+    .linka-command-root[aria-hidden="true"],
+    .linka-command-root:not(.palette-open) { pointer-events: none !important; }
+    .linka-toast-stack { pointer-events: none !important; }
+    .linka-toast-stack .linka-toast,
+    .linka-toast-stack .linka-toast button { pointer-events: auto !important; }
+    .hero { display: none !important; }
+    .privacy, .capture-subtitle, .hint, .footer > span:nth-child(2) { display: none !important; }
+    .capture-foot { justify-content: flex-end; }
+    @media (max-width: 760px) {
+      html[data-platform="desktop"] .shell {
+        display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 100%;
+        margin: 0; padding: 12px; min-width: 0;
+      }
+      html[data-platform="desktop"] .web-sidebar {
+        position: sticky; top: 0; z-index: 25; height: auto; min-height: 0; width: 100%;
+        display: flex; flex-direction: row; align-items: center; gap: 8px; padding: 8px;
+        border: 1px solid var(--line); border-radius: 16px; background: var(--panel-solid);
+      }
+      html[data-platform="desktop"] .web-side-brand,
+      html[data-platform="desktop"] .web-side-caption { display: none; }
+      html[data-platform="desktop"] .web-side-nav {
+        display: flex; flex-direction: row; align-items: center; gap: 4px; width: 100%;
+        overflow-x: auto; overflow-y: hidden; padding: 2px; scrollbar-width: thin;
+      }
+      html[data-platform="desktop"] .web-nav-item {
+        flex: 0 0 38px; width: 38px; min-width: 38px; min-height: 38px; height: 38px;
+        justify-content: center; padding: 6px;
+      }
+      html[data-platform="desktop"] .web-nav-label { display: none; }
+      html[data-platform="desktop"] .topbar,
+      html[data-platform="desktop"] .capture,
+      html[data-platform="desktop"] .workspace,
+      html[data-platform="desktop"] .footer { grid-area: auto; width: 100%; max-width: 100%; margin: 0; }
+      html[data-platform="desktop"] .topbar { justify-content: flex-end; }
+      html[data-platform="desktop"] .grid { grid-template-columns: minmax(0, 1fr); }
+      html[data-platform="desktop"] .tools { flex-wrap: wrap; }
+      html[data-platform="desktop"] .search { width: min(100%, 240px); max-width: 100%; }
+    }
+
   </style>
 </head>
 <body>
     <main class="shell" id="app">
     <header class="topbar">
       <a class="brand" href="#" aria-label="Linka home"><img src="/linka-mark.svg" alt=""><span class="brand-name">linka</span></a>
-      <div class="top-actions"><div class="privacy"><span class="dot"></span>Private by default · local-first</div><label class="language-wrap" aria-label="Application language"><span class="sr-only">Language</span><select id="linka-language" class="language-select" aria-label="Application language"><option value="en">EN</option><option value="ru">RU</option><option value="az">AZ</option><option value="tr">TR</option></select></label><button class="icon-btn search-open" id="search-space-button" type="button" aria-label="Search your library" title="Search your library (Ctrl/⌘ K)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.8" cy="10.8" r="6.5"/><path d="m16 16 4 4"/></svg></button><button class="icon-btn" id="settings-button" type="button" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.7 2.95-.08-.02a1.7 1.7 0 0 0-1.82.4l-.06.06h-3.4l-.04-.08a1.7 1.7 0 0 0-1.55-1.03 1.7 1.7 0 0 0-1.2.49l-.07.06-2.95-1.7.02-.08a1.7 1.7 0 0 0-.4-1.82l-.06-.06v-3.4l.08-.04a1.7 1.7 0 0 0 1.03-1.55 1.7 1.7 0 0 0-.49-1.2l-.06-.07 1.7-2.95.08.02a1.7 1.7 0 0 0 1.82-.4l.06-.06h3.4l.04.08a1.7 1.7 0 0 0 1.55 1.03 1.7 1.7 0 0 0 1.2-.49l.07-.06 2.95 1.7-.02.08a1.7 1.7 0 0 0 .4 1.82l.06.06v3.4z" transform="translate(-.5 -.5) scale(1.04)"/></svg></button></div>
+      <div class="top-actions"><label class="language-wrap" aria-label="Application language"><span class="sr-only">Language</span><select id="linka-language" class="language-select" aria-label="Application language"><option value="en">EN</option><option value="ru">RU</option><option value="az">AZ</option><option value="tr">TR</option></select></label><button class="icon-btn search-open" id="search-space-button" type="button" aria-label="Search your library" title="Search your library (Ctrl/⌘ K)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.8" cy="10.8" r="6.5"/><path d="m16 16 4 4"/></svg></button><button class="icon-btn" id="settings-button" type="button" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.7 2.95-.08-.02a1.7 1.7 0 0 0-1.82.4l-.06.06h-3.4l-.04-.08a1.7 1.7 0 0 0-1.55-1.03 1.7 1.7 0 0 0-1.2.49l-.07.06-2.95-1.7.02-.08a1.7 1.7 0 0 0-.4-1.82l-.06-.06v-3.4l.08-.04a1.7 1.7 0 0 0 1.03-1.55 1.7 1.7 0 0 0-.49-1.2l-.06-.07 1.7-2.95.08.02a1.7 1.7 0 0 0 1.82-.4l.06-.06h3.4l.04.08a1.7 1.7 0 0 0 1.55 1.03 1.7 1.7 0 0 0 1.2-.49l.07-.06 2.95 1.7-.02.08a1.7 1.7 0 0 0 .4 1.82l.06.06v3.4z" transform="translate(-.5 -.5) scale(1.04)"/></svg></button></div>
     </header>
-    <section class="hero">
-      <div class="eyebrow">Your personal library</div>
+    <section class="hero" aria-hidden="true">
       <h1><span class="word" style="--i:0">Keep</span> <span class="word" style="--i:1">what</span><br><span class="word second" style="--i:2">matters.</span></h1>
       <p>Links, notes, and useful ideas.<br>Saved once. Easy to find again.</p>
-      <p class="hero-sub"><span class="dot"></span>On-device first <span class="hero-divider">/</span> Cloud sync is optional</p>
     </section>
     <form class="capture" id="capture-form">
-      <div class="capture-head"><div><span class="capture-title" id="compose-label">Быстрое сохранение</span><span class="capture-subtitle">Keep the useful stuff.</span></div><span class="shortcut">Ctrl / ⌘ + Enter</span></div>
+      <div class="capture-head"><div><span class="capture-title" id="compose-label">Быстрое сохранение</span></div><span class="shortcut">Ctrl / ⌘ + Enter</span></div>
       <textarea class="compose" id="capture-text" maxlength="100000" placeholder="Drop a link. Save a thought. Keep it for later…" aria-label="Capture text"></textarea>
       <div class="capture-meta">
         <label><span id="capture-tags-label">Tags</span><input id="capture-tags" list="linka-tag-options" maxlength="1000" placeholder="design, reading, work" autocomplete="off"></label>
@@ -363,7 +408,7 @@ body{background:var(--bg);background-image:radial-gradient(ellipse at 8% 0%,rgba
         <datalist id="linka-tag-options"></datalist>
         <datalist id="linka-collection-options"></datalist>
       </div>
-      <div class="capture-foot"><span class="hint">Saved on this device.<br>Export a backup whenever you need.</span><button class="primary" id="save-button" type="submit" disabled>Save to inbox <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg></button></div>
+      <div class="capture-foot"><button class="primary" id="save-button" type="submit" disabled>Save to inbox <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg></button></div>
     </form>
     <section class="workspace">
       <div class="toolbar"><div class="section-title">Your inbox <span class="count" id="capture-count">0 items</span></div><div class="tools"><input class="search" id="search" type="search" placeholder="Поиск по библиотеке…" aria-label="Поиск по библиотеке"><button class="ghost" id="export-button" type="button">Экспорт</button><button class="ghost" id="import-button" type="button">Импорт</button><input class="file-input" id="import-file" type="file" accept="application/json,.json"></div></div>
@@ -371,7 +416,7 @@ body{background:var(--bg);background-image:radial-gradient(ellipse at 8% 0%,rgba
       <section class="grid" id="capture-list" aria-live="polite"></section>
       <div class="status" id="status" role="status" aria-live="polite"></div>
     </section>
-    <footer class="footer"><span><strong>linka</strong> · твоя личная библиотека</span><span>Ничего лишнего. Всё под твоим контролем. Важное лучше резервировать.</span></footer>
+    <footer class="footer"><span><strong>linka</strong></span></footer>
   </main>
   <div id="modal-root"></div>
   <script src="/linka-config.js"></script>
