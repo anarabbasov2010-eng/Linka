@@ -2,6 +2,8 @@
 
 ## Next — Utility surface, account entry and future plans
 
+- Android: brought the native Compose app into the Forest Atelier visual system with aligned forest/ivory/brass tokens, five saved accent palettes, adjustable glass opacity and background dimming, selectable motion/texture profiles, and a localized local-time card. Existing native navigation, local storage, forest/photo/video backgrounds, music player, and document flows remain in place.
+
 - Added a top-edge utility panel that reveals local time, date, optional current weather and Linka's account/local-first state with a calm slide-down motion.
 - Weather access is opt-in: geolocation is requested only after the user selects it, coordinates stay in local storage, and the weather provider receives no account or library data.
 - Restyled the Google-first account entry and email-code fallback in the Forest Atelier visual language without replacing the existing Google OAuth flow.
