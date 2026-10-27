@@ -375,6 +375,37 @@ body{background:var(--bg);background-image:radial-gradient(ellipse at 8% 0%,rgba
   </main>
   <div id="modal-root"></div>
   <script src="/linka-config.js"></script>
+  <script>
+    (() => {
+      const report = (kind, detail) => {
+        const message = String(kind + ": " + (detail || "unknown")).slice(0, 2400)
+          .replace(/(access_token|refresh_token|token|secret|code|key)=([^&\\s]+)/gi, "$1=[redacted]");
+        try {
+          const invoke = window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke;
+          if (typeof invoke === "function") void invoke("log_startup_diagnostic", { message }).catch(() => {});
+          const key = "linka.startup.diagnostics.v1";
+          const entries = JSON.parse(localStorage.getItem(key) || "[]");
+          entries.push({ at: new Date().toISOString(), message });
+          localStorage.setItem(key, JSON.stringify(entries.slice(-8)));
+        } catch (_) {}
+      };
+      window.addEventListener("error", event => report("page error",
+        (event.message || "unknown error") + " at " + (event.filename || "unknown") + ":" + (event.lineno || 0) + ":" + (event.colno || 0)));
+      window.addEventListener("unhandledrejection", event => {
+        const reason = event.reason;
+        report("unhandled rejection", reason && (reason.stack || reason.message) || String(reason || "unknown rejection"));
+      });
+      try {
+        const key = "linka.startup.diagnostics.v1";
+        const entries = JSON.parse(localStorage.getItem(key) || "[]");
+        const invoke = window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke;
+        if (entries.length && typeof invoke === "function") {
+          void invoke("log_startup_diagnostic", { message: "Previous launch diagnostics: " + JSON.stringify(entries).slice(0, 1800) }).catch(() => {});
+          localStorage.removeItem(key);
+        }
+      } catch (_) {}
+    })();
+  </script>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>
