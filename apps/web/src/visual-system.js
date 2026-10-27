@@ -391,35 +391,27 @@ export function initVisualSystem() {
     }
   }, true);
 
+  // Keep the cursor glow, but coalesce pointer events to one update per frame.
+  // Avoid layout reads and per-card 3D transforms on every mouse movement.
   const pointer = (() => { try { return window.matchMedia("(pointer: fine)"); } catch { return null; } })();
-  let activeCard = null;
   if (pointer?.matches) {
+    let pointerFrame = 0;
+    let pointerX = 0;
+    let pointerY = 0;
     document.addEventListener("pointermove", event => {
       if (event.pointerType === "touch" || root.classList.contains("reduced-motion") || root.dataset.effects !== "atmosphere") return;
-      root.style.setProperty("--pointer-x", event.clientX + "px");
-      root.style.setProperty("--pointer-y", event.clientY + "px");
-      const card = event.target instanceof Element ? event.target.closest(".item, .capture") : null;
-      if (card !== activeCard) {
-        if (activeCard) {
-          activeCard.style.setProperty("--tilt-x", "0deg");
-          activeCard.style.setProperty("--tilt-y", "0deg");
-        }
-        activeCard = card;
-      }
-      if (card) {
-        const rect = card.getBoundingClientRect();
-        const x = ((event.clientX - rect.left) / Math.max(rect.width, 1) - .5) * 1.6;
-        const y = ((event.clientY - rect.top) / Math.max(rect.height, 1) - .5) * -1.4;
-        card.style.setProperty("--tilt-x", x.toFixed(2) + "deg");
-        card.style.setProperty("--tilt-y", y.toFixed(2) + "deg");
-      }
+      pointerX = event.clientX;
+      pointerY = event.clientY;
+      if (pointerFrame) return;
+      pointerFrame = requestAnimationFrame(() => {
+        root.style.setProperty("--pointer-x", pointerX + "px");
+        root.style.setProperty("--pointer-y", pointerY + "px");
+        pointerFrame = 0;
+      });
     }, { passive: true });
     document.addEventListener("pointerleave", () => {
-      if (activeCard) {
-        activeCard.style.setProperty("--tilt-x", "0deg");
-        activeCard.style.setProperty("--tilt-y", "0deg");
-        activeCard = null;
-      }
+      root.style.setProperty("--pointer-x", "50vw");
+      root.style.setProperty("--pointer-y", "16vh");
     });
   }
 
