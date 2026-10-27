@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addDeletedIds, completeGoogleOAuthCallback, getOtpCooldown, mergeCloudCaptures, readDeletedIds, removeDeletedIds, readLinkaProfile, saveLinkaProfile, DELETED_IDS_KEY } from "./cloud-sync.js";
+import { addDeletedIds, completeGoogleOAuthCallback, getOtpCooldown, mergeCloudCaptures, readDeletedIds, removeDeletedIds, readLinkaProfile, saveLinkaProfile, DELETED_IDS_KEY, MAX_SYNC_PAYLOAD_BYTES, estimateCloudPayloadBytes } from "./cloud-sync.js";
 
 test("cloud merge picks the newest copy, keeps pins, and orders newest first", () => {
   const remote = [
@@ -101,4 +101,19 @@ test("Google OAuth callback ignores normal routes and reports provider errors", 
     completeGoogleOAuthCallback({ location: { hash: "#error=access_denied&error_description=Sign-in%20was%20cancelled" } }),
     /Sign-in was cancelled/i
   );
+});
+
+test("cloud payload guard uses UTF-8 bytes and identifies oversized libraries", () => {
+  assert.equal(estimateCloudPayloadBytes("plain"), 5);
+  assert.equal(estimateCloudPayloadBytes("é"), 2);
+  const normal = JSON.stringify({
+    captures: Array.from({ length: 5000 }, (_, index) => ({
+      id: String(index), text: "short note " + index, createdAt: index + 1, updatedAt: index + 1
+    }))
+  });
+  assert.ok(estimateCloudPayloadBytes(normal) < MAX_SYNC_PAYLOAD_BYTES);
+  const oversized = JSON.stringify({
+    captures: [{ id: "large", text: "x".repeat(MAX_SYNC_PAYLOAD_BYTES) }]
+  });
+  assert.ok(estimateCloudPayloadBytes(oversized) > MAX_SYNC_PAYLOAD_BYTES);
 });
