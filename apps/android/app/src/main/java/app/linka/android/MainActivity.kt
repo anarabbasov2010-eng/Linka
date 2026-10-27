@@ -1022,7 +1022,7 @@ class MainActivity : ComponentActivity() {
             val raisedColor = DR
             val outlineColor = DBR
             MaterialTheme(colorScheme = if (dark) darkColorScheme(
-                background = backgroundColor, surface = surfaceColor, primary = accentColor, onPrimary = Color(0xFF171323), onBackground = DT, onSurface = DT, surfaceVariant = raisedColor, outline = outlineColor
+                background = backgroundColor, surface = surfaceColor, primary = accentColor, onPrimary = Color(0xFF172014), onBackground = DT, onSurface = DT, surfaceVariant = raisedColor, outline = outlineColor
             ) else lightColorScheme(
                 background = LB, surface = LS, primary = accentColor, onPrimary = Color(0xFFFFFFFF), onBackground = LT, onSurface = LT, surfaceVariant = LR, outline = LBR
             )) {
