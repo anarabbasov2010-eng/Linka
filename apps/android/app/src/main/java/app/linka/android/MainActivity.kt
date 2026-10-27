@@ -171,18 +171,37 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withContext
 import coil.compose.AsyncImage
 
-private val DB = Color(0xFF0B120D)
-private val DS = Color(0xFF121C14)
-private val DR = Color(0xFF1B291D)
-private val DBR = Color(0xFF394938)
-private val DT = Color(0xFFE8DFC8)
-private val DM = Color(0xFFB3BDA9)
-private val LB = Color(0xFF0B120D)
-private val LS = Color(0xFF121C14)
-private val LR = Color(0xFF1B291D)
-private val LBR = Color(0xFF394938)
-private val LT = Color(0xFFE8DFC8)
-private val LM = Color(0xFFB3BDA9)
+private val DB = Color(0xFF08100B)
+private val DS = Color(0xFF101B13)
+private val DR = Color(0xFF1A291D)
+private val DBR = Color(0xFF4A5942)
+private val DT = Color(0xFFEEE7D4)
+private val DM = Color(0xFFADB5A3)
+// Reserved light palette values remain available for accessibility themes.
+private val LB = Color(0xFFF3F1E8)
+private val LS = Color(0xFFFFFEF9)
+private val LR = Color(0xFFEAE8DD)
+private val LBR = Color(0xFFC9C5B7)
+private val LT = Color(0xFF23271F)
+private val LM = Color(0xFF686F62)
+
+private fun accentForName(name: String): Color = when (name) {
+    "sage" -> Color(0xFFB7C5A5)
+    "moss" -> Color(0xFF95B184)
+    "clay" -> Color(0xFFC98F72)
+    "mist" -> Color(0xFFA4B9BA)
+    else -> Color(0xFFC8AD79)
+}
+
+private fun blendSurface(base: Color, background: Color, opacity: Float): Color {
+    val amount = opacity.coerceIn(0.55f, 0.98f)
+    return Color(
+        red = base.red * amount + background.red * (1f - amount),
+        green = base.green * amount + background.green * (1f - amount),
+        blue = base.blue * amount + background.blue * (1f - amount),
+        alpha = 1f
+    )
+}
 private const val PREFS = "linka_local_v3"
 private const val CAPTURES_KEY = "captures"
 private const val THEME_KEY = "theme"
@@ -194,6 +213,8 @@ private const val ANIMATIONS_KEY = "animations"
 const val AMBIENT_AUDIO_KEY = "ambient_audio"
 private const val DENSITY_KEY = "interface_density"
 private const val EFFECTS_KEY = "visual_effects"
+private const val PANEL_OPACITY_KEY = "forest_atelier_panel_opacity"
+private const val BACKGROUND_DIM_KEY = "forest_atelier_background_dim"
 private const val FONT_SCALE_KEY = "font_scale"
 private const val UPDATE_ALERTS_KEY = "update_alerts"
 internal const val AUTO_DOWNLOAD_KEY = "auto_download_updates"
@@ -973,25 +994,29 @@ class MainActivity : ComponentActivity() {
         rememberPairingIntent(intent)
         checkForUpdate(true)
         setContent {
-            var theme by remember { mutableStateOf("forest") }
-            var accent by remember { mutableStateOf("forest") }
+            var theme by remember { mutableStateOf(prefs().getString(THEME_KEY, "forest") ?: "forest") }
+            var accent by remember {
+                mutableStateOf((prefs().getString(ACCENT_KEY, "gold") ?: "gold").let { if (it == "forest") "gold" else it })
+            }
             var language by remember { mutableStateOf(prefs().getString(LANGUAGE_KEY, "") ?: "") }
             var accepted by remember { mutableStateOf(prefs().getString(TERMS_KEY, "") == TERMS_VERSION) }
             var animations by remember { mutableStateOf(prefs().getBoolean(ANIMATIONS_KEY, true) && !android.provider.Settings.Global.getFloat(contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f).equals(0f)) }
             var ambientAudio by remember { mutableStateOf(false) }
             var density by remember { mutableStateOf(prefs().getString(DENSITY_KEY, "standard") ?: "standard") }
-            var effects by remember { mutableStateOf("atmosphere") }
+            var effects by remember { mutableStateOf(prefs().getString(EFFECTS_KEY, "atmosphere") ?: "atmosphere") }
+            var panelOpacity by remember { mutableFloatStateOf(prefs().getFloat(PANEL_OPACITY_KEY, .88f).coerceIn(.62f, .96f)) }
+            var backgroundDim by remember { mutableFloatStateOf(prefs().getFloat(BACKGROUND_DIM_KEY, .62f).coerceIn(.25f, .90f)) }
             var fontScale by remember { mutableFloatStateOf(prefs().getFloat(FONT_SCALE_KEY, 1f).coerceIn(.9f, 1.2f)) }
             var alerts by remember { mutableStateOf(prefs().getBoolean(UPDATE_ALERTS_KEY, true)) }
             var autoDownload by remember { mutableStateOf(prefs().getBoolean(AUTO_DOWNLOAD_KEY, false)) }
             LaunchedEffect(Unit) {
-                prefs().edit().putString(THEME_KEY, "forest").putString(ACCENT_KEY, "forest")
-                    .putString(EFFECTS_KEY, "atmosphere").putBoolean(AMBIENT_AUDIO_KEY, false).apply()
-                AmbientAudioEngine.stop()
+                if (prefs().getString(ACCENT_KEY, "gold") == "forest") {
+                    prefs().edit().putString(ACCENT_KEY, "gold").apply()
+                }
+                if (!ambientAudio) AmbientAudioEngine.stop()
             }
-            val darkSystem = androidx.compose.foundation.isSystemInDarkTheme()
             val dark = true
-            val accentColor = Color(0xFFB59A69)
+            val accentColor = accentForName(accent)
             val backgroundColor = DB
             val surfaceColor = DS
             val raisedColor = DR
@@ -1006,13 +1031,15 @@ class MainActivity : ComponentActivity() {
                     externalDocumentText = incomingLinkaDocumentText, externalDocumentTitle = incomingLinkaDocumentTitle, externalDocumentTrigger = incomingLinkaDocumentToken,
                     load = { loadCaptures() }, save = { saveCaptures(it) },
                     copy = { copyText(it) }, open = { openExternal(it) },
-                    theme = theme, setTheme = { },
-                    accent = accent, setAccent = { },
+                    theme = theme, setTheme = { value -> theme = value; prefs().edit().putString(THEME_KEY, value).apply() },
+                    accent = accent, setAccent = { value -> accent = value; prefs().edit().putString(ACCENT_KEY, value).apply() },
                     language = language, setLanguage = { language = it; prefs().edit().putString(LANGUAGE_KEY, it).apply() },
                     animations = animations, setAnimations = { animations = it; prefs().edit().putBoolean(ANIMATIONS_KEY, it).apply() },
                     ambientAudio = ambientAudio, setAmbientAudio = { },
                     density = density, setDensity = { density = it; prefs().edit().putString(DENSITY_KEY, it).apply() },
-                    effects = effects, setEffects = { },
+                    effects = effects, setEffects = { value -> effects = value; prefs().edit().putString(EFFECTS_KEY, value).apply() },
+                    panelOpacity = panelOpacity, setPanelOpacity = { value -> panelOpacity = value.coerceIn(.62f, .96f); prefs().edit().putFloat(PANEL_OPACITY_KEY, panelOpacity).apply() },
+                    backgroundDim = backgroundDim, setBackgroundDim = { value -> backgroundDim = value.coerceIn(.25f, .90f); prefs().edit().putFloat(BACKGROUND_DIM_KEY, backgroundDim).apply() },
                     fontScale = fontScale, setFontScale = { fontScale = it; prefs().edit().putFloat(FONT_SCALE_KEY, it).apply() },
                     alerts = alerts, notificationPermissionGranted = notificationsAllowed, openNotificationSettings = { openNotificationSettings() }, sendTestNotification = { sendTestNotification() }, setAlerts = { enabled ->
                         if (enabled && Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -1359,7 +1386,8 @@ private fun LinkaApp(
     externalDocumentText: String, externalDocumentTitle: String, externalDocumentTrigger: Int,
     load: () -> List<Capture>, save: (List<Capture>) -> Unit, copy: (String) -> Unit, open: (String) -> Unit,
     theme: String, setTheme: (String) -> Unit, accent: String, setAccent: (String) -> Unit, language: String, setLanguage: (String) -> Unit,
-    animations: Boolean, setAnimations: (Boolean) -> Unit, ambientAudio: Boolean, setAmbientAudio: (Boolean) -> Unit, density: String, setDensity: (String) -> Unit, effects: String, setEffects: (String) -> Unit, fontScale: Float, setFontScale: (Float) -> Unit,
+    animations: Boolean, setAnimations: (Boolean) -> Unit, ambientAudio: Boolean, setAmbientAudio: (Boolean) -> Unit, density: String, setDensity: (String) -> Unit, effects: String, setEffects: (String) -> Unit,
+    panelOpacity: Float, setPanelOpacity: (Float) -> Unit, backgroundDim: Float, setBackgroundDim: (Float) -> Unit, fontScale: Float, setFontScale: (Float) -> Unit,
     alerts: Boolean, notificationPermissionGranted: Boolean, openNotificationSettings: () -> Unit, sendTestNotification: () -> Unit, setAlerts: (Boolean) -> Unit, updateInfo: UpdateInfo?, updateStatus: String, checking: Boolean,
     checkUpdates: () -> Unit, openUpdate: (UpdateInfo) -> Unit,
     autoDownload: Boolean, setAutoDownload: (Boolean) -> Unit, downloadProgress: Int, downloadingUpdate: Boolean,
@@ -1369,8 +1397,10 @@ private fun LinkaApp(
     val lang = language.ifBlank { "en" }
     val dark = theme == "oled" || MaterialTheme.colorScheme.background == DB
     val bg = if (theme == "oled") Color.Black else if (dark) DB else LB
-    val panel = if (theme == "oled") Color(0xFF050507) else if (dark) DS else LS
-    val raised = if (theme == "oled") Color(0xFF111116) else if (dark) DR else LR
+    val panelBase = if (theme == "oled") Color(0xFF050507) else if (dark) DS else LS
+    val raisedBase = if (theme == "oled") Color(0xFF111116) else if (dark) DR else LR
+    val panel = blendSurface(panelBase, bg, panelOpacity)
+    val raised = blendSurface(raisedBase, bg, (panelOpacity + .08f).coerceAtMost(.98f))
     val border = if (theme == "oled") Color(0xFF26242D) else if (dark) DBR else LBR
     val main = if (dark) DT else LT
     val muted = if (dark) DM else LM
@@ -1381,6 +1411,13 @@ private fun LinkaApp(
     val grainTransition = rememberInfiniteTransition(label = "film-grain-drift")
     val grainDrift by grainTransition.animateFloat(initialValue = 0f, targetValue = 1f, animationSpec = infiniteRepeatable(animation = tween(durationMillis = 48_000, easing = LinearEasing), repeatMode = RepeatMode.Restart), label = "film-grain-motion")
     var captures by remember { mutableStateOf(load()) }
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(15_000L)
+            now = System.currentTimeMillis()
+        }
+    }
     var draft by remember { mutableStateOf(sharedText) }
     var typingTick by remember { mutableIntStateOf(0) }
     var inkOpacity by remember { mutableFloatStateOf(1f) }
@@ -1945,7 +1982,9 @@ private fun LinkaApp(
                 )
             }
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(
-                Color.Black.copy(alpha = .16f), Color.Black.copy(alpha = .34f), Color.Black.copy(alpha = .62f)
+                Color.Black.copy(alpha = (backgroundDim * .27f).coerceIn(.05f, .30f)),
+                Color.Black.copy(alpha = (backgroundDim * .55f).coerceIn(.12f, .55f)),
+                Color.Black.copy(alpha = backgroundDim.coerceIn(.25f, .90f))
             ))))
             if (atmosphereGrainEnabled && effects != "quiet") {
                 Box(Modifier.fillMaxSize().drawBehind {
@@ -2007,6 +2046,7 @@ private fun LinkaApp(
                 Header(lang, main, muted, panel, border) { tab = 3 }
                 when (page) {
                     0 -> {
+                        LocalMomentCard(lang, now, panel, border, main, muted)
                         Text(tr(lang, "tagline"), color = muted, fontSize = 9.sp, letterSpacing = 1.8.sp,
                             fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 5.dp, bottom = 1.dp))
                         Column(verticalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.padding(bottom = 5.dp)) {
@@ -2195,6 +2235,92 @@ private fun LinkaApp(
                                 Text("${(fontScale * 100).toInt()}%", color = muted, fontSize = 11.sp)
                             }
                             Slider(value = fontScale, onValueChange = setFontScale, valueRange = .9f..1.2f, steps = 5)
+                        }
+                        SettingsGroup(
+                            if (lang == "ru") "Forest Atelier · оформление"
+                            else if (lang == "az") "Forest Atelier · görünüş"
+                            else if (lang == "tr") "Forest Atelier · görünüm"
+                            else "Forest Atelier · visual system",
+                            panel, border, main
+                        ) {
+                            Text(
+                                if (lang == "ru") "Акцентный цвет"
+                                else if (lang == "az") "Vurğu rəngi"
+                                else if (lang == "tr") "Vurgu rengi"
+                                else "Accent color",
+                                color = muted, fontSize = 11.sp
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                listOf(
+                                    "gold" to (if (lang == "ru") "Латунь" else if (lang == "az") "Qızılı" else if (lang == "tr") "Pirinç" else "Brass"),
+                                    "sage" to (if (lang == "ru") "Шалфей" else if (lang == "az") "Adaçayı" else if (lang == "tr") "Adaçayı" else "Sage"),
+                                    "moss" to (if (lang == "ru") "Мох" else if (lang == "az") "Mamır" else if (lang == "tr") "Yosun" else "Moss"),
+                                    "clay" to (if (lang == "ru") "Глина" else if (lang == "az") "Gil" else if (lang == "tr") "Kil" else "Clay"),
+                                    "mist" to (if (lang == "ru") "Туман" else if (lang == "az") "Duman" else if (lang == "tr") "Sis" else "Mist")
+                                ).forEach { (value, label) ->
+                                    FilterChip(
+                                        selected = accent == value,
+                                        onClick = { setAccent(value) },
+                                        label = {
+                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                                Box(Modifier.size(8.dp).background(accentForName(value), CircleShape))
+                                                Text(label, fontSize = 10.sp)
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    if (lang == "ru") "Прозрачность блоков"
+                                    else if (lang == "az") "Blokların şəffaflığı"
+                                    else if (lang == "tr") "Panel saydamlığı"
+                                    else "Glass opacity",
+                                    color = main, fontSize = 12.sp, modifier = Modifier.weight(1f)
+                                )
+                                Text("${(panelOpacity * 100).toInt()}%", color = muted, fontSize = 10.sp)
+                            }
+                            Slider(value = panelOpacity, onValueChange = setPanelOpacity, valueRange = .62f.. .96f, steps = 16)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    if (lang == "ru") "Затемнение лесного фона"
+                                    else if (lang == "az") "Meşə fonunun qaraldılması"
+                                    else if (lang == "tr") "Orman arka planını karart"
+                                    else "Background dimming",
+                                    color = main, fontSize = 12.sp, modifier = Modifier.weight(1f)
+                                )
+                                Text("${(backgroundDim * 100).toInt()}%", color = muted, fontSize = 10.sp)
+                            }
+                            Slider(value = backgroundDim, onValueChange = setBackgroundDim, valueRange = .25f.. .90f, steps = 12)
+                            Text(
+                                if (lang == "ru") "Движение и текстура"
+                                else if (lang == "az") "Hərəkət və tekstura"
+                                else if (lang == "tr") "Hareket ve doku"
+                                else "Motion & texture",
+                                color = muted, fontSize = 11.sp
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                listOf(
+                                    "quiet" to (if (lang == "ru") "Тихо" else if (lang == "az") "Sakit" else if (lang == "tr") "Sakin" else "Quiet"),
+                                    "balanced" to (if (lang == "ru") "Баланс" else if (lang == "az") "Balans" else if (lang == "tr") "Dengeli" else "Balanced"),
+                                    "atmosphere" to (if (lang == "ru") "Атмосфера" else if (lang == "az") "Atmosfer" else if (lang == "tr") "Atmosfer" else "Atmosphere")
+                                ).forEach { (value, label) ->
+                                    FilterChip(selected = effects == value, onClick = { setEffects(value) }, label = { Text(label, fontSize = 10.sp) })
+                                }
+                            }
+                            Text(
+                                if (lang == "ru") "Настройки сохраняются на этом устройстве. Приватная библиотека не отправляется в облако из-за смены оформления."
+                                else if (lang == "az") "Parametrlər bu cihazda saxlanılır. Görünüş dəyişdikdə şəxsi kitabxana buluda göndərilmir."
+                                else if (lang == "tr") "Ayarlar bu cihazda tutulur. Görünüm değiştirmek özel kitaplığı buluta göndermez."
+                                else "Appearance preferences stay on this device and never trigger a library sync.",
+                                color = muted, fontSize = 10.sp, lineHeight = 15.sp
+                            )
                         }
                         SettingsGroup(if (lang == "ru") "Атмосфера и звук" else if (lang == "az") "Atmosfer və səs" else if (lang == "tr") "Atmosfer ve ses" else "Atmosphere & sound", panel, border, main) {
                             SettingSwitch(
@@ -2803,6 +2929,63 @@ private fun LanguageWelcome(dark: Boolean, animations: Boolean, onContinue: (Str
         Button(onClick = { onContinue(chosen) }, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(15.dp),
             colors = ButtonDefaults.buttonColors(containerColor = main, contentColor = bg)) {
             Text(tr(chosen, "continue"), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+private fun LocalMomentCard(lang: String, now: Long, panel: Color, border: Color, main: Color, muted: Color) {
+    val locale = when (lang) {
+        "ru" -> Locale.forLanguageTag("ru-RU")
+        "az" -> Locale.forLanguageTag("az-AZ")
+        "tr" -> Locale.forLanguageTag("tr-TR")
+        else -> Locale.ENGLISH
+    }
+    val instant = Date(now)
+    val time = DateFormat.getTimeInstance(DateFormat.SHORT, locale).format(instant)
+    val date = DateFormat.getDateInstance(DateFormat.FULL, locale).format(instant)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(21.dp),
+        colors = CardDefaults.cardColors(containerColor = panel.copy(alpha = .92f)),
+        border = BorderStroke(1.dp, border.copy(alpha = .86f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(Modifier.padding(horizontal = 15.dp, vertical = 13.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        if (lang == "ru") "СЕЙЧАС · НА ЭТОМ УСТРОЙСТВЕ"
+                        else if (lang == "az") "İNDİ · BU CİHAZDA"
+                        else if (lang == "tr") "ŞİMDİ · BU CİHAZDA"
+                        else "HERE & NOW · THIS DEVICE",
+                        color = muted, fontSize = 8.sp, letterSpacing = 1.2.sp, fontWeight = FontWeight.SemiBold
+                    )
+                    Text(time, color = main, fontSize = 27.sp, lineHeight = 31.sp,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Serif, fontWeight = FontWeight.Medium,
+                        letterSpacing = (-.8).sp)
+                    Text(date.replaceFirstChar { if (it.isLowerCase()) it.titlecase(locale) else it.toString() },
+                        color = muted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Surface(
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = .13f),
+                    shape = RoundedCornerShape(15.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = .22f))
+                ) {
+                    Icon(Icons.Outlined.Home, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(13.dp).size(22.dp))
+                }
+            }
+            Box(Modifier.fillMaxWidth().height(1.dp).background(border.copy(alpha = .62f)))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                Box(Modifier.size(6.dp).background(Color(0xFF91B27F), CircleShape))
+                Text(
+                    if (lang == "ru") "Локальная библиотека · личные данные остаются здесь"
+                    else if (lang == "az") "Yerli kitabxana · şəxsi məlumatlar burada qalır"
+                    else if (lang == "tr") "Yerel kitaplık · kişisel veriler burada kalır"
+                    else "Local-first library · your personal data stays here",
+                    color = muted, fontSize = 9.sp, lineHeight = 14.sp
+                )
+            }
         }
     }
 }
