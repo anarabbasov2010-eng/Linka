@@ -18,16 +18,18 @@ function writeStartupDiagnostic(message) {
   if (!window.__TAURI_INTERNALS__) return;
   const safe = String(message || "Unknown startup diagnostic")
     .slice(0, 2400)
-    .replace(/(access_token|refresh_token|token|secret|code|key)=([^&\\s]+)/gi, "$1=[redacted]");
+    .replace(/(access_token|refresh_token|token|secret|code|key)=([^&\s]+)/gi, "$1=[redacted]");
   try { void invoke("log_startup_diagnostic", { message: safe }).catch(() => {}); } catch {}
 }
 
 window.addEventListener("error", event => {
-  writeStartupDiagnostic(`window error: ${event.message || "Unknown error"} at ${event.filename || "unknown"}:${event.lineno || 0}:${event.colno || 0}${event.error?.stack ? "\\n" + event.error.stack : ""}`);
+  writeStartupDiagnostic("window error: " + (event.message || "Unknown error") +
+    " at " + (event.filename || "unknown") + ":" + (event.lineno || 0) + ":" + (event.colno || 0) +
+    (event.error?.stack ? "\n" + event.error.stack : ""));
 });
 window.addEventListener("unhandledrejection", event => {
   const reason = event.reason;
-  writeStartupDiagnostic(`unhandled rejection: ${reason?.stack || reason?.message || String(reason || "unknown rejection")}`);
+  writeStartupDiagnostic("unhandled rejection: " + (reason?.stack || reason?.message || String(reason || "unknown rejection")));
 });
 writeStartupDiagnostic("frontend module execution started");
 
