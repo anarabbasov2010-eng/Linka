@@ -3,16 +3,17 @@ import { test, expect } from "@playwright/test";
 const ACCEPTED_TERMS = "2026-10-23-v2";
 const FOREST_HOST = "https://videos.pexels.com/";
 
-async function openLinka(page, { reducedMotion = "no-preference", disableVideo = false } = {}) {
+async function openLinka(page, { reducedMotion = "no-preference", disableVideo = false, onboarded = true } = {}) {
   await page.emulateMedia({ reducedMotion });
-  await page.addInitScript(({ acceptedTerms, disableForestVideo }) => {
+  await page.addInitScript(({ acceptedTerms, disableForestVideo, hasOnboarded }) => {
     localStorage.clear();
     localStorage.setItem("linka.termsAccepted", acceptedTerms);
+    if (hasOnboarded) localStorage.setItem("linka.experience.onboarded.v1", "true");
     if (disableForestVideo) {
       localStorage.setItem("linka.atmosphere.themeVersion", "forest-studio-v3");
       localStorage.setItem("linka.atmosphere.video", "false");
     }
-  }, { acceptedTerms: ACCEPTED_TERMS, disableForestVideo: disableVideo });
+  }, { acceptedTerms: ACCEPTED_TERMS, disableForestVideo: disableVideo, hasOnboarded: onboarded });
   await page.route("https://videos.pexels.com/**", route => route.abort());
   await page.goto("/");
   await expect(page.locator("#capture-text")).toBeVisible();
@@ -64,12 +65,23 @@ test("reduced motion uses the static local forest and skips remote video", async
   expect(videoRequests).toHaveLength(0);
 });
 
+test("first-run onboarding can continue without an account", async ({ page }) => {
+  await openLinka(page, { onboarded: false });
+  const firstRun = page.getByRole("dialog");
+  await expect(firstRun).toContainText("Welcome to Linka");
+  await firstRun.getByRole("button", { name: "Continue offline" }).click();
+  await expect(page.getByRole("dialog")).toContainText("A little about you");
+});
+
 test("turning forest video off prevents remote media requests", async ({ page }) => {
   const videoRequests = [];
   page.on("request", request => {
     if (request.url().startsWith(FOREST_HOST)) videoRequests.push(request.url());
   });
   await openLinka(page, { disableVideo: true });
+  const poster = page.locator("#linka-atmosphere img");
+  await expect(poster).toHaveClass(/ready/);
   await expect(page.locator("#linka-atmosphere")).toHaveClass(/disabled/);
+  expect(await page.evaluate(() => localStorage.getItem("linka.atmosphere.video"))).toBe("false");
   expect(videoRequests).toHaveLength(0);
 });
