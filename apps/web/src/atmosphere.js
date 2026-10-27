@@ -9,6 +9,7 @@ const FOREST_VIDEO_CANDIDATES=[
   "https://videos.pexels.com/video-files/37426477/37426477-hd_1920_1080_30fps.mp4"
 ];
 const DEFAULT_FOREST_POSTER="/forest-fallback.svg";
+const STATIC_FOREST_POSTER="/forest-fallback-static.svg";
 const DB_NAME="linka-atmosphere-v1", STORE="media", PREFIX="linka.atmosphere.";
 const $=(s,r=document)=>r.querySelector(s);
 const read=(k,d)=>{try{const v=localStorage.getItem(PREFIX+k);return v==null?d:JSON.parse(v)}catch{return d}};
@@ -76,12 +77,13 @@ async function loadBackground(){
   if(!layer||!video||!image)return;
 
   function showFallback(){
+    const poster=motionShouldBeReduced()?STATIC_FOREST_POSTER:DEFAULT_FOREST_POSTER;
     image.style.display="block";
     image.onload=()=>{image.classList.add("ready");layer.classList.remove("poster-unavailable")};
     image.onerror=()=>{image.classList.remove("ready");image.style.display="none";layer.classList.add("poster-unavailable")};
-    if(image.getAttribute("src")!==DEFAULT_FOREST_POSTER){
+    if(image.getAttribute("src")!==poster){
       image.classList.remove("ready");
-      image.src=DEFAULT_FOREST_POSTER;
+      image.src=poster;
     }else if(image.complete&&image.naturalWidth){
       image.classList.add("ready");
     }
