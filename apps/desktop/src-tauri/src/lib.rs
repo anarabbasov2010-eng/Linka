@@ -97,9 +97,19 @@ pub fn run() {
             startup_log("Tauri setup callback entered");
             #[cfg(desktop)]
             {
-                startup_log("registering updater plugin");
-                app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
-                startup_log("updater plugin registered");
+                // Tauri's updater plugin requires a non-null `plugins.updater`
+                // configuration object. The release workflow only injects that
+                // object when signing keys are configured, so do not register
+                // the plugin in local/unsigned builds.
+                let updater_enabled = option_env!("LINKA_UPDATER_ENABLED")
+                    .is_some_and(|value| value.eq_ignore_ascii_case("true"));
+                if updater_enabled {
+                    startup_log("registering signed updater plugin");
+                    app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
+                    startup_log("signed updater plugin registered");
+                } else {
+                    startup_log("signed updater disabled for this build");
+                }
             }
 
             let startup_document = std::env::args().skip(1)
