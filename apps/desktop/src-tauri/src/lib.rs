@@ -1,7 +1,37 @@
-use std::fs;
-use std::path::Path;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{Emitter, Manager, State};
+
+fn startup_log_path() -> PathBuf {
+    let root = std::env::var_os("LOCALAPPDATA")
+        .map(PathBuf::from)
+        .unwrap_or_else(std::env::temp_dir);
+    root.join("Linka").join("startup.log")
+}
+
+fn startup_log(message: &str) {
+    let path = startup_log_path();
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_secs())
+            .unwrap_or_default();
+        let single_line = message.replace('\r', " ").replace('\n', " | ");
+        let _ = writeln!(file, "[{timestamp}] {single_line}");
+    }
+}
+
+#[tauri::command]
+fn log_startup_diagnostic(message: String) {
+    let message: String = message.chars().take(2500).collect();
+    startup_log(&format!("frontend: {message}"));
+}
 
 struct StartupLinkaDocument(Mutex<Option<String>>);
 
@@ -29,12 +59,17 @@ fn read_linka_document(argument: &str) -> Option<String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    std::panic::set_hook(Box::new(|info| {
+        startup_log(&format!("panic: {info}"));
+    }));
+    startup_log("Rust entry point reached");
     let mut builder = tauri::Builder::default();
 
     // Register single-instance first so a browser callback or .linka file is
     // delivered to the existing window instead of creating a second process.
     #[cfg(desktop)]
     {
+        startup_log("registering single-instance plugin");
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 for argument in &argv {
@@ -46,33 +81,55 @@ pub fn run() {
                 let _ = window.set_focus();
             }
         }));
+        startup_log("registering deep-link plugin");
         builder = builder.plugin(tauri_plugin_deep_link::init());
+        startup_log("registering opener plugin");
         builder = builder.plugin(tauri_plugin_opener::init());
     }
 
+    startup_log("registering process and notification plugins");
     builder = builder
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_notification::init());
 
     builder
         .setup(|app| {
+            startup_log("Tauri setup callback entered");
             #[cfg(desktop)]
-            app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
+            {
+                // Tauri's updater plugin requires a non-null `plugins.updater`
+                // configuration object. The release workflow only injects that
+                // object when signing keys are configured, so do not register
+                // the plugin in local/unsigned builds.
+                let updater_enabled = option_env!("LINKA_UPDATER_ENABLED")
+                    .is_some_and(|value| value.eq_ignore_ascii_case("true"));
+                if updater_enabled {
+                    startup_log("registering signed updater plugin");
+                    app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
+                    startup_log("signed updater plugin registered");
+                } else {
+                    startup_log("signed updater disabled for this build");
+                }
+            }
 
             let startup_document = std::env::args().skip(1)
                 .find_map(|argument| read_linka_document(&argument));
             app.manage(StartupLinkaDocument(Mutex::new(startup_document)));
+            startup_log("startup state registered");
 
             #[cfg(any(windows, target_os = "linux"))]
             {
                 use tauri_plugin_deep_link::DeepLinkExt;
                 if let Err(error) = app.deep_link().register_all() {
-                    eprintln!("Could not register Linka URL scheme: {error}");
+                    startup_log(&format!("deep-link registration warning: {error}"));
+                } else {
+                    startup_log("deep-link scheme registered");
                 }
             }
+            startup_log("Tauri setup callback finished");
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![take_startup_document])
+        .invoke_handler(tauri::generate_handler![take_startup_document, log_startup_diagnostic])
         .run(tauri::generate_context!())
         .expect("failed to run Linka desktop application");
 }
