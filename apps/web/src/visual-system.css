@@ -1599,3 +1599,14 @@ html.reduced-motion .linka-atmosphere-actions button {
 .linka-appearance-color input[type="color"]::-webkit-color-swatch { border:1px solid rgba(255,255,255,.14);border-radius:7px; }
 .linka-appearance-color input[type="color"]::-moz-color-swatch { border:1px solid rgba(255,255,255,.14);border-radius:7px; }
 .linka-appearance-color input[type="color"]:focus-visible { outline:2px solid var(--atelier-brass);outline-offset:3px; }
+
+
+/* Decorative and closed layers must never intercept workspace input. */
+.web-nav-active-pill,
+.linka-toast-stack { pointer-events: none !important; }
+.linka-toast-stack .linka-toast,
+.linka-toast-stack .linka-toast button { pointer-events: auto !important; }
+.linka-command-root[hidden],
+.linka-command-root[aria-hidden="true"],
+.linka-command-root:not(.palette-open) { pointer-events: none !important; }
+.linka-command-root.palette-open { pointer-events: auto !important; }
