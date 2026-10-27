@@ -1953,7 +1953,7 @@ private fun LinkaApp(
                     factory = { viewContext -> LinkaAmbientVideoView(viewContext).apply { tag = backgroundSource; configure(backgroundSource, appInForeground && animations) } },
                     update = { view ->
                         view.tag = backgroundSource
-                        view.configure(backgroundSource, appInForeground)
+                        view.configure(backgroundSource, appInForeground && animations)
                     }
                 )
             }
