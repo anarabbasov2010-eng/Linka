@@ -210,6 +210,7 @@ function createMirrorAnimation(textarea, mirror) {
   ["fontFamily","fontSize","fontWeight","fontStyle","lineHeight","letterSpacing","textAlign","textIndent","paddingTop","paddingRight","paddingBottom","paddingLeft","boxSizing","tabSize"].forEach(key => { mirror.style[key] = computed[key]; });
   const wrapper = textarea.closest(".linka-doc-body-wrap");
   const MAX_ANIMATED_CHARS = 3000;
+  const MAX_ANIMATED_FRAGMENT = 180;
   let previous = textarea.value;
   let clearGhostTimer = 0;
   const draw = (value, before = value, animate = false) => {
@@ -235,12 +236,18 @@ function createMirrorAnimation(textarea, mirror) {
     };
 
     if (prefix) mirror.append(document.createTextNode(value.slice(0, prefix)));
-    if (animate && removed && !reducedMotion()) {
+    const canAnimateRemoved = Boolean(animate && removed && removed.length <= MAX_ANIMATED_FRAGMENT && !reducedMotion());
+    if (canAnimateRemoved) {
       [...removed].forEach((character, index) => mirror.append(makeSpan(character, "linka-doc-gone", index)));
       clearTimeout(clearGhostTimer);
       clearGhostTimer = setTimeout(() => draw(textarea.value), 210);
     }
-    [...added].forEach((character, index) => mirror.append(makeSpan(character, animate && !reducedMotion() ? "linka-doc-letter" : "", index)));
+    const canAnimateAdded = Boolean(animate && added && added.length <= MAX_ANIMATED_FRAGMENT && !reducedMotion());
+    if (canAnimateAdded) {
+      [...added].forEach((character, index) => mirror.append(makeSpan(character, "linka-doc-letter", index)));
+    } else if (added) {
+      mirror.append(document.createTextNode(added));
+    }
     if (suffix) mirror.append(document.createTextNode(value.slice(value.length - suffix)));
   };
   draw(textarea.value);
