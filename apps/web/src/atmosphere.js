@@ -8,7 +8,7 @@ const FOREST_VIDEO_CANDIDATES=[
   "https://videos.pexels.com/video-files/36928736/36928736-hd_1920_1080_30fps.mp4",
   "https://videos.pexels.com/video-files/37426477/37426477-hd_1920_1080_30fps.mp4"
 ];
-const DEFAULT_FOREST_POSTER="https://images.pexels.com/videos/36928855/free-video-36928855.jpg?fit=crop&w=1920&h=1080&auto=compress&cs=tinysrgb";
+const DEFAULT_FOREST_POSTER="/forest-fallback.svg";
 const DB_NAME="linka-atmosphere-v1", STORE="media", PREFIX="linka.atmosphere.";
 const $=(s,r=document)=>r.querySelector(s);
 const read=(k,d)=>{try{const v=localStorage.getItem(PREFIX+k);return v==null?d:JSON.parse(v)}catch{return d}};
@@ -24,6 +24,7 @@ function btn(label,glyph,extra=""){const b=document.createElement("button");b.ty
 function addStyles(){if($("#linka-atmosphere-styles"))return;const s=document.createElement("style");s.id="linka-atmosphere-styles";s.textContent=[
 '#linka-atmosphere{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;background:#09090d;isolation:isolate}',
 '#linka-atmosphere video,#linka-atmosphere img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transform:scale(1.04);filter:saturate(.72) contrast(1.04);transition:opacity 1.8s ease;animation:linka-forest 78s ease-in-out infinite alternate}',
+'#linka-atmosphere video{z-index:1}#linka-atmosphere img{z-index:0}#linka-atmosphere img.covered{opacity:0!important}',
 '#linka-atmosphere img{display:none}',
 '#linka-atmosphere .veil{position:absolute;inset:0;background:linear-gradient(180deg,rgba(7,6,13,.20),rgba(6,6,10,.36) 48%,rgba(4,4,7,.62)),radial-gradient(ellipse at 52% 14%,rgba(188,151,128,.075),transparent 55%)}',
 '#linka-atmosphere .grain{position:absolute;inset:-40%;opacity:.026;background-image:url("data:image/svg+xml,%3Csvg viewBox=%270 0 180 180%27 xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cfilter id=%27n%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.8%27 numOctaves=%273%27 stitchTiles=%27stitch%27/%3E%3C/filter%3E%3Crect width=%27100%25%27 height=%27100%25%27 filter=%27url(%23n)%27 opacity=%27.8%27/%3E%3C/svg%3E");animation:linka-grain .24s steps(2) infinite}',
@@ -62,22 +63,31 @@ function buildBackground(){const layer=document.createElement("div");layer.id="l
 async function loadBackground(){
   const layer=$("#linka-atmosphere"),video=$("video",layer),image=$("img",layer),saved=read("background",null);
   function defaultForest(){
-    layer.classList.remove("custom");
-    image.removeAttribute("src");image.style.display="none";image.classList.remove("ready");
+    layer.classList.remove("custom","poster-unavailable");
+    // Keep a bundled forest scene visible while remote video candidates load or fail.
+    image.style.display="block";image.classList.remove("ready");
+    image.onload=()=>image.classList.add("ready");
+    image.onerror=()=>{image.classList.remove("ready");layer.classList.add("poster-unavailable")};
+    image.src=DEFAULT_FOREST_POSTER;
     video.style.display="block";video.muted=true;video.loop=true;video.playsInline=true;video.preload="auto";
+    const reducedMotion=window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches===true;
+    const saveData=navigator.connection?.saveData===true;
+    if(reducedMotion||saveData){video.pause();video.removeAttribute("src");video.style.display="none";return}
     let attempt=0;
     const useNextVideo=()=>{
       video.classList.remove("ready");
+      image.style.display="block";image.classList.remove("covered");
       video.onerror=()=>{
         attempt++;
         if(attempt<FOREST_VIDEO_CANDIDATES.length){useNextVideo();return}
         video.pause();video.removeAttribute("src");video.style.display="none";
-        image.style.display="block";image.src=DEFAULT_FOREST_POSTER;
+        image.style.display="block";image.classList.remove("covered");image.src=DEFAULT_FOREST_POSTER;
         image.onload=()=>image.classList.add("ready");
         image.onerror=()=>{image.classList.remove("ready");layer.classList.add("poster-unavailable")};
       };
-      video.onloadeddata=()=>{video.classList.add("ready");image.style.display="none"};
-      video.oncanplay=()=>{video.classList.add("ready");image.style.display="none"};
+      const revealVideo=()=>{video.classList.add("ready");image.classList.add("covered")};
+      video.onloadeddata=revealVideo;
+      video.oncanplay=revealVideo;
       video.src=FOREST_VIDEO_CANDIDATES[attempt];video.load();
       video.play().catch(()=>{});
     };
