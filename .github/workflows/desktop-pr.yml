@@ -39,6 +39,46 @@ jobs:
       - name: Build Windows installer
         working-directory: apps/desktop
         run: npm run build
+      - name: Smoke-test packaged Windows startup and frontend boot
+        shell: pwsh
+        run: |
+          $app = Join-Path $env:GITHUB_WORKSPACE "apps/desktop/src-tauri/target/release/linka-desktop.exe"
+          $logPath = Join-Path $env:LOCALAPPDATA "Linka/startup.log"
+          if (-not (Test-Path $app)) { throw "Built Linka executable was not found: $app" }
+          if (Test-Path $logPath) { Remove-Item $logPath -Force }
+          $proc = Start-Process -FilePath $app -WorkingDirectory (Split-Path $app) -PassThru
+          $deadline = (Get-Date).AddSeconds(30)
+          $booted = $false
+          while ((Get-Date) -lt $deadline) {
+            $proc.Refresh()
+            if ($proc.HasExited) { break }
+            if (Test-Path $logPath) {
+              $log = Get-Content -Raw $logPath
+              $requiredMessages = @(
+                "initLinkaExperience completed",
+                "initVisualSystem completed",
+                "initLinkaUtilityPanel completed",
+                "initLinkaAtmosphere completed",
+                "initLinkaDocuments completed"
+              )
+              if (($requiredMessages | Where-Object { -not $log.Contains($_) }).Count -eq 0) { $booted = $true; break }
+            }
+            Start-Sleep -Milliseconds 500
+          }
+          if (-not $booted) {
+            $proc.Refresh()
+            if (Test-Path $logPath) { Get-Content $logPath }
+            else { Write-Host "No Linka startup log was created." }
+            if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
+            throw "Linka did not complete frontend startup within 30 seconds."
+          }
+          $finalLog = Get-Content -Raw $logPath
+          if ($finalLog -match "initLinkaAtmosphere failed:|initLinkaDocuments failed:|unhandled rejection:") {
+            Write-Host $finalLog
+            throw "Linka reported a frontend initialization error during the smoke test."
+          }
+          Write-Host "Linka frontend, atmosphere and document initialization completed successfully."
+          Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
       - name: Save preview installer
         uses: actions/upload-artifact@v4
         with:

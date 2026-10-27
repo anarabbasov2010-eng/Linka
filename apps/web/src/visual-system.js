@@ -1,35 +1,16 @@
 import "./visual-system.css";
 
 const ACCENTS = {
-  forest: { dark: "#B59A69", light: "#80652F", darkText: "#12170F", lightText: "#FFFFFF", glowDark: "rgba(181,154,105,.11)", glowLight: "rgba(128,101,47,.09)" },
-  violet: { dark: "#C9C0FF", light: "#6554A6", darkText: "#171323", lightText: "#FFFFFF", glowDark: "rgba(169,154,255,.13)", glowLight: "rgba(101,84,166,.09)" },
-  blue: { dark: "#9CC5FF", light: "#356BB4", darkText: "#101A2A", lightText: "#FFFFFF", glowDark: "rgba(111,169,255,.13)", glowLight: "rgba(53,107,180,.09)" },
-  mint: { dark: "#8FE3CF", light: "#237A68", darkText: "#0C2420", lightText: "#FFFFFF", glowDark: "rgba(92,220,188,.11)", glowLight: "rgba(35,122,104,.08)" },
-  rose: { dark: "#FFB6D2", light: "#B14E78", darkText: "#29121E", lightText: "#FFFFFF", glowDark: "rgba(255,145,191,.11)", glowLight: "rgba(177,78,120,.08)" }
+  forest: { dark: "#C8AD79", light: "#80643A", darkText: "#172014", lightText: "#FFFFFF", glowDark: "rgba(146,169,123,.13)", glowLight: "rgba(128,100,58,.10)" }
 };
 const DENSITIES = ["compact", "standard", "spacious"];
 const EFFECTS = ["quiet", "balanced", "atmosphere"];
-const THEMES = ["forest", "dark", "light", "system", "oled"];
+const THEMES = ["forest"];
 const THEME_PRESETS = {
   forest: {
-    "--bg": "#0B120D", "--panel": "rgba(18,28,20,.88)", "--panel-solid": "#121C14", "--panel-raised": "#1B291D",
-    "--line": "rgba(232,223,200,.105)", "--line-strong": "rgba(181,154,105,.30)", "--text": "#E8DFC8",
-    "--muted": "#B3BDA9", "--soft": "#D1C3A2", "--shadow": "0 28px 88px rgba(0,0,0,.33)", "--surface-top": "rgba(255,255,255,.035)"
-  },
-  dark: {
-    "--bg": "#09090B", "--panel": "rgba(17,17,20,.90)", "--panel-solid": "#111114", "--panel-raised": "#1B1B21",
-    "--line": "rgba(255,255,255,.09)", "--line-strong": "rgba(255,255,255,.16)", "--text": "#EDEDF2",
-    "--muted": "#9696A3", "--soft": "#CFCFD8", "--shadow": "0 22px 80px rgba(0,0,0,.34)", "--surface-top": "rgba(255,255,255,.035)"
-  },
-  light: {
-    "--bg": "#F4F2ED", "--panel": "rgba(255,255,255,.88)", "--panel-solid": "#FFFFFF", "--panel-raised": "#EBE8E1",
-    "--line": "rgba(37,34,28,.10)", "--line-strong": "rgba(37,34,28,.18)", "--text": "#24232A",
-    "--muted": "#74717A", "--soft": "#53515A", "--shadow": "0 22px 70px rgba(42,35,24,.12)", "--surface-top": "rgba(25,20,10,.025)"
-  },
-  oled: {
-    "--bg": "#000000", "--panel": "rgba(6,6,8,.92)", "--panel-solid": "#050506", "--panel-raised": "#101014",
-    "--line": "rgba(255,255,255,.10)", "--line-strong": "rgba(255,255,255,.18)", "--text": "#F5F5F7",
-    "--muted": "#92929D", "--soft": "#D0D0D8", "--shadow": "0 22px 80px rgba(0,0,0,.55)", "--surface-top": "rgba(255,255,255,.025)"
+    "--bg": "#08100B", "--panel": "rgba(15,26,18,.84)", "--panel-solid": "#101B13", "--panel-raised": "#1A291D",
+    "--line": "rgba(232,223,200,.11)", "--line-strong": "rgba(200,173,121,.34)", "--text": "#EEE7D4",
+    "--muted": "#ADB5A3", "--soft": "#D9CFB7", "--shadow": "0 28px 88px rgba(0,0,0,.42)", "--surface-top": "rgba(255,248,224,.045)"
   }
 };
 
@@ -57,7 +38,7 @@ export function setLinkaTheme(value = storageGet("linka.theme", "forest")) {
     root.style.setProperty(property, color);
   });
   storageSet("linka.theme", key);
-  setLinkaAccent(storageGet("linka.accent", "forest"));
+  setLinkaAccent("forest");
   window.dispatchEvent(new CustomEvent("linka:appearance-theme", { detail: { theme: key, resolvedTheme: resolved } }));
   return key;
 }
@@ -92,6 +73,80 @@ export function setLinkaEffects(value = storageGet("linka.effects", "balanced"))
   return key;
 }
 
+const APPEARANCE_CONTROLS = {
+  glassOpacity: { key: "linka.glassOpacity", css: "--atelier-glass-opacity", min: 25, max: 95, fallback: 78, unit: "%" },
+  glassBlur: { key: "linka.glassBlur", css: "--atelier-glass-blur", min: 0, max: 32, fallback: 20, unit: "px" },
+  glassSaturation: { key: "linka.glassSaturation", css: "--atelier-glass-saturation", min: 80, max: 150, fallback: 115, unit: "%" },
+  backgroundDim: { key: "linka.backgroundDim", css: "--atelier-background-dim", min: 25, max: 100, fallback: 72, unit: "%" }
+};
+const CUSTOM_COLORS = {
+  accentColor: { key: "linka.customAccentColor", css: "--atelier-brass", fallback: "#C8AD79" },
+  blockColor: { key: "linka.customBlockColor", css: "--atelier-block-color", rgbCss: "--atelier-block-rgb", fallback: "#0D160E" }
+};
+function normalizeHexColor(value, fallback) {
+  let color = String(value || "").trim();
+  if (/^#[0-9a-f]{3}$/i.test(color)) color = "#" + Array.from(color.slice(1)).map(ch => ch + ch).join("");
+  return /^#[0-9a-f]{6}$/i.test(color) ? color.toUpperCase() : fallback;
+}
+function colorChannels(hex) {
+  const normalized = normalizeHexColor(hex, "#000000");
+  return [1, 3, 5].map(offset => parseInt(normalized.slice(offset, offset + 2), 16)).join(", ");
+}
+export function setLinkaCustomColor(name, value) {
+  const config = CUSTOM_COLORS[name];
+  if (!config) return null;
+  const color = normalizeHexColor(value, config.fallback);
+  const root = document.documentElement;
+  root.style.setProperty(config.css, color);
+  const channels = colorChannels(color);
+  if (name === "accentColor") {
+    const [r, g, b] = channels.split(", ").map(Number);
+    const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    root.style.setProperty("--accent", color);
+    root.style.setProperty("--accent-text", luminance > 0.58 ? "#172014" : "#F7F3E7");
+    root.style.setProperty("--glow", "rgba(" + channels + ", .14)");
+    root.style.setProperty("--line-strong", "rgba(" + channels + ", .34)");
+  } else {
+    root.style.setProperty(config.rgbCss, channels);
+  }
+  storageSet(config.key, color);
+  window.dispatchEvent(new CustomEvent("linka:custom-color-changed", { detail: { colorName: name, value: color } }));
+  return color;
+}
+export function getLinkaCustomColor(name) {
+  const config = CUSTOM_COLORS[name];
+  return config ? normalizeHexColor(storageGet(config.key, config.fallback), config.fallback) : null;
+}
+
+export function setLinkaAppearanceControl(name, value) {
+  const config = APPEARANCE_CONTROLS[name];
+  if (!config) return null;
+  const numeric = Number(value);
+  const safe = Number.isFinite(numeric)
+    ? Math.round(Math.min(config.max, Math.max(config.min, numeric)))
+    : config.fallback;
+  const root = document.documentElement;
+  root.style.setProperty(config.css, name === "glassBlur" ? safe + "px" : (name === "glassOpacity" || name === "backgroundDim" ? String(safe / 100) : String(safe) + "%"));
+  storageSet(config.key, String(safe));
+  window.dispatchEvent(new CustomEvent("linka:appearance-changed", { detail: { control: name, value: safe } }));
+  return safe;
+}
+
+export function resetLinkaAppearance() {
+  Object.entries(APPEARANCE_CONTROLS).forEach(([name, config]) => setLinkaAppearanceControl(name, config.fallback));
+  Object.entries(CUSTOM_COLORS).forEach(([name, config]) => setLinkaCustomColor(name, config.fallback));
+  setLinkaDensity("standard");
+  setLinkaEffects("balanced");
+}
+
+export function getLinkaAppearanceControl(name) {
+  const config = APPEARANCE_CONTROLS[name];
+  if (!config) return null;
+  const stored = Number(storageGet(config.key, String(config.fallback)));
+  return Number.isFinite(stored) ? Math.min(config.max, Math.max(config.min, stored)) : config.fallback;
+}
+
+
 function makeButton(text, className) {
   const button = document.createElement("button");
   button.type = "button";
@@ -105,10 +160,12 @@ export function initVisualSystem() {
   if (root.dataset.visualSystemReady === "true") return;
   root.dataset.visualSystemReady = "true";
 
-  setLinkaTheme(storageGet("linka.theme", "forest"));
+  setLinkaTheme("forest");
   setLinkaAccent(storageGet("linka.accent", "forest"));
   setLinkaDensity(storageGet("linka.density", "standard"));
-  setLinkaEffects(storageGet("linka.effects", "atmosphere"));
+  setLinkaEffects(storageGet("linka.effects", "balanced"));
+  Object.keys(APPEARANCE_CONTROLS).forEach(name => setLinkaAppearanceControl(name, getLinkaAppearanceControl(name)));
+  Object.keys(CUSTOM_COLORS).forEach(name => setLinkaCustomColor(name, getLinkaCustomColor(name)));
 
   const savedMotion = storageGet("linka.reduceMotion", "");
   let reducedMotion = savedMotion === "true";
@@ -127,6 +184,7 @@ export function initVisualSystem() {
       reducedMotion = event.matches;
       root.classList.toggle("reduced-motion", reducedMotion);
       root.dataset.reduceMotion = String(reducedMotion);
+      window.dispatchEvent(new CustomEvent("linka:reduce-motion-changed", { detail: { reducedMotion } }));
     });
   }
 
@@ -199,6 +257,7 @@ export function initVisualSystem() {
   let currentCommands = [];
   let activeIndex = 0;
   let previousFocus = null;
+  let paletteCloseTimer = 0;
 
   const notify = text => toast(text);
   const commands = [
@@ -271,17 +330,35 @@ export function initVisualSystem() {
     });
   }
   function closePalette() {
-    if (palette.hidden) return;
-    palette.hidden = true;
+    if (palette.hidden || palette.classList.contains("is-closing")) return;
     root.classList.remove("palette-open");
+    palette.setAttribute("aria-hidden", "true");
+    if (reducedMotion || root.classList.contains("reduced-motion") || motionQuery?.matches) {
+      palette.hidden = true;
+      palette.inert = true;
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+      return;
+    }
+    palette.inert = true;
+    palette.classList.add("is-closing");
+    window.clearTimeout(paletteCloseTimer);
+    paletteCloseTimer = window.setTimeout(() => {
+      palette.hidden = true;
+      palette.inert = true;
+      palette.classList.remove("is-closing");
+    }, 190);
     if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
   }
   function openPalette() {
+    window.clearTimeout(paletteCloseTimer);
+    palette.classList.remove("is-closing");
     previousFocus = document.activeElement;
     commandInput.value = "";
     activeIndex = 0;
     renderCommands();
     palette.hidden = false;
+    palette.inert = false;
+    palette.setAttribute("aria-hidden", "false");
     root.classList.add("palette-open");
     requestAnimationFrame(() => commandInput.focus());
   }
@@ -304,7 +381,7 @@ export function initVisualSystem() {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
       event.preventDefault();
       event.stopImmediatePropagation();
-      if (palette.hidden) openPalette(); else closePalette();
+      if (palette.hidden || palette.classList.contains("is-closing")) openPalette(); else closePalette();
       return;
     }
     if (!palette.hidden && event.key === "Escape") {
@@ -314,35 +391,27 @@ export function initVisualSystem() {
     }
   }, true);
 
+  // Keep the cursor glow, but coalesce pointer events to one update per frame.
+  // Avoid layout reads and per-card 3D transforms on every mouse movement.
   const pointer = (() => { try { return window.matchMedia("(pointer: fine)"); } catch { return null; } })();
-  let activeCard = null;
   if (pointer?.matches) {
+    let pointerFrame = 0;
+    let pointerX = 0;
+    let pointerY = 0;
     document.addEventListener("pointermove", event => {
       if (event.pointerType === "touch" || root.classList.contains("reduced-motion") || root.dataset.effects !== "atmosphere") return;
-      root.style.setProperty("--pointer-x", event.clientX + "px");
-      root.style.setProperty("--pointer-y", event.clientY + "px");
-      const card = event.target instanceof Element ? event.target.closest(".item, .capture") : null;
-      if (card !== activeCard) {
-        if (activeCard) {
-          activeCard.style.setProperty("--tilt-x", "0deg");
-          activeCard.style.setProperty("--tilt-y", "0deg");
-        }
-        activeCard = card;
-      }
-      if (card) {
-        const rect = card.getBoundingClientRect();
-        const x = ((event.clientX - rect.left) / Math.max(rect.width, 1) - .5) * 1.6;
-        const y = ((event.clientY - rect.top) / Math.max(rect.height, 1) - .5) * -1.4;
-        card.style.setProperty("--tilt-x", x.toFixed(2) + "deg");
-        card.style.setProperty("--tilt-y", y.toFixed(2) + "deg");
-      }
+      pointerX = event.clientX;
+      pointerY = event.clientY;
+      if (pointerFrame) return;
+      pointerFrame = requestAnimationFrame(() => {
+        root.style.setProperty("--pointer-x", pointerX + "px");
+        root.style.setProperty("--pointer-y", pointerY + "px");
+        pointerFrame = 0;
+      });
     }, { passive: true });
     document.addEventListener("pointerleave", () => {
-      if (activeCard) {
-        activeCard.style.setProperty("--tilt-x", "0deg");
-        activeCard.style.setProperty("--tilt-y", "0deg");
-        activeCard = null;
-      }
+      root.style.setProperty("--pointer-x", "50vw");
+      root.style.setProperty("--pointer-y", "16vh");
     });
   }
 

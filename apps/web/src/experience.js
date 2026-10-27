@@ -5,7 +5,7 @@ import {
   requestEmailOtp, saveCloudConfig, saveLinkaProfile, verifyEmailOtp,
   startGoogleOAuth, completeGoogleOAuthCallback
 } from "./cloud-sync.js";
-import { setLinkaTheme, setLinkaAccent, setLinkaDensity, setLinkaEffects } from "./visual-system.js";
+import { setLinkaDensity, setLinkaEffects, setLinkaAppearanceControl, getLinkaAppearanceControl, setLinkaCustomColor, getLinkaCustomColor, resetLinkaAppearance } from "./visual-system.js";
 
 const LANG_KEY = "linka.language.v1";
 const ONBOARDED_KEY = "linka.experience.onboarded.v1";
@@ -21,7 +21,7 @@ const COPY = {
   en: {
     ambientSound: "Ambient sound", ambientSoundBody: "A quiet, slowly breathing synth pad. Off by default.", audioUnavailable: "Ambient audio is not available in this environment.", checkUpdates: "Check for updates", updateChanges: "What changed",
     privacy: "Private by default · local-first", eyebrow: "Your personal library",
-    hero: ["Keep", "what", "matters."], heroBody: "Links, notes, and useful ideas. Saved once. Easy to find again.",
+    hero: ["Keep", "what", "matters."], heroBody: "Links and notes, in one place.",
     quick: "Quick capture", subtitle: "Keep the useful stuff.", placeholder: "Drop a link. Save a thought. Keep it for later…",
     hint: "Saved on this device. Export a backup whenever you need.", tags: "Tags", collection: "Collection", tagsPlaceholder: "design, reading, work", collectionPlaceholder: "Project or topic", later: "Read later", archive: "Archive", trash: "Trash", save: "Save to inbox",
     inbox: "Your inbox", export: "Export", import: "Import", filters: ["All", "Pinned", "Read later", "Archive", "Trash", "Links", "Notes"],
@@ -30,7 +30,7 @@ const COPY = {
     startTitle: "Welcome to Linka", startBody: "Create your account with your email. Your library will be ready on every signed-in device.",
     googleSignIn: "Continue with Google", emailFallback: "Use email code instead",
     email: "Email address", code: "Six-digit code", sendCreate: "Create account · send code",
-    sendLogin: "Sign in · send code", verify: "Verify and continue", continueOffline: "Continue offline",
+    sendLogin: "Sign in · send code", verify: "Verify and continue", continueOffline: "Continue without an account",
     profileTitle: "A little about you", profileBody: "Choose the name you want to see in Linka. Real details aren't required.",
     name: "What should we call you?", age: "Age (optional)", finish: "Finish setup",
     config: "Cloud service settings", projectUrl: "Supabase project URL", publishableKey: "Public publishable key",
@@ -49,7 +49,7 @@ const COPY = {
   ru: {
     ambientSound: "Атмосферный звук", ambientSoundBody: "Тихий синтезаторный фон с медленным дыханием. По умолчанию выключен.", audioUnavailable: "Атмосферный звук недоступен в этой среде.", checkUpdates: "Проверить обновления", updateChanges: "Что изменилось",
     privacy: "Приватность по умолчанию · сначала локально", eyebrow: "Твоя личная библиотека",
-    hero: ["Сохраняй", "то,", "что важно."], heroBody: "Ссылки, заметки и идеи. Сохраняй один раз — находи снова.",
+    hero: ["Сохраняй", "то,", "что важно."], heroBody: "Ссылки и заметки — в одном месте.",
     quick: "Быстрое сохранение", subtitle: "Только то, что нужно.", placeholder: "Вставь ссылку или сохрани мысль…",
     hint: "Сохранено на этом устройстве. Не забывай делать резервную копию.", tags: "Теги", collection: "Коллекция", tagsPlaceholder: "дизайн, чтение, работа", collectionPlaceholder: "Проект или тема", later: "Сохранить на потом", archive: "Архивировать", trash: "Корзина", save: "Сохранить",
     inbox: "Твоя библиотека", export: "Экспорт", import: "Импорт", filters: ["Всё", "Закреплённое", "Сохранить на потом", "Архив", "Корзина", "Ссылки", "Заметки"],
@@ -77,7 +77,7 @@ const COPY = {
   az: {
     ambientSound: "Atmosfer səsi", ambientSoundBody: "Yavaş nəfəs alan sakit sintezator fonu. Standart olaraq sönülüdür.", audioUnavailable: "Atmosfer səsi bu mühitdə mövcud deyil.", checkUpdates: "Yeniləmələri yoxla", updateChanges: "Nə dəyişdi",
     privacy: "Məxfilik standartdır · əvvəlcə cihazda", eyebrow: "Şəxsi kitabxanan",
-    hero: ["Vacib", "olanı", "saxla."], heroBody: "Linklər, qeydlər və ideyalar. Bir dəfə saxla, sonra asan tap.",
+    hero: ["Vacib", "olanı", "saxla."], heroBody: "Linklər və qeydlər bir yerdə.",
     quick: "Tez yadda saxla", subtitle: "Yalnız lazım olanlar.", placeholder: "Link əlavə et və ya fikrini yaz…",
     hint: "Bu cihazda saxlanılır. Ehtiyat nüsxə yaratmağı unutma.", tags: "Teqlər", collection: "Kolleksiya", tagsPlaceholder: "dizayn, oxu, iş", collectionPlaceholder: "Layihə və ya mövzu", later: "Sonra oxu", archive: "Arxivə köçür", trash: "Zibil qutusu", save: "Yadda saxla",
     inbox: "Kitabxanan", export: "İxrac", import: "İdxal", filters: ["Hamısı", "Sabitlənmiş", "Sonra oxu", "Arxiv", "Zibil qutusu", "Linklər", "Qeydlər"],
@@ -105,7 +105,7 @@ const COPY = {
   tr: {
     ambientSound: "Ortam sesi", ambientSoundBody: "Yavaşça nefes alan sakin bir synth tonu. Varsayılan olarak kapalı.", audioUnavailable: "Ortam sesi bu ortamda kullanılamıyor.", checkUpdates: "Güncellemeleri denetle", updateChanges: "Neler değişti",
     privacy: "Varsayılan gizlilik · önce cihazda", eyebrow: "Kişisel kitaplığın",
-    hero: ["Önemli", "olanı", "sakla."], heroBody: "Bağlantılar, notlar ve fikirler. Bir kez kaydet, sonra kolayca bul.",
+    hero: ["Önemli", "olanı", "sakla."], heroBody: "Bağlantılar ve notlar tek yerde.",
     quick: "Hızlı kayıt", subtitle: "Yalnızca gerekenler.", placeholder: "Bağlantı ekle veya bir düşünce yaz…",
     hint: "Bu cihazda saklanır. Yedek almayı unutma.", tags: "Etiketler", collection: "Koleksiyon", tagsPlaceholder: "tasarım, okuma, iş", collectionPlaceholder: "Proje veya konu", later: "Daha sonra oku", archive: "Arşivle", trash: "Çöp kutusu", save: "Gelen kutusuna kaydet",
     inbox: "Kitaplığın", export: "Dışa aktar", import: "İçe aktar", filters: ["Tümü", "Sabitlenen", "Daha sonra oku", "Arşiv", "Çöp kutusu", "Bağlantılar", "Notlar"],
@@ -262,11 +262,29 @@ function modal(titleText, subtitleText, options = {}) {
   head.append(logo, copy);
   panel.append(head);
   layer.append(panel);
-  document.querySelector("#modal-root")?.replaceChildren(layer);
+  const modalRoot = document.querySelector("#modal-root");
+  if (modalRoot) {
+    for (const previous of Array.from(modalRoot.children)) {
+      if (previous.classList.contains("closing")) continue;
+      previous.classList.add("closing");
+      previous.setAttribute("aria-hidden", "true");
+      previous.inert = true;
+      const reduced = Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches)
+        || document.documentElement.classList.contains("reduced-motion");
+      if (reduced) previous.remove();
+      else window.setTimeout(() => previous.remove(), 230);
+    }
+    modalRoot.append(layer);
+  }
   const close = () => {
+    if (!layer.isConnected || layer.classList.contains("closing")) return;
     layer.classList.add("closing");
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) layer.remove();
-    else setTimeout(() => layer.remove(), 180);
+    layer.setAttribute("aria-hidden", "true");
+    layer.inert = true;
+    const reduced = Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches)
+      || document.documentElement.classList.contains("reduced-motion");
+    if (reduced) layer.remove();
+    else window.setTimeout(() => layer.remove(), 230);
   };
   return { layer, panel, close };
 }
@@ -586,7 +604,6 @@ function openProfileEditor({ firstRun = false, close = () => {} } = {}) {
       localStorage.setItem(ONBOARDED_KEY, "true");
       setStatus(status, tr("profileSaved"));
       dialog.close();
-      if (firstRun) document.querySelector("#modal-root")?.replaceChildren();
       if (getCloudSession()) window.dispatchEvent(new CustomEvent("linka:profile-saved", { detail: profile }));
     } catch (error) { setStatus(status, error.message || tr("errors"), true); }
   });
@@ -671,6 +688,21 @@ function showAccount({ firstRun = false } = {}) {
 
   const dialog = modal(tr("startTitle"), tr("startBody"), { onboarding: firstRun });
   const panel = dialog.panel;
+  dialog.layer.classList.add("linka-auth-layer");
+  panel.classList.add("linka-auth-panel");
+  const authCopy = ({
+    en: ["A QUIET PLACE FOR WHAT MATTERS", "Your personal library, at your pace.", "Your library stays on this device unless you choose to sync."],
+    ru: ["ТИХОЕ МЕСТО ДЛЯ ВАЖНОГО", "Твоя личная библиотека — в своём ритме.", "Данные остаются на устройстве, пока ты сам не включишь синхронизацию."],
+    az: ["VACİB OLANLAR ÜÇÜN SAKİN MƏKAN", "Şəxsi kitabxanan, öz ritmində.", "Sinxronizasiyanı seçməyincə kitabxanan bu cihazda qalır."],
+    tr: ["ÖNEMLİ ŞEYLER İÇİN SAKİN BİR YER", "Kişisel kitaplığın, kendi ritminde.", "Eşitlemeyi seçmediğin sürece kitaplığın bu cihazda kalır."]
+  })[langCode()] || ["A QUIET PLACE FOR WHAT MATTERS", "Your personal library, at your pace.", "Your library stays on this device unless you choose to sync."];
+  const authIntro = make("div", "linka-auth-intro");
+  authIntro.append(
+    make("span", "linka-auth-eyebrow", authCopy[0]),
+    make("h3", "linka-auth-headline", authCopy[1]),
+    make("p", "linka-auth-description", authCopy[2])
+  );
+  panel.querySelector(".modal-head")?.insertAdjacentElement("afterend", authIntro);
   const service = configForm(panel, getCloudConfig(), true);
   const email = field(tr("email"), "email", "", "you@example.com");
   const code = field(tr("code"), "text", "", "000000");
@@ -684,7 +716,7 @@ function showAccount({ firstRun = false } = {}) {
   const sendLogin = button(tr("sendLogin"), "linka-button linka-button-secondary");
   const verify = button(tr("verify"));
   verify.hidden = true;
-  const offline = button(tr("continueOffline"), "linka-button linka-button-secondary");
+  const offline = button(tr("continueOffline"), "linka-button linka-button-secondary linka-auth-offline");
   const actions = make("div", "linka-actions");
   actions.append(sendCreate, sendLogin, verify);
   const form = make("form", "linka-form-stack");
@@ -693,12 +725,14 @@ function showAccount({ firstRun = false } = {}) {
     if (verify.hidden) sendLogin.click(); else verify.click();
   });
   form.append(email.wrap, code.wrap, status, actions);
-  const emailFallback = make("details", "linka-config linka-email-fallback");
+  const emailFallback = make("details", "linka-config linka-email-fallback linka-auth-email-fallback");
   const emailFallbackSummary = make("summary", "", tr("emailFallback"));
   emailFallback.append(emailFallbackSummary, form);
   const googleStatus = make("p", "linka-status");
-  const googleButton = button(tr("googleSignIn"));
+  const googleButton = button(tr("googleSignIn"), "linka-button linka-google-button");
   googleButton.setAttribute("data-auth-action", "google");
+  const googleLabel = googleButton.textContent;
+  googleButton.replaceChildren(make("span", "linka-google-mark", "G"), make("span", "linka-google-label", googleLabel));
   googleButton.addEventListener("click", async () => {
     googleButton.disabled = true;
     try {
@@ -806,15 +840,15 @@ function showSettings() {
   const picker = make("select", "linka-select");
   LANGUAGES.forEach(item => { const option=make("option","",item.label); option.value=item.value; picker.append(option); });
   picker.value = langCode();
-  picker.addEventListener("change", () => { setLanguage(picker.value); dialog.close(); setTimeout(showSettings, 190); });
+  picker.addEventListener("change", () => { setLanguage(picker.value); dialog.close(); setTimeout(showSettings, 240); });
   pickerLabel.append(picker);
   dialog.panel.append(pickerLabel);
 
   const preferenceLabels = ({
-    en: { accent: "Accent color", density: "Interface density", compact: "Compact", standard: "Standard", spacious: "Spacious", effects: "Visual effects", quiet: "Quiet", balanced: "Balanced", atmosphere: "Atmosphere", forest: "Forest", oled: "OLED black", cloud: "Cloud sync", backdrop: "Atmosphere & music", agreement: "User agreement" },
-    ru: { accent: "Акцентный цвет", density: "Плотность интерфейса", compact: "Компактная", standard: "Стандартная", spacious: "Просторная", effects: "Визуальные эффекты", quiet: "Минимальные", balanced: "Сбалансированные", atmosphere: "Атмосфера", forest: "Лес", oled: "OLED-чёрная", cloud: "Облачная синхронизация", backdrop: "Атмосфера и музыка", agreement: "Пользовательское соглашение" },
-    az: { accent: "Vurğu rəngi", density: "İnterfeys sıxlığı", compact: "Yığcam", standard: "Standart", spacious: "Geniş", effects: "Vizual effektlər", quiet: "Sakit", balanced: "Balanslı", atmosphere: "Atmosfer", forest: "Meşə", oled: "OLED qara", cloud: "Bulud sinxronizasiyası", backdrop: "Atmosfer və musiqi", agreement: "İstifadəçi razılaşması" },
-    tr: { accent: "Vurgu rengi", density: "Arayüz yoğunluğu", compact: "Kompakt", standard: "Standart", spacious: "Geniş", effects: "Görsel efektler", quiet: "Sakin", balanced: "Dengeli", atmosphere: "Atmosfer", forest: "Orman", oled: "OLED siyahı", cloud: "Bulut eşitleme", backdrop: "Atmosfer ve müzik", agreement: "Kullanıcı sözleşmesi" }
+    en: { accent: "Accent color", density: "Interface density", compact: "Compact", standard: "Standard", spacious: "Spacious", effects: "Visual effects", quiet: "Quiet", balanced: "Balanced", atmosphere: "Atmosphere", forest: "Forest", oled: "OLED black", cloud: "Cloud sync", backdrop: "Atmosphere & music", agreement: "User agreement", glassOpacity: "Glass transparency", glassBlur: "Glass blur", glassSaturation: "Glass saturation", backgroundDim: "Background dimming", appearanceReset: "Reset appearance", glassOpacityHelp: "Lower values make panels more transparent.", glassBlurHelp: "Higher blur softens what sits behind panels.", glassSaturationHelp: "Adjust the richness of colors seen through glass.", accentColorCustom: "Accent color", blockColorCustom: "Panel tint", accentColorHelp: "Sets the highlight color across the interface.", blockColorHelp: "Adds a personal tint to glass panels while preserving contrast.", backgroundDimHelp: "Controls how dark the background scene appears." },
+    ru: { accent: "Акцентный цвет", density: "Плотность интерфейса", compact: "Компактная", standard: "Стандартная", spacious: "Просторная", effects: "Визуальные эффекты", quiet: "Минимальные", balanced: "Сбалансированные", atmosphere: "Атмосфера", forest: "Лес", oled: "OLED-чёрная", cloud: "Облачная синхронизация", backdrop: "Атмосфера и музыка", agreement: "Пользовательское соглашение", glassOpacity: "Прозрачность стекла", glassBlur: "Размытие стекла", glassSaturation: "Насыщенность стекла", backgroundDim: "Затемнение фона", appearanceReset: "Сбросить оформление", glassOpacityHelp: "Чем ниже значение, тем прозрачнее панели.", glassBlurHelp: "Сильное размытие смягчает изображение за панелями.", glassSaturationHelp: "Настраивает насыщенность цветов, видимых сквозь стекло.", accentColorCustom: "Цвет акцента", blockColorCustom: "Оттенок блоков", accentColorHelp: "Меняет цвет акцентов по всему интерфейсу.", blockColorHelp: "Добавляет панелям собственный оттенок, сохраняя читаемость.", backgroundDimHelp: "Управляет затемнением фоновой сцены." },
+    az: { accent: "Vurğu rəngi", density: "İnterfeys sıxlığı", compact: "Yığcam", standard: "Standart", spacious: "Geniş", effects: "Vizual effektlər", quiet: "Sakit", balanced: "Balanslı", atmosphere: "Atmosfer", forest: "Meşə", oled: "OLED qara", cloud: "Bulud sinxronizasiyası", backdrop: "Atmosfer və musiqi", agreement: "İstifadəçi razılaşması", glassOpacity: "Şüşə şəffaflığı", glassBlur: "Şüşə bulanıqlığı", glassSaturation: "Şüşə rəng doyumu", backgroundDim: "Fonun qaraldılması", appearanceReset: "Görünüşü sıfırla", glassOpacityHelp: "Dəyər azaldıqca panellər daha şəffaf olur.", glassBlurHelp: "Bulanıqlıq panellərin arxasındakı təsviri yumşaldır.", glassSaturationHelp: "Şüşədən görünən rənglərin doyumunu tənzimləyir.", accentColorCustom: "Vurğu rəngi", blockColorCustom: "Blokların tonu", accentColorHelp: "İnterfeys boyunca vurğu rəngini dəyişir.", blockColorHelp: "Oxunaqlılığı qoruyaraq şüşə panellərə rəng tonu verir.", backgroundDimHelp: "Fon səhnəsinin nə qədər qaralacağını idarə edir." },
+    tr: { accent: "Vurgu rengi", density: "Arayüz yoğunluğu", compact: "Kompakt", standard: "Standart", spacious: "Geniş", effects: "Görsel efektler", quiet: "Sakin", balanced: "Dengeli", atmosphere: "Atmosfer", forest: "Orman", oled: "OLED siyahı", cloud: "Bulut eşitleme", backdrop: "Atmosfer ve müzik", agreement: "Kullanıcı sözleşmesi", glassOpacity: "Cam şeffaflığı", glassBlur: "Cam bulanıklığı", glassSaturation: "Cam doygunluğu", backgroundDim: "Arka plan karartma", appearanceReset: "Görünümü sıfırla", glassOpacityHelp: "Değer azaldıkça paneller daha şeffaf olur.", glassBlurHelp: "Bulanıklık, panellerin arkasındaki görüntüyü yumuşatır.", glassSaturationHelp: "Camın arkasından görünen renklerin yoğunluğunu ayarlar.", accentColorCustom: "Vurgu rengi", blockColorCustom: "Panel tonu", accentColorHelp: "Arayüzdeki vurgu rengini değiştirir.", blockColorHelp: "Okunabilirliği koruyarak cam panellere kişisel bir ton verir.", backgroundDimHelp: "Arka plan sahnesinin ne kadar karartılacağını ayarlar." }
   })[langCode()] || {};
   const addPreference = (label, options, selected, apply) => {
     const field = make("label", "linka-field");
@@ -831,20 +865,20 @@ function showSettings() {
     dialog.panel.append(field);
     return select;
   };
-  addPreference(tr("theme"), [
-    { value: "forest", label: preferenceLabels.forest || "Forest" },
-    { value: "dark", label: tr("dark") },
-    { value: "light", label: tr("light") },
-    { value: "system", label: tr("system") },
-    { value: "oled", label: preferenceLabels.oled || "OLED black" }
-  ], localStorage.getItem("linka.theme") || "forest", setLinkaTheme);
-  addPreference(preferenceLabels.accent || "Accent color", [
-    { value: "forest", label: preferenceLabels.forest || "Forest" },
-    { value: "violet", label: "Violet" },
-    { value: "blue", label: "Blue" },
-    { value: "mint", label: "Mint" },
-    { value: "rose", label: "Rose" }
-  ], localStorage.getItem("linka.accent") || "forest", setLinkaAccent);
+  const appearanceCopy = ({
+    en: ["THE LINKA SIGNATURE", "Forest Atelier", "One signature look: a twilight forest, bookish typography and restrained brass accents."],
+    ru: ["ФИРМЕННЫЙ СТИЛЬ LINKA", "Forest Atelier", "Единое оформление: сумеречный лес, книжная типографика и мягкие латунные акценты."],
+    az: ["LINKA-NIN İMZA ÜSLUBU", "Forest Atelier", "Vahid görünüş: alaqaranlıq meşə, kitab tipografiyası və zərif latun vurğuları."],
+    tr: ["LINKA'NIN İMZA STİLİ", "Forest Atelier", "Tek bir görünüm: alacakaranlık ormanı, kitap karakterli tipografi ve ölçülü pirinç vurgular."]
+  })[langCode()] || ["THE LINKA SIGNATURE", "Forest Atelier", "A twilight forest, bookish typography and restrained brass accents."];
+  const appearanceCard = make("section", "linka-appearance-card");
+  appearanceCard.append(
+    make("span", "linka-appearance-kicker", appearanceCopy[0]),
+    make("h3", "linka-appearance-title", appearanceCopy[1]),
+    make("p", "linka-appearance-description", appearanceCopy[2])
+  );
+  dialog.panel.append(appearanceCard);
+
   addPreference(preferenceLabels.density || "Interface density", [
     { value: "compact", label: preferenceLabels.compact || "Compact" },
     { value: "standard", label: preferenceLabels.standard || "Standard" },
@@ -855,6 +889,134 @@ function showSettings() {
     { value: "balanced", label: preferenceLabels.balanced || "Balanced" },
     { value: "atmosphere", label: preferenceLabels.atmosphere || "Atmosphere" }
   ], localStorage.getItem("linka.effects") || "atmosphere", setLinkaEffects);
+
+  const materialsSection = make("section", "linka-settings-block");
+  materialsSection.append(make("h3", "", langCode() === "ru" ? "Настройка материалов" : langCode() === "az" ? "Materialların tənzimlənməsi" : langCode() === "tr" ? "Malzeme ayarları" : "Material tuning"));
+  const addAppearanceSlider = (name, labelKey, min, max, step, unit, helpKey) => {
+    const wrap = make("div", "linka-appearance-control");
+    const head = make("div", "linka-appearance-control-head");
+    const id = "linka-appearance-" + name;
+    const label = make("label", "", preferenceLabels[labelKey] || labelKey);
+    label.htmlFor = id;
+    const output = make("output", "");
+    const input = make("input", "");
+    input.id = id;
+    input.type = "range";
+    input.min = String(min);
+    input.max = String(max);
+    input.step = String(step);
+    input.value = String(getLinkaAppearanceControl(name));
+    input.setAttribute("aria-describedby", id + "-help");
+    const renderValue = () => { output.value = input.value + unit; output.textContent = output.value; };
+    input.addEventListener("input", () => { setLinkaAppearanceControl(name, input.value); renderValue(); });
+    head.append(label, output);
+    const help = make("small", "", preferenceLabels[helpKey] || "");
+    help.id = id + "-help";
+    wrap.append(head, input, help);
+    materialsSection.append(wrap);
+    renderValue();
+  };
+  addAppearanceSlider("glassOpacity", "glassOpacity", 25, 95, 1, "%", "glassOpacityHelp");
+  addAppearanceSlider("glassBlur", "glassBlur", 0, 32, 1, " px", "glassBlurHelp");
+  addAppearanceSlider("glassSaturation", "glassSaturation", 80, 150, 1, "%", "glassSaturationHelp");
+  addAppearanceSlider("backgroundDim", "backgroundDim", 25, 100, 1, "%", "backgroundDimHelp");
+  const addAppearanceColor = (name, labelKey, helpKey) => {
+    const wrap = make("div", "linka-appearance-control linka-appearance-color");
+    const head = make("div", "linka-appearance-control-head");
+    const id = "linka-color-" + name;
+    const label = make("label", "", preferenceLabels[labelKey] || labelKey);
+    label.htmlFor = id;
+    const output = make("output", "");
+    const input = make("input", "");
+    input.type = "color";
+    input.id = id;
+    input.value = getLinkaCustomColor(name);
+    input.setAttribute("aria-describedby", id + "-help");
+    const renderValue = () => { output.value = input.value.toUpperCase(); output.textContent = output.value; };
+    input.addEventListener("input", () => { setLinkaCustomColor(name, input.value); renderValue(); });
+    head.append(label, output);
+    const help = make("small", "", preferenceLabels[helpKey] || "");
+    help.id = id + "-help";
+    wrap.append(head, input, help);
+    materialsSection.append(wrap);
+    renderValue();
+  };
+  addAppearanceColor("accentColor", "accentColorCustom", "accentColorHelp");
+  addAppearanceColor("blockColor", "blockColorCustom", "blockColorHelp");
+  const resetAppearance = button(preferenceLabels.appearanceReset || "Reset appearance", "linka-button linka-button-secondary linka-appearance-reset");
+  resetAppearance.addEventListener("click", () => {
+    resetLinkaAppearance();
+    materialsSection.querySelectorAll('input[type="range"]').forEach(input => {
+      const name = input.id.replace("linka-appearance-", "");
+      input.value = String(getLinkaAppearanceControl(name));
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    materialsSection.querySelectorAll('input[type="color"]').forEach(input => {
+      const name = input.id.replace("linka-color-", "");
+      input.value = getLinkaCustomColor(name);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const density = dialog.panel.querySelectorAll("select.linka-select");
+    if (density[1]) density[1].value = "standard";
+    if (density[2]) density[2].value = "balanced";
+  });
+  materialsSection.append(resetAppearance);
+  dialog.panel.append(materialsSection);
+
+
+  const plansCopy = ({
+    en: {
+      title: "The future of Linka",
+      intro: "All features and appearance controls are free today. These tiers are a roadmap only — nothing is locked and no payment is being requested.",
+      badges: ["Included now", "Planned", "Planned"], names: ["Free", "Pro", "Ultimate"],
+      descriptions: ["The complete Linka experience, available now.", "More ways to shape colors, materials and saved looks.", "A deeply personal workspace with custom image and video atmospheres."],
+      features: [["All current tools are unlocked", "Glass, block-color and accent controls", "Custom photo/video backgrounds; optional cloud sync"], ["More accent and surface palettes", "Saved themes and material presets", "Expanded layout personalization"], ["Advanced atmosphere presets", "Additional animated background treatments", "Portable visual profiles"]]
+    },
+    ru: {
+      title: "Будущее Linka",
+      intro: "Сейчас все функции и настройки оформления бесплатны. Тарифы ниже — только план развития: ничего не заблокировано, оплата не требуется.",
+      badges: ["Доступно сейчас", "В планах", "В планах"], names: ["Free", "Pro", "Ultimate"],
+      descriptions: ["Полноценная Linka, доступная уже сейчас.", "Больше способов настраивать цвета, материалы и сохранённые стили.", "Персональное рабочее пространство с собственными фото- и видеофонами."],
+      features: [["Все текущие функции открыты", "Настройка акцента, цвета блоков и стекла", "Свои фото/видео-фоны и облако по желанию"], ["Расширенные палитры акцентов и поверхностей", "Сохраняемые темы и пресеты материалов", "Более тонкая настройка интерфейса"], ["Расширенные наборы атмосферы", "Дополнительные эффекты фоновой сцены", "Переносимые профили оформления"]]
+    },
+    az: {
+      title: "Linka-nın gələcəyi",
+      intro: "Hazırda bütün funksiyalar və görünüş parametrləri pulsuzdur. Bu planlar yalnız gələcək yol xəritəsidir — heç nə kilidlənməyib və ödəniş tələb olunmur.",
+      badges: ["İndi daxildir", "Planlaşdırılır", "Planlaşdırılır"], names: ["Free", "Pro", "Ultimate"],
+      descriptions: ["Bütün imkanları ilə Linka artıq əlçatandır.", "Rəngləri, materialları və saxlanılan görünüşləri daha geniş fərdiləşdirmə.", "Şəxsi şəkil və video atmosferləri olan fərdi iş məkanı."],
+      features: [["Bütün hazırkı funksiyalar açıqdır", "Vurğu, blok rəngi və şüşə parametrləri", "Şəxsi foto/video fonları və istəyə bağlı bulud"], ["Geniş rəng və səth palitraları", "Saxlanılan mövzular və material presetləri", "Daha detallı interfeys fərdiləşdirməsi"], ["Qabaqcıl atmosfer paketləri", "Əlavə animasiyalı fon effektləri", "Daşına bilən görünüş profilləri"]]
+    },
+    tr: {
+      title: "Linka'nın geleceği",
+      intro: "Şu anda tüm özellikler ve görünüm ayarları ücretsiz. Bu planlar yalnızca yol haritasıdır — hiçbir özellik kilitli değil ve ödeme gerekmiyor.",
+      badges: ["Şimdi dahil", "Planlanıyor", "Planlanıyor"], names: ["Free", "Pro", "Ultimate"],
+      descriptions: ["Tüm özellikleriyle Linka, şimdi kullanılabilir.", "Renkleri, malzemeleri ve kayıtlı görünümleri daha kapsamlı kişiselleştirme.", "Özel görsel ve video atmosferlerine sahip kişisel çalışma alanı."],
+      features: [["Mevcut tüm araçlar açık", "Vurgu, panel rengi ve cam kontrolleri", "Özel foto/video arka planları ve isteğe bağlı bulut"], ["Daha geniş vurgu ve yüzey paletleri", "Kaydedilebilir temalar ve malzeme hazır ayarları", "Daha ayrıntılı arayüz kişiselleştirme"], ["Gelişmiş atmosfer paketleri", "Ek animasyonlu arka plan efektleri", "Taşınabilir görünüm profilleri"]]
+    }
+  })[langCode()] || null;
+  const planText = plansCopy || {
+    title: "The future of Linka",
+    intro: "All features and appearance controls are free today. These tiers are a roadmap only — nothing is locked and no payment is being requested.",
+    badges: ["Included now", "Planned", "Planned"], names: ["Free", "Pro", "Ultimate"],
+    descriptions: ["The complete Linka experience, available now.", "More ways to shape colors, materials and saved looks.", "A deeply personal workspace with custom image and video atmospheres."],
+    features: [["All current tools are unlocked", "Glass, block-color and accent controls", "Custom photo/video backgrounds; optional cloud sync"], ["More accent and surface palettes", "Saved themes and material presets", "Expanded layout personalization"], ["Advanced atmosphere presets", "Additional animated background treatments", "Portable visual profiles"]]
+  };
+  const plansSection = make("section", "linka-settings-block linka-plans-section");
+  plansSection.append(make("h3", "", planText.title), make("p", "linka-muted linka-plans-intro", planText.intro));
+  const plansGrid = make("div", "linka-plans-grid");
+  planText.names.forEach((name, index) => {
+    const card = make("article", "linka-plan-card" + (index === 0 ? " is-current" : " is-future"));
+    card.dataset.plan = name.toLowerCase();
+    const head = make("div", "linka-plan-head");
+    head.append(make("h4", "", name), make("span", "linka-plan-badge" + (index === 0 ? " is-current" : ""), planText.badges[index]));
+    card.append(head, make("p", "linka-plan-description", planText.descriptions[index]));
+    const list = make("ul", "linka-plan-features");
+    planText.features[index].forEach(feature => list.append(make("li", "", feature)));
+    card.append(list);
+    plansGrid.append(card);
+  });
+  plansSection.append(plansGrid);
+  dialog.panel.append(plansSection);
 
   const soundSection = make("div", "linka-settings-block");
   soundSection.append(make("h3", "", tr("ambientSound")), make("p", "linka-muted", tr("ambientSoundBody")));
@@ -882,6 +1044,7 @@ function showSettings() {
     const next = !currentReducedMotion();
     localStorage.setItem("linka.reduceMotion", String(next));
     document.documentElement.classList.toggle("reduced-motion", next);
+    window.dispatchEvent(new CustomEvent("linka:reduce-motion-changed", { detail: { reducedMotion: next } }));
     refreshMotionLabel();
   });
   motionSection.append(motionToggle);
@@ -933,16 +1096,31 @@ function mountWebNavigation() {
   const nav = make("nav", "web-side-nav");
   nav.setAttribute("aria-label", "Library sections");
   const entries = [
-    ["all", "▦", tr("inbox")], ["pinned", "⌖", tr("pinned")], ["read-later", "◷", tr("later")], ["archive", "▤", tr("archive")], ["trash", "⌫", tr("trash")],
-    ["links", "↗", tr("links")], ["notes", "Aa", tr("notes")],
-    ["search", "⌕", tr("search")], ["capture", "+", tr("quick")],
-    ["account", "○", tr("account")], ["settings", "⚙", tr("settings")]
+    ["all", tr("inbox")], ["pinned", tr("pinned")], ["read-later", tr("later")], ["archive", tr("archive")], ["trash", tr("trash")],
+    ["links", tr("links")], ["notes", tr("notes")],
+    ["search", tr("search")], ["capture", tr("quick")],
+    ["account", tr("account")], ["settings", tr("settings")]
   ];
+  const navIcons = {
+    all: '<rect x="4" y="4" width="6" height="6" rx="1.4"/><rect x="14" y="4" width="6" height="6" rx="1.4"/><rect x="4" y="14" width="6" height="6" rx="1.4"/><rect x="14" y="14" width="6" height="6" rx="1.4"/>',
+    pinned: '<path d="M8 4h8l-1 5 3 3v2H6v-2l3-3-1-5Z"/><path d="M12 14v6"/>',
+    "read-later": '<circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/>',
+    archive: '<path d="M4 5h16v4H4z"/><path d="M6 9v10h12V9M10 13h4"/>',
+    trash: '<path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/>',
+    links: '<path d="M10 13.5a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1.7 1.7"/><path d="M14 10.5a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1.7-1.7"/>',
+    notes: '<path d="M6 4h9l3 3v13H6z"/><path d="M14 4v4h4M9 12h6M9 16h6"/>',
+    search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4 4"/>',
+    capture: '<path d="M12 5v14M5 12h14"/>',
+    account: '<circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c.4-3.5 2.9-5.5 6.5-5.5s6.1 2 6.5 5.5"/>',
+    settings: '<path d="M12 3.7v2M12 18.3v2M20.3 12h-2M5.7 12h-2M17.85 6.15l-1.42 1.42M7.57 16.43l-1.42 1.42M17.85 17.85l-1.42-1.42M7.57 7.57 6.15 6.15"/><circle cx="12" cy="12" r="4"/>'
+  };
   const itemButtons = new Map();
   const activePill = make("span", "web-nav-active-pill");
   activePill.setAttribute("aria-hidden", "true");
   nav.append(activePill);
+  let activeKey = "all";
   const activate = key => {
+    activeKey = key;
     for (const [value, node] of itemButtons) {
       const active = value === key;
       node.classList.toggle("active", active);
@@ -951,12 +1129,14 @@ function mountWebNavigation() {
     const target = itemButtons.get(key);
     if (target) { activePill.style.height = target.offsetHeight + "px"; activePill.style.transform = "translate3d(0," + target.offsetTop + "px,0)"; activePill.style.opacity = "1"; }
   };
-  for (const [key, glyph, label] of entries) {
+  for (const [key, label] of entries) {
     const node = make("button", "web-nav-item");
     node.type = "button";
     node.dataset.nav = key;
-    node.innerHTML = '<span class="web-nav-glyph" aria-hidden="true"></span><span class="web-nav-label"></span>';
-    node.querySelector(".web-nav-glyph").textContent = glyph;
+    node.setAttribute("aria-label", label);
+    node.title = label;
+    node.innerHTML = '<span class="web-nav-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></svg></span><span class="web-nav-label"></span>';
+    node.querySelector(".web-nav-glyph svg").innerHTML = navIcons[key];
     node.querySelector(".web-nav-label").textContent = label;
     node.addEventListener("click", () => {
       if (["all", "pinned", "read-later", "archive", "trash", "links", "notes"].includes(key)) {
@@ -981,9 +1161,13 @@ function mountWebNavigation() {
     itemButtons.set(key, node);
     nav.append(node);
   }
-  const foot = make("div", "web-side-foot");
-  foot.innerHTML = '<span class="web-side-status-dot" aria-hidden="true"></span><span><strong>Private by default</strong><small>Stored here. Sync when you sign in.</small></span>';
-  sidebar.append(brand, caption, nav, foot);
+  window.addEventListener("resize", () => {
+    const target = itemButtons.get(activeKey);
+    if (!target || !activePill.isConnected) return;
+    activePill.style.height = target.offsetHeight + "px";
+    activePill.style.transform = "translate3d(0," + target.offsetTop + "px,0)";
+  }, { passive: true });
+  sidebar.append(brand, caption, nav);
   shell.prepend(sidebar);
   document.querySelectorAll("[data-filter]").forEach(node => node.addEventListener("click", () => activate(node.dataset.filter || "all")));
   activate("all");
@@ -999,11 +1183,19 @@ function updateWebNavLabels() {
   };
   const selected = labels[lang] || labels.en;
   document.querySelectorAll(".web-nav-item[data-nav]").forEach(node => {
-    const label = node.querySelector(".web-nav-label");
-    if (label) label.textContent = selected[node.dataset.nav] || labels.en[node.dataset.nav] || "";
+    const label = selected[node.dataset.nav] || labels.en[node.dataset.nav] || "";
+    const labelNode = node.querySelector(".web-nav-label");
+    if (labelNode) labelNode.textContent = label;
+    node.setAttribute("aria-label", label);
+    node.title = label;
   });
   const sidebar = document.querySelector(".web-sidebar");
-  if (sidebar) sidebar.setAttribute("aria-label", lang === "ru" ? "Навигация Linka" : lang === "az" ? "Linka naviqasiyası" : lang === "tr" ? "Linka gezinme" : "Linka navigation");
+  if (sidebar) {
+    sidebar.setAttribute("aria-label", lang === "ru" ? "Навигация Linka" : lang === "az" ? "Linka naviqasiyası" : lang === "tr" ? "Linka gezinme" : "Linka navigation");
+    const captions = { en: "LIBRARY", ru: "БИБЛИОТЕКА", az: "KİTABXANA", tr: "KÜTÜPHANE" };
+    const caption = sidebar.querySelector(".web-side-caption");
+    if (caption) caption.textContent = captions[lang] || captions.en;
+  }
 }
 async function handleDesktopOAuthUrl(rawUrl) {
   try {
@@ -1112,15 +1304,11 @@ export function initLinkaExperience() {
   updateTimer = setInterval(() => checkForRelease({ notify: true }), 15 * 60 * 1000);
   handleIncomingPairing();
   const oauthCallbackPending = /(?:access_token|error)=/.test(location.hash || "");
-  if (!oauthCallbackPending && localStorage.getItem("linka.termsAccepted") === "2026-10-23-v2") {
-    if (!localStorage.getItem(ONBOARDED_KEY)) {
-      const session = getCloudSession();
-      if (session && readLinkaProfile()) localStorage.setItem(ONBOARDED_KEY, "true");
-      else setTimeout(() => showAccount({ firstRun: true }), 240);
-    }
-  } else if (!oauthCallbackPending) {
-    window.addEventListener("linka:agreement-accepted", () => {
-      if (!localStorage.getItem(ONBOARDED_KEY)) setTimeout(() => showAccount({ firstRun: true }), 240);
-    }, { once: true });
+  // Account setup is optional. A first-run sign-in overlay used to cover the
+  // entire workspace until the user discovered "Continue without an account",
+  // making the app appear frozen on a fresh install. Keep the workspace usable
+  // after the agreement; account setup is opened only from an explicit action.
+  if (!oauthCallbackPending && getCloudSession() && readLinkaProfile()) {
+    localStorage.setItem(ONBOARDED_KEY, "true");
   }
 }

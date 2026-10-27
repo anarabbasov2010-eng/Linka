@@ -26,6 +26,12 @@ jobs:
       - name: Test local inbox storage
         working-directory: apps/web
         run: npm test
+      - name: Install Playwright Chromium and system dependencies
+        working-directory: apps/web
+        run: npx playwright install --with-deps chromium
+      - name: Test browser interactions and atmosphere fallback
+        working-directory: apps/web
+        run: npm run test:e2e
       - name: Build web client
         working-directory: apps/web
         run: npm run build

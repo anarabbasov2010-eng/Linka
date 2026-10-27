@@ -1,5 +1,60 @@
 # Changelog
 
+## Next — Reliable forest motion and media recovery
+
+- Added a gently animated, bundled forest fallback with drifting mist and breathing light, so the atmosphere remains alive when remote video hosts are unavailable.
+- Bounded each remote forest-video attempt with a timeout and retry sequence; playback errors now advance to the next candidate rather than silently leaving a stalled video element.
+- Preserved the reduced-motion preference in the bundled fallback.
+
+## Next — Desktop stability and forest fallback
+
+- The forest scene now has a bundled fallback, so the workspace never depends on an external poster image just to show a background.
+- Remote forest videos are attempted in the background; if a host, codec or autoplay policy fails, Linka keeps the local forest scene visible instead of leaving a black screen.
+- Bound the background's dimming control to the actual veil and reduce blur-based work in the typing animation.
+- Removed repeated “local-first / cloud sync / saved on this device” slogans from the main workspace and sidebar.
+- Added hit-testing safeguards for decorative layers and closed overlays, plus a one-column fallback for narrow Windows windows.
+
+## Next — Utility surface, account entry and future plans
+
+- Android: brought the native Compose app into the Forest Atelier visual system with aligned forest/ivory/brass tokens, five saved accent palettes, adjustable glass opacity and background dimming, selectable motion/texture profiles, and a localized local-time card. Existing native navigation, local storage, forest/photo/video backgrounds, music player, and document flows remain in place.
+
+- Added a top-edge utility panel that reveals local time, date, optional current weather and Linka's account/local-first state with a calm slide-down motion.
+- Weather access is opt-in: geolocation is requested only after the user selects it, coordinates stay in local storage, and the weather provider receives no account or library data.
+- Restyled the Google-first account entry and email-code fallback in the Forest Atelier visual language without replacing the existing Google OAuth flow.
+- Added a transparent Free / Pro / Ultimate roadmap card: all current features remain free and unlocked, including photo/video backgrounds, glass controls and custom accent/panel colors; future tiers are informational only.
+
+## Next — Navigation and component polish
+
+- Replaced font-dependent sidebar glyphs with a consistent SVG stroke icon set and localized the privacy/status footer across English, Russian, Azerbaijani and Turkish.
+- Refined the Web sidebar with a warmer moving active state, clearer icon emphasis and a quieter status footer.
+- Reworked the capture canvas, language picker, search field, filter chips, selection state, empty library, bulk-action toolbar and card actions to share the Forest Atelier control language.
+- Added more deliberate keyboard focus halos, themed scrollbars and responsive filter scrolling on narrow windows.
+- Refined document-editor typography, save status, input focus, music transport buttons, seek/volume controls, playlist rows and atmosphere toggles with the same forest-and-brass control language.
+- Polished hover and press feedback while preserving the reduced-motion and in-app reduced-motion settings.
+- Kept the Windows shell compact; shared component styling follows the same Forest Atelier tokens used by Web.
+
+## Next — Consistent motion and graceful exits
+
+- Unified modal, settings, atmosphere-player and library-card entrance/exit timing into one restrained Forest Atelier motion system.
+- Modal layers now fade and soften out instead of disappearing immediately; opening a new Linka settings panel lets the previous panel finish closing underneath it.
+- Library cards that leave the active filter or search results animate out without blocking input or retaining interactive ghost controls.
+- Atmosphere settings and player panels now close with a coordinated fade, blur and short movement rather than an abrupt removal.
+- Both the operating-system reduced-motion preference and Linka's in-app reduced-motion setting suppress non-essential animation.
+- The command palette, document editor, settings overlays, and music player disable interaction while exiting and restore keyboard focus to the invoking control.
+- Reduced-transparency preferences now override inline glass-slider values, so the accessibility fallback is respected even after the user customizes the glass.
+- Exit animations for departing library cards are capped to avoid generating large temporary DOM trees during broad searches.
+- Web CI and Windows desktop PR validation are running; builds must finish successfully before this branch is release-ready.
+
+
+
+## Next — Forest Atelier design completion
+
+- Unified Windows and Web around one signature appearance: twilight forest, bookish system-serif headings, warm brass accents, paper-toned text and translucent moss-glass surfaces.
+- Removed legacy theme and accent selectors from Settings; old saved preferences migrate to Forest Atelier at startup.
+- Rebalanced the capture canvas, library cards, search, filters, dialogs, command palette, document editor and music dock for one coherent visual language.
+- Refined responsive spacing, focus states, scrollbars and reduced-motion handling; removed per-card 3D tilt to keep library browsing calmer and less GPU-intensive.
+- Added a localized Forest Atelier identity panel in Settings. Density, visual-effects, background-media, music and reduced-motion controls remain available.
+
 ## Next — Unified twilight theme correction
 
 - Removed the pulsing sphere and old generated ambient audio; the twilight forest is now Linka's single built-in appearance across Android, Web, and Windows.
@@ -77,3 +132,9 @@
 
 - Local-first inbox capture, pin, edit, delete, copy, filter and export features.
 - Web storage tests and CI build.
+
+## Forest Atelier — adjustable materials
+- Added live, persistent controls for glass transparency, blur strength, glass color saturation, and background-scene dimming in Settings.
+- Added accessible slider labels, live numeric values, localized help text (English, Russian, Azerbaijani, Turkish), and a one-click appearance reset.
+- Centralized appearance values as CSS custom properties so Web and Windows share the same material controls.
+- Respects reduced-transparency preferences with a more opaque, blur-free fallback.
