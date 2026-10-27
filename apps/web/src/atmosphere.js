@@ -63,6 +63,7 @@ function addStyles(){if($("#linka-atmosphere-styles"))return;const s=document.cr
 function buildBackground(){const layer=document.createElement("div");layer.id="linka-atmosphere";layer.setAttribute("aria-hidden","true");layer.innerHTML='<video class="linka-atmosphere-video" playsinline muted loop preload="metadata"></video><img class="linka-atmosphere-image" alt=""><div class="veil"></div><div class="grain"></div><div class="wind"></div>';document.body.prepend(layer);return layer}
 async function loadBackground(){
   const layer=$("#linka-atmosphere"),video=$("video",layer),image=$("img",layer),saved=read("background",null);
+  let videoAttemptTimeout=0;
   if(!layer||!video||!image)return;
 
   function showFallback(){
@@ -77,7 +78,8 @@ async function loadBackground(){
     }
   }
   function stopVideo(){
-    video.onerror=null;video.onloadeddata=null;video.oncanplay=null;
+    if(videoAttemptTimeout){window.clearTimeout(videoAttemptTimeout);videoAttemptTimeout=0}
+    video.onerror=null;video.onloadeddata=null;video.oncanplay=null;video.onstalled=null;
     try{video.pause()}catch{}
     video.removeAttribute("src");
     video.classList.remove("ready");
@@ -90,27 +92,35 @@ async function loadBackground(){
     video.style.display="block";
     video.muted=true;video.loop=true;video.playsInline=true;video.preload="auto";
     let attempt=0,playStartedFor=-1;
+    const clearAttemptTimeout=()=>{
+      if(videoAttemptTimeout){window.clearTimeout(videoAttemptTimeout);videoAttemptTimeout=0}
+    };
+    const failAttempt=(activeAttempt)=>{
+      if(activeAttempt!==attempt)return;
+      clearAttemptTimeout();
+      attempt++;
+      if(attempt<FOREST_VIDEO_CANDIDATES.length){
+        try{video.pause()}catch{}
+        video.removeAttribute("src");
+        video.classList.remove("ready");
+        useNextVideo();
+      }else{
+        stopVideo();
+        showFallback();
+      }
+    };
     const useNextVideo=()=>{
+      clearAttemptTimeout();
       const activeAttempt=attempt;
       playStartedFor=-1;
       video.classList.remove("ready");
-      video.onerror=()=>{
-        if(activeAttempt!==attempt)return;
-        attempt++;
-        if(attempt<FOREST_VIDEO_CANDIDATES.length){
-          try{video.pause()}catch{}
-          video.removeAttribute("src");
-          useNextVideo();
-        }else{
-          stopVideo();
-          showFallback();
-        }
-      };
+      video.onerror=()=>failAttempt(activeAttempt);
       const startPlayback=()=>{
         if(activeAttempt!==attempt||playStartedFor===activeAttempt)return;
         playStartedFor=activeAttempt;
         Promise.resolve(video.play()).then(()=>{
           if(activeAttempt!==attempt)return;
+          clearAttemptTimeout();
           video.classList.add("ready");
           image.style.display="none";
         }).catch(()=>{
@@ -118,12 +128,18 @@ async function loadBackground(){
           video.classList.remove("ready");
           image.style.display="block";
           if(image.complete&&image.naturalWidth)image.classList.add("ready");
+          // A candidate can load but still fail to play on a given WebView/codec.
+          // Move on instead of silently settling on a dead video element.
+          failAttempt(activeAttempt);
         });
       };
       video.onloadeddata=startPlayback;
       video.oncanplay=startPlayback;
       video.src=FOREST_VIDEO_CANDIDATES[activeAttempt];
       try{video.load()}catch{}
+      // Some networks/WebViews stall without firing an error event. Keep the
+      // local animated poster visible and bound each remote attempt.
+      videoAttemptTimeout=window.setTimeout(()=>failAttempt(activeAttempt),8000);
     };
     useNextVideo();
   }

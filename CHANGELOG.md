@@ -1,5 +1,11 @@
 # Changelog
 
+## Next — Reliable forest motion and media recovery
+
+- Added a gently animated, bundled forest fallback with drifting mist and breathing light, so the atmosphere remains alive when remote video hosts are unavailable.
+- Bounded each remote forest-video attempt with a timeout and retry sequence; playback errors now advance to the next candidate rather than silently leaving a stalled video element.
+- Preserved the reduced-motion preference in the bundled fallback.
+
 ## Next — Desktop stability and forest fallback
 
 - The forest scene now has a bundled fallback, so the workspace never depends on an external poster image just to show a background.
