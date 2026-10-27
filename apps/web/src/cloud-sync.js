@@ -1,6 +1,13 @@
 const CONFIG_KEY = "linka.cloud.config.v1";
 const SESSION_KEY = "linka.cloud.session.v1";
 export const DELETED_IDS_KEY = "linka.deletedIds.v1";
+export const MAX_SYNC_PAYLOAD_BYTES = 4 * 1024 * 1024;
+
+export function estimateCloudPayloadBytes(value) {
+  const serialized = typeof value === "string" ? value : JSON.stringify(value);
+  if (typeof TextEncoder !== "undefined") return new TextEncoder().encode(serialized).byteLength;
+  return new Blob([serialized]).size;
+}
 
 function readObject(key, storage = globalThis.localStorage) {
   try {
@@ -320,10 +327,17 @@ export async function syncCloudCaptures(localCaptures, localDeletedIds = readDel
     data: { captures: merged, deletedIds: Array.from(deleted), ...(syncedProfile ? { profile: syncedProfile } : {}) },
     updated_at: new Date().toISOString()
   };
+  const serializedBody = JSON.stringify(body);
+  const payloadBytes = estimateCloudPayloadBytes(serializedBody);
+  if (payloadBytes > MAX_SYNC_PAYLOAD_BYTES) {
+    const payloadMiB = (payloadBytes / (1024 * 1024)).toFixed(2);
+    const limitMiB = (MAX_SYNC_PAYLOAD_BYTES / (1024 * 1024)).toFixed(0);
+    throw new Error(`Cloud sync paused: this request is ${payloadMiB} MiB, above the ${limitMiB} MiB safety limit. Your local library was not changed. Export a backup or sync a smaller set of content before retrying.`);
+  }
   const upsert = await fetch(`${config.url}/rest/v1/linka_sync?on_conflict=user_id`, {
     method: "POST",
     headers: { ...headers, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
-    body: JSON.stringify(body)
+    body: serializedBody
   });
   await readResponse(upsert);
   // A delete can happen while the request is in flight. Preserve any newer
