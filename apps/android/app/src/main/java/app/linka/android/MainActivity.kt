@@ -193,6 +193,27 @@ private fun accentForName(name: String): Color = when (name) {
     else -> Color(0xFFC8AD79)
 }
 
+private fun panelBaseForName(name: String): Color = when (name) {
+    "pine" -> Color(0xFF0B1712)
+    "olive" -> Color(0xFF171D10)
+    "charcoal" -> Color(0xFF141715)
+    else -> DS
+}
+
+private fun raisedBaseForName(name: String): Color = when (name) {
+    "pine" -> Color(0xFF172820)
+    "olive" -> Color(0xFF252B18)
+    "charcoal" -> Color(0xFF222722)
+    else -> DR
+}
+
+private fun borderForName(name: String): Color = when (name) {
+    "pine" -> Color(0xFF385647)
+    "olive" -> Color(0xFF555A3C)
+    "charcoal" -> Color(0xFF454B45)
+    else -> DBR
+}
+
 private fun blendSurface(base: Color, background: Color, opacity: Float): Color {
     val amount = opacity.coerceIn(0.55f, 0.98f)
     return Color(
@@ -214,6 +235,7 @@ const val AMBIENT_AUDIO_KEY = "ambient_audio"
 private const val DENSITY_KEY = "interface_density"
 private const val EFFECTS_KEY = "visual_effects"
 private const val PANEL_OPACITY_KEY = "forest_atelier_panel_opacity"
+private const val PANEL_TONE_KEY = "forest_atelier_panel_tone"
 private const val BACKGROUND_DIM_KEY = "forest_atelier_background_dim"
 private const val FONT_SCALE_KEY = "font_scale"
 private const val UPDATE_ALERTS_KEY = "update_alerts"
@@ -994,7 +1016,7 @@ class MainActivity : ComponentActivity() {
         rememberPairingIntent(intent)
         checkForUpdate(true)
         setContent {
-            var theme by remember { mutableStateOf(prefs().getString(THEME_KEY, "forest") ?: "forest") }
+            var theme by remember { mutableStateOf("forest") }
             var accent by remember {
                 mutableStateOf((prefs().getString(ACCENT_KEY, "gold") ?: "gold").let { if (it == "forest") "gold" else it })
             }
@@ -1005,14 +1027,13 @@ class MainActivity : ComponentActivity() {
             var density by remember { mutableStateOf(prefs().getString(DENSITY_KEY, "standard") ?: "standard") }
             var effects by remember { mutableStateOf(prefs().getString(EFFECTS_KEY, "atmosphere") ?: "atmosphere") }
             var panelOpacity by remember { mutableFloatStateOf(prefs().getFloat(PANEL_OPACITY_KEY, .88f).coerceIn(.62f, .96f)) }
+            var panelTone by remember { mutableStateOf(prefs().getString(PANEL_TONE_KEY, "forest") ?: "forest") }
             var backgroundDim by remember { mutableFloatStateOf(prefs().getFloat(BACKGROUND_DIM_KEY, .62f).coerceIn(.25f, .90f)) }
             var fontScale by remember { mutableFloatStateOf(prefs().getFloat(FONT_SCALE_KEY, 1f).coerceIn(.9f, 1.2f)) }
             var alerts by remember { mutableStateOf(prefs().getBoolean(UPDATE_ALERTS_KEY, true)) }
             var autoDownload by remember { mutableStateOf(prefs().getBoolean(AUTO_DOWNLOAD_KEY, false)) }
             LaunchedEffect(Unit) {
-                if (prefs().getString(ACCENT_KEY, "gold") == "forest") {
-                    prefs().edit().putString(ACCENT_KEY, "gold").apply()
-                }
+                prefs().edit().putString(THEME_KEY, "forest").putString(ACCENT_KEY, accent).apply()
                 if (!ambientAudio) AmbientAudioEngine.stop()
             }
             val dark = true
@@ -1039,6 +1060,7 @@ class MainActivity : ComponentActivity() {
                     density = density, setDensity = { density = it; prefs().edit().putString(DENSITY_KEY, it).apply() },
                     effects = effects, setEffects = { value -> effects = value; prefs().edit().putString(EFFECTS_KEY, value).apply() },
                     panelOpacity = panelOpacity, setPanelOpacity = { value -> panelOpacity = value.coerceIn(.62f, .96f); prefs().edit().putFloat(PANEL_OPACITY_KEY, panelOpacity).apply() },
+                    panelTone = panelTone, setPanelTone = { value -> panelTone = value; prefs().edit().putString(PANEL_TONE_KEY, value).apply() },
                     backgroundDim = backgroundDim, setBackgroundDim = { value -> backgroundDim = value.coerceIn(.25f, .90f); prefs().edit().putFloat(BACKGROUND_DIM_KEY, backgroundDim).apply() },
                     fontScale = fontScale, setFontScale = { fontScale = it; prefs().edit().putFloat(FONT_SCALE_KEY, it).apply() },
                     alerts = alerts, notificationPermissionGranted = notificationsAllowed, openNotificationSettings = { openNotificationSettings() }, sendTestNotification = { sendTestNotification() }, setAlerts = { enabled ->
@@ -1387,7 +1409,8 @@ private fun LinkaApp(
     load: () -> List<Capture>, save: (List<Capture>) -> Unit, copy: (String) -> Unit, open: (String) -> Unit,
     theme: String, setTheme: (String) -> Unit, accent: String, setAccent: (String) -> Unit, language: String, setLanguage: (String) -> Unit,
     animations: Boolean, setAnimations: (Boolean) -> Unit, ambientAudio: Boolean, setAmbientAudio: (Boolean) -> Unit, density: String, setDensity: (String) -> Unit, effects: String, setEffects: (String) -> Unit,
-    panelOpacity: Float, setPanelOpacity: (Float) -> Unit, backgroundDim: Float, setBackgroundDim: (Float) -> Unit, fontScale: Float, setFontScale: (Float) -> Unit,
+    panelOpacity: Float, setPanelOpacity: (Float) -> Unit, panelTone: String, setPanelTone: (String) -> Unit,
+    backgroundDim: Float, setBackgroundDim: (Float) -> Unit, fontScale: Float, setFontScale: (Float) -> Unit,
     alerts: Boolean, notificationPermissionGranted: Boolean, openNotificationSettings: () -> Unit, sendTestNotification: () -> Unit, setAlerts: (Boolean) -> Unit, updateInfo: UpdateInfo?, updateStatus: String, checking: Boolean,
     checkUpdates: () -> Unit, openUpdate: (UpdateInfo) -> Unit,
     autoDownload: Boolean, setAutoDownload: (Boolean) -> Unit, downloadProgress: Int, downloadingUpdate: Boolean,
@@ -1397,11 +1420,11 @@ private fun LinkaApp(
     val lang = language.ifBlank { "en" }
     val dark = theme == "oled" || MaterialTheme.colorScheme.background == DB
     val bg = if (theme == "oled") Color.Black else if (dark) DB else LB
-    val panelBase = if (theme == "oled") Color(0xFF050507) else if (dark) DS else LS
-    val raisedBase = if (theme == "oled") Color(0xFF111116) else if (dark) DR else LR
+    val panelBase = if (theme == "oled") Color(0xFF050507) else if (dark) panelBaseForName(panelTone) else LS
+    val raisedBase = if (theme == "oled") Color(0xFF111116) else if (dark) raisedBaseForName(panelTone) else LR
     val panel = blendSurface(panelBase, bg, panelOpacity)
     val raised = blendSurface(raisedBase, bg, (panelOpacity + .08f).coerceAtMost(.98f))
-    val border = if (theme == "oled") Color(0xFF26242D) else if (dark) DBR else LBR
+    val border = if (theme == "oled") Color(0xFF26242D) else if (dark) borderForName(panelTone) else LBR
     val main = if (dark) DT else LT
     val muted = if (dark) DM else LM
     val context = LocalContext.current
@@ -2271,6 +2294,26 @@ private fun LinkaApp(
                                             }
                                         }
                                     )
+                                }
+                            }
+                            Text(
+                                if (lang == "ru") "Цвет блоков"
+                                else if (lang == "az") "Blokların rəngi"
+                                else if (lang == "tr") "Panel rengi"
+                                else "Panel tone",
+                                color = muted, fontSize = 11.sp
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                listOf(
+                                    "forest" to (if (lang == "ru") "Лес" else if (lang == "az") "Meşə" else if (lang == "tr") "Orman" else "Forest"),
+                                    "pine" to (if (lang == "ru") "Сосна" else if (lang == "az") "Şam" else if (lang == "tr") "Çam" else "Pine"),
+                                    "olive" to (if (lang == "ru") "Олива" else if (lang == "az") "Zeytun" else if (lang == "tr") "Zeytin" else "Olive"),
+                                    "charcoal" to (if (lang == "ru") "Графит" else if (lang == "az") "Qrafit" else if (lang == "tr") "Grafit" else "Charcoal")
+                                ).forEach { (value, label) ->
+                                    FilterChip(selected = panelTone == value, onClick = { setPanelTone(value) }, label = { Text(label, fontSize = 10.sp) })
                                 }
                             }
                             Row(verticalAlignment = Alignment.CenterVertically) {
