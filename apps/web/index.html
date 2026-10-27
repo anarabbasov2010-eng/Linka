@@ -348,8 +348,10 @@ body{background:var(--bg);background-image:radial-gradient(ellipse at 8% 0%,rgba
     .modal-layer.closing,
     .modal-layer[aria-hidden="true"],
     .linka-player-panel[aria-hidden="true"],
+    .linka-command-root[hidden],
     .linka-command-root[aria-hidden="true"],
-    .linka-command-root:not(.palette-open) { pointer-events: none !important; }
+    .linka-command-root.is-closing { pointer-events: none !important; }
+    .linka-command-root[aria-hidden="false"] { pointer-events: auto !important; }
     .linka-toast-stack { pointer-events: none !important; }
     .linka-toast-stack .linka-toast,
     .linka-toast-stack .linka-toast button { pointer-events: auto !important; }
