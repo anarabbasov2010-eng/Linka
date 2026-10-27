@@ -184,6 +184,7 @@ export function initVisualSystem() {
       reducedMotion = event.matches;
       root.classList.toggle("reduced-motion", reducedMotion);
       root.dataset.reduceMotion = String(reducedMotion);
+      window.dispatchEvent(new CustomEvent("linka:reduce-motion-changed", { detail: { reducedMotion } }));
     });
   }
 

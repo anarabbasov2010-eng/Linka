@@ -1044,6 +1044,7 @@ function showSettings() {
     const next = !currentReducedMotion();
     localStorage.setItem("linka.reduceMotion", String(next));
     document.documentElement.classList.toggle("reduced-motion", next);
+    window.dispatchEvent(new CustomEvent("linka:reduce-motion-changed", { detail: { reducedMotion: next } }));
     refreshMotionLabel();
   });
   motionSection.append(motionToggle);
