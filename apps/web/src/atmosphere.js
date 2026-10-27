@@ -8,7 +8,7 @@ const FOREST_VIDEO_CANDIDATES=[
   "https://videos.pexels.com/video-files/36928736/36928736-hd_1920_1080_30fps.mp4",
   "https://videos.pexels.com/video-files/37426477/37426477-hd_1920_1080_30fps.mp4"
 ];
-const DEFAULT_FOREST_POSTER="https://images.pexels.com/videos/36928855/free-video-36928855.jpg?fit=crop&w=1920&h=1080&auto=compress&cs=tinysrgb";
+const DEFAULT_FOREST_POSTER="/forest-fallback.svg";
 const DB_NAME="linka-atmosphere-v1", STORE="media", PREFIX="linka.atmosphere.";
 const $=(s,r=document)=>r.querySelector(s);
 const read=(k,d)=>{try{const v=localStorage.getItem(PREFIX+k);return v==null?d:JSON.parse(v)}catch{return d}};
@@ -62,8 +62,12 @@ function buildBackground(){const layer=document.createElement("div");layer.id="l
 async function loadBackground(){
   const layer=$("#linka-atmosphere"),video=$("video",layer),image=$("img",layer),saved=read("background",null);
   function defaultForest(){
-    layer.classList.remove("custom");
-    image.removeAttribute("src");image.style.display="none";image.classList.remove("ready");
+    layer.classList.remove("custom","poster-unavailable");
+    // Keep a bundled forest scene visible while remote video candidates load or fail.
+    image.style.display="block";image.classList.remove("ready");
+    image.onload=()=>image.classList.add("ready");
+    image.onerror=()=>{image.classList.remove("ready");layer.classList.add("poster-unavailable")};
+    image.src=DEFAULT_FOREST_POSTER;
     video.style.display="block";video.muted=true;video.loop=true;video.playsInline=true;video.preload="auto";
     let attempt=0;
     const useNextVideo=()=>{
