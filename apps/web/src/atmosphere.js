@@ -24,6 +24,7 @@ function btn(label,glyph,extra=""){const b=document.createElement("button");b.ty
 function addStyles(){if($("#linka-atmosphere-styles"))return;const s=document.createElement("style");s.id="linka-atmosphere-styles";s.textContent=[
 '#linka-atmosphere{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;background:#09090d;isolation:isolate}',
 '#linka-atmosphere video,#linka-atmosphere img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transform:scale(1.04);filter:saturate(.72) contrast(1.04);transition:opacity 1.8s ease;animation:linka-forest 78s ease-in-out infinite alternate}',
+'#linka-atmosphere video{z-index:1}#linka-atmosphere img{z-index:0}#linka-atmosphere img.covered{opacity:0!important}',
 '#linka-atmosphere img{display:none}',
 '#linka-atmosphere .veil{position:absolute;inset:0;background:linear-gradient(180deg,rgba(7,6,13,.20),rgba(6,6,10,.36) 48%,rgba(4,4,7,.62)),radial-gradient(ellipse at 52% 14%,rgba(188,151,128,.075),transparent 55%)}',
 '#linka-atmosphere .grain{position:absolute;inset:-40%;opacity:.026;background-image:url("data:image/svg+xml,%3Csvg viewBox=%270 0 180 180%27 xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cfilter id=%27n%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.8%27 numOctaves=%273%27 stitchTiles=%27stitch%27/%3E%3C/filter%3E%3Crect width=%27100%25%27 height=%27100%25%27 filter=%27url(%23n)%27 opacity=%27.8%27/%3E%3C/svg%3E");animation:linka-grain .24s steps(2) infinite}',
@@ -72,16 +73,18 @@ async function loadBackground(){
     let attempt=0;
     const useNextVideo=()=>{
       video.classList.remove("ready");
+      image.style.display="block";image.classList.remove("covered");
       video.onerror=()=>{
         attempt++;
         if(attempt<FOREST_VIDEO_CANDIDATES.length){useNextVideo();return}
         video.pause();video.removeAttribute("src");video.style.display="none";
-        image.style.display="block";image.src=DEFAULT_FOREST_POSTER;
+        image.style.display="block";image.classList.remove("covered");image.src=DEFAULT_FOREST_POSTER;
         image.onload=()=>image.classList.add("ready");
         image.onerror=()=>{image.classList.remove("ready");layer.classList.add("poster-unavailable")};
       };
-      video.onloadeddata=()=>{video.classList.add("ready");image.style.display="none"};
-      video.oncanplay=()=>{video.classList.add("ready");image.style.display="none"};
+      const revealVideo=()=>{video.classList.add("ready");image.classList.add("covered")};
+      video.onloadeddata=revealVideo;
+      video.oncanplay=revealVideo;
       video.src=FOREST_VIDEO_CANDIDATES[attempt];video.load();
       video.play().catch(()=>{});
     };
