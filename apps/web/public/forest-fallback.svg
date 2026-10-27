@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Twilight forest path">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#101c20"/><stop offset=".42" stop-color="#455f58"/><stop offset=".7" stop-color="#9a9a78"/><stop offset="1" stop-color="#172b28"/></linearGradient>
+    <radialGradient id="glow" cx=".52" cy=".49" r=".48"><stop stop-color="#e4c89a" stop-opacity=".78"/><stop offset=".34" stop-color="#c8bd8e" stop-opacity=".25"/><stop offset="1" stop-color="#a6c4a7" stop-opacity="0"/></radialGradient>
+    <linearGradient id="path" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#b1b08a" stop-opacity=".6"/><stop offset="1" stop-color="#0b1714" stop-opacity=".9"/></linearGradient>
+    <linearGradient id="haze" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#b9c7ad" stop-opacity="0"/><stop offset=".5" stop-color="#d8d4ad" stop-opacity=".28"/><stop offset="1" stop-color="#b9c7ad" stop-opacity="0"/></linearGradient>
+    <filter id="soft"><feGaussianBlur stdDeviation="25"/></filter>
+    <g id="pine" fill="#10231e">
+      <path d="M0 0 42 86H25L57 143H37L76 210H-76L-37 143H-57L-25 86H-42Z"/>
+      <path d="M0 140V248" stroke="#182821" stroke-width="10"/>
+    </g>
+    <g id="pine2" fill="#1a3028">
+      <path d="M0 0 31 64H18L45 108H29L61 160H-61L-29 108H-45L-18 64H-31Z"/>
+      <path d="M0 105V200" stroke="#24382c" stroke-width="8"/>
+    </g>
+  </defs>
+  <rect width="1600" height="900" fill="url(#sky)"/>
+  <rect width="1600" height="900" fill="url(#glow)"/>
+  <g opacity=".6" fill="#6c806b">
+    <path d="M0 415 110 348 222 397 354 310 480 389 626 300 764 396 910 309 1045 390 1173 330 1312 397 1450 323 1600 398V650H0Z"/>
+    <path d="M0 485 145 408 260 460 396 382 534 468 662 404 809 485 940 403 1071 464 1220 391 1367 473 1512 413 1600 445V700H0Z" fill="#394f40"/>
+  </g>
+  <g fill="#203b30" opacity=".78">
+    <path d="M0 535 95 460 173 508 269 443 359 527 449 473 548 547 642 480 735 557 838 479 927 547 1030 465 1126 537 1221 454 1324 532 1420 469 1515 531 1600 484V900H0Z"/>
+  </g>
+  <path d="M0 650 Q250 570 460 632T850 610T1250 624T1600 590V900H0Z" fill="#152b23"/>
+  <path d="M800 522 C758 592 740 655 695 900H1035C975 701 938 597 864 522Z" fill="url(#path)" opacity=".92"/>
+  <path d="M817 546 C795 628 781 727 764 900M849 547 C864 666 895 775 923 900" fill="none" stroke="#d7c89c" stroke-opacity=".13" stroke-width="5"/>
+  <g opacity=".92">
+    <use href="#pine" x="5" y="190" transform="translate(0 85) scale(1.4 2.2)"/>
+    <use href="#pine" x="145" y="235" transform="translate(20 50) scale(1.25 1.9)"/>
+    <use href="#pine2" x="310" y="290" transform="translate(0 15) scale(1.35 1.8)"/>
+    <use href="#pine" x="1510" y="170" transform="translate(-35 90) scale(1.55 2.35)"/>
+    <use href="#pine" x="1360" y="240" transform="translate(-10 65) scale(1.24 2)"/>
+    <use href="#pine2" x="1215" y="295" transform="translate(0 24) scale(1.3 1.85)"/>
+  </g>
+  <g fill="#0d201a">
+    <path d="M0 278 36 357H18L61 437H38L91 534H-40L8 437H-12L25 357H0Z"/>
+    <path d="M100 346 129 408H114L148 473H129L167 543H74L110 473H95L123 408H100Z"/>
+    <path d="M1600 260 1560 345H1580L1538 432H1560L1503 540H1645L1590 432H1610L1574 345H1600Z"/>
+    <path d="M1490 333 1456 400H1474L1438 465H1456L1414 536H1524L1487 465H1504L1472 400H1490Z"/>
+  </g>
+  <g fill="url(#haze)" opacity=".52">
+    <rect x="-100" y="490" width="1800" height="30"/>
+    <rect x="-100" y="564" width="1800" height="19" opacity=".65"/>
+  </g>
+  <g fill="#d6cba4" opacity=".17" filter="url(#soft)">
+    <ellipse cx="815" cy="480" rx="190" ry="46"/>
+    <ellipse cx="795" cy="600" rx="330" ry="28"/>
+  </g>
+  <g fill="#d4d8ba" opacity=".27">
+    <circle cx="540" cy="371" r="1.5"/><circle cx="1080" cy="434" r="1.4"/><circle cx="653" cy="449" r="1.2"/><circle cx="976" cy="358" r="1.3"/><circle cx="1180" cy="488" r="1.1"/><circle cx="402" cy="449" r="1.2"/>
+  </g>
+  <rect width="1600" height="900" fill="#07100d" opacity=".16"/>
+</svg>
