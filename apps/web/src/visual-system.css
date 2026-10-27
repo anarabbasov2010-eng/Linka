@@ -1608,5 +1608,5 @@ html.reduced-motion .linka-atmosphere-actions button {
 .linka-toast-stack .linka-toast button { pointer-events: auto !important; }
 .linka-command-root[hidden],
 .linka-command-root[aria-hidden="true"],
-.linka-command-root:not(.palette-open) { pointer-events: none !important; }
-.linka-command-root.palette-open { pointer-events: auto !important; }
+.linka-command-root.is-closing { pointer-events: none !important; }
+.linka-command-root[aria-hidden="false"] { pointer-events: auto !important; }
