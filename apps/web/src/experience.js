@@ -21,7 +21,7 @@ const COPY = {
   en: {
     ambientSound: "Ambient sound", ambientSoundBody: "A quiet, slowly breathing synth pad. Off by default.", audioUnavailable: "Ambient audio is not available in this environment.", checkUpdates: "Check for updates", updateChanges: "What changed",
     privacy: "Private by default · local-first", eyebrow: "Your personal library",
-    hero: ["Keep", "what", "matters."], heroBody: "Links, notes, and useful ideas. Saved once. Easy to find again.",
+    hero: ["Keep", "what", "matters."], heroBody: "Links and notes, in one place.",
     quick: "Quick capture", subtitle: "Keep the useful stuff.", placeholder: "Drop a link. Save a thought. Keep it for later…",
     hint: "Saved on this device. Export a backup whenever you need.", tags: "Tags", collection: "Collection", tagsPlaceholder: "design, reading, work", collectionPlaceholder: "Project or topic", later: "Read later", archive: "Archive", trash: "Trash", save: "Save to inbox",
     inbox: "Your inbox", export: "Export", import: "Import", filters: ["All", "Pinned", "Read later", "Archive", "Trash", "Links", "Notes"],
@@ -49,7 +49,7 @@ const COPY = {
   ru: {
     ambientSound: "Атмосферный звук", ambientSoundBody: "Тихий синтезаторный фон с медленным дыханием. По умолчанию выключен.", audioUnavailable: "Атмосферный звук недоступен в этой среде.", checkUpdates: "Проверить обновления", updateChanges: "Что изменилось",
     privacy: "Приватность по умолчанию · сначала локально", eyebrow: "Твоя личная библиотека",
-    hero: ["Сохраняй", "то,", "что важно."], heroBody: "Ссылки, заметки и идеи. Сохраняй один раз — находи снова.",
+    hero: ["Сохраняй", "то,", "что важно."], heroBody: "Ссылки и заметки — в одном месте.",
     quick: "Быстрое сохранение", subtitle: "Только то, что нужно.", placeholder: "Вставь ссылку или сохрани мысль…",
     hint: "Сохранено на этом устройстве. Не забывай делать резервную копию.", tags: "Теги", collection: "Коллекция", tagsPlaceholder: "дизайн, чтение, работа", collectionPlaceholder: "Проект или тема", later: "Сохранить на потом", archive: "Архивировать", trash: "Корзина", save: "Сохранить",
     inbox: "Твоя библиотека", export: "Экспорт", import: "Импорт", filters: ["Всё", "Закреплённое", "Сохранить на потом", "Архив", "Корзина", "Ссылки", "Заметки"],
@@ -77,7 +77,7 @@ const COPY = {
   az: {
     ambientSound: "Atmosfer səsi", ambientSoundBody: "Yavaş nəfəs alan sakit sintezator fonu. Standart olaraq sönülüdür.", audioUnavailable: "Atmosfer səsi bu mühitdə mövcud deyil.", checkUpdates: "Yeniləmələri yoxla", updateChanges: "Nə dəyişdi",
     privacy: "Məxfilik standartdır · əvvəlcə cihazda", eyebrow: "Şəxsi kitabxanan",
-    hero: ["Vacib", "olanı", "saxla."], heroBody: "Linklər, qeydlər və ideyalar. Bir dəfə saxla, sonra asan tap.",
+    hero: ["Vacib", "olanı", "saxla."], heroBody: "Linklər və qeydlər bir yerdə.",
     quick: "Tez yadda saxla", subtitle: "Yalnız lazım olanlar.", placeholder: "Link əlavə et və ya fikrini yaz…",
     hint: "Bu cihazda saxlanılır. Ehtiyat nüsxə yaratmağı unutma.", tags: "Teqlər", collection: "Kolleksiya", tagsPlaceholder: "dizayn, oxu, iş", collectionPlaceholder: "Layihə və ya mövzu", later: "Sonra oxu", archive: "Arxivə köçür", trash: "Zibil qutusu", save: "Yadda saxla",
     inbox: "Kitabxanan", export: "İxrac", import: "İdxal", filters: ["Hamısı", "Sabitlənmiş", "Sonra oxu", "Arxiv", "Zibil qutusu", "Linklər", "Qeydlər"],
@@ -105,7 +105,7 @@ const COPY = {
   tr: {
     ambientSound: "Ortam sesi", ambientSoundBody: "Yavaşça nefes alan sakin bir synth tonu. Varsayılan olarak kapalı.", audioUnavailable: "Ortam sesi bu ortamda kullanılamıyor.", checkUpdates: "Güncellemeleri denetle", updateChanges: "Neler değişti",
     privacy: "Varsayılan gizlilik · önce cihazda", eyebrow: "Kişisel kitaplığın",
-    hero: ["Önemli", "olanı", "sakla."], heroBody: "Bağlantılar, notlar ve fikirler. Bir kez kaydet, sonra kolayca bul.",
+    hero: ["Önemli", "olanı", "sakla."], heroBody: "Bağlantılar ve notlar tek yerde.",
     quick: "Hızlı kayıt", subtitle: "Yalnızca gerekenler.", placeholder: "Bağlantı ekle veya bir düşünce yaz…",
     hint: "Bu cihazda saklanır. Yedek almayı unutma.", tags: "Etiketler", collection: "Koleksiyon", tagsPlaceholder: "tasarım, okuma, iş", collectionPlaceholder: "Proje veya konu", later: "Daha sonra oku", archive: "Arşivle", trash: "Çöp kutusu", save: "Gelen kutusuna kaydet",
     inbox: "Kitaplığın", export: "Dışa aktar", import: "İçe aktar", filters: ["Tümü", "Sabitlenen", "Daha sonra oku", "Arşiv", "Çöp kutusu", "Bağlantılar", "Notlar"],
@@ -1166,9 +1166,7 @@ function mountWebNavigation() {
     activePill.style.height = target.offsetHeight + "px";
     activePill.style.transform = "translate3d(0," + target.offsetTop + "px,0)";
   }, { passive: true });
-  const foot = make("div", "web-side-foot");
-  foot.innerHTML = '<span class="web-side-status-dot" aria-hidden="true"></span><span><strong></strong><small></small></span>';
-  sidebar.append(brand, caption, nav, foot);
+  sidebar.append(brand, caption, nav);
   shell.prepend(sidebar);
   document.querySelectorAll("[data-filter]").forEach(node => node.addEventListener("click", () => activate(node.dataset.filter || "all")));
   activate("all");
@@ -1193,18 +1191,9 @@ function updateWebNavLabels() {
   const sidebar = document.querySelector(".web-sidebar");
   if (sidebar) {
     sidebar.setAttribute("aria-label", lang === "ru" ? "Навигация Linka" : lang === "az" ? "Linka naviqasiyası" : lang === "tr" ? "Linka gezinme" : "Linka navigation");
-    const sideCopy = {
-      en: { caption: "YOUR SPACE", privacy: "Private by default", sync: "Stored here. Sync when you sign in." },
-      ru: { caption: "ТВОЁ ПРОСТРАНСТВО", privacy: "Конфиденциальность по умолчанию", sync: "Хранится здесь. Синхронизация после входа." },
-      az: { caption: "SƏNİN MƏKANIN", privacy: "Məxfilik standart olaraq qorunur", sync: "Burada saxlanılır. Daxil olduqda sinxronlaşır." },
-      tr: { caption: "SENİN ALANIN", privacy: "Gizlilik varsayılan olarak açık", sync: "Burada saklanır. Giriş yaptığında eşitlenir." }
-    }[lang] || { caption: "YOUR SPACE", privacy: "Private by default", sync: "Stored here. Sync when you sign in." };
+    const captions = { en: "LIBRARY", ru: "БИБЛИОТЕКА", az: "KİTABXANA", tr: "KÜTÜPHANE" };
     const caption = sidebar.querySelector(".web-side-caption");
-    const privacy = sidebar.querySelector(".web-side-foot strong");
-    const sync = sidebar.querySelector(".web-side-foot small");
-    if (caption) caption.textContent = sideCopy.caption;
-    if (privacy) privacy.textContent = sideCopy.privacy;
-    if (sync) sync.textContent = sideCopy.sync;
+    if (caption) caption.textContent = captions[lang] || captions.en;
   }
 }
 async function handleDesktopOAuthUrl(rawUrl) {
