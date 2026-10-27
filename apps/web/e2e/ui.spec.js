@@ -74,6 +74,17 @@ test("fresh profiles can save captures without an account overlay", async ({ pag
   await expect(page.locator("#capture-list")).toContainText("First-run capture");
 });
 
+test("the default forest ambience plays without an external audio file", async ({ page }) => {
+  await openLinka(page);
+  const play = page.locator(".linka-player-dock [data-player-play]");
+  await expect(play).toBeVisible();
+  await play.click();
+  await expect(play).toHaveAttribute("aria-label", "Pause");
+  await expect(page.locator("#linka-atmosphere")).toHaveClass(/music-playing/);
+  await play.click();
+  await expect(play).toHaveAttribute("aria-label", "Play");
+});
+
 test("turning forest video off prevents remote media requests", async ({ page }) => {
   const videoRequests = [];
   page.on("request", request => {

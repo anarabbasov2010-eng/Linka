@@ -1,4 +1,4 @@
-const DEFAULT_TRACK={id:"linka-empty-track",name:"Выбери свой трек",artist:"Музыка с устройства",src:""};
+const DEFAULT_TRACK={id:"linka-empty-track",name:"Forest ambience",artist:"Linka ambient",src:"",generated:true};
 const DEFAULT_VIDEO="https://videos.pexels.com/video-files/36928855/36928855-hd_1920_1080_30fps.mp4";
 const FOREST_VIDEO_CANDIDATES=[
   DEFAULT_VIDEO,
@@ -24,7 +24,7 @@ function motionShouldBeReduced(){
     return document.documentElement.classList.contains("reduced-motion");
   }
 }
-const state={db:null,video:true,grain:true,music:false,volume:.14,playlist:[],index:0,audio:null,urls:new Map(),playing:false,background:null,reduced:false};
+const state={db:null,video:true,grain:true,music:false,volume:.14,playlist:[],index:0,audio:null,urls:new Map(),playing:false,background:null,reduced:false,ambient:null};
 function openDb(){return new Promise(resolve=>{if(!("indexedDB"in window))return resolve(null);const q=indexedDB.open(DB_NAME,1);q.onupgradeneeded=()=>{if(!q.result.objectStoreNames.contains(STORE))q.result.createObjectStore(STORE,{keyPath:"id"})};q.onsuccess=()=>resolve(q.result);q.onerror=()=>resolve(null)})}
 function db(id,mode,fn){return new Promise((resolve,reject)=>{if(!state.db)return reject(new Error("Локальное хранилище недоступно"));const t=state.db.transaction(STORE,mode),q=fn(t.objectStore(STORE));q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error)})}
 async function putMedia(id,file,kind){if(file.size>350*1024*1024)throw new Error("Файл должен быть меньше 350 МБ");await db(id,"readwrite",s=>s.put({id,name:file.name,type:file.type,blob:file,kind}))}
@@ -203,10 +203,187 @@ async function loadBackground(){
 function track(){return state.playlist[state.index]||DEFAULT_TRACK}
 function source(t){return t?.localId?(state.urls.get(t.localId)||""):t?.src||""}
 function time(n){if(!Number.isFinite(n)||n<0)return"0:00";return Math.floor(n/60)+":"+String(Math.floor(n%60)).padStart(2,"0")}
-function renderPlayer(){const t=track();document.querySelectorAll("[data-player-title]").forEach(e=>e.textContent=t.name);document.querySelectorAll("[data-player-artist]").forEach(e=>e.textContent=t.artist||(t.localId?"Локальный файл":"Фоновая музыка"));document.querySelectorAll("[data-player-play]").forEach(e=>{e.innerHTML=icon(state.playing?"pause":"play");e.setAttribute("aria-label",state.playing?"Пауза":"Воспроизвести")});$(".linka-player-panel")?.classList.toggle("playing",state.playing);$("#linka-atmosphere")?.classList.toggle("music-playing",state.playing);const a=state.audio;if(!a)return;const cur=$(".linka-player-time-current"),dur=$(".linka-player-time-duration"),seek=$(".linka-player-seek");if(cur)cur.textContent=time(a.currentTime);if(dur)dur.textContent=time(a.duration);if(seek&&Number.isFinite(a.duration)&&a.duration>0&&!seek.matches(":active"))seek.value=String(a.currentTime/a.duration*1000);const list=$(".linka-player-playlist");const signature=state.index+"|"+state.playlist.map(it=>it.id+":"+it.name).join("|");if(list&&list.dataset.signature!==signature){list.dataset.signature=signature;list.replaceChildren();state.playlist.forEach((it,i)=>{const row=document.createElement("button");row.type="button";row.className="linka-player-playlist-item"+(i===state.index?" active":"");const no=document.createElement("span");no.className="linka-player-track-no";no.textContent=String(i+1).padStart(2,"0");const label=document.createElement("span");label.className="linka-player-list-label";const strong=document.createElement("strong");strong.textContent=it.name;const sub=document.createElement("small");sub.textContent=it.localId?"На этом устройстве":it.artist||"Linka soundtrack";label.append(strong,sub);row.append(no,label);if(it.id!==DEFAULT_TRACK.id){const del=btn("Удалить трек","close");del.addEventListener("click",e=>{e.stopPropagation();void removeTrack(it.id)});row.append(del)}row.addEventListener("click",()=>void loadTrack(i,true));list.append(row)})}}
+function atmosphereCopy(){
+  const language=(document.documentElement.lang||"en").toLowerCase().slice(0,2);
+  const copy={
+    en:{ambientTrack:"Forest ambience",ambientArtist:"A quiet Linka soundscape",playerLabel:"Music player",openPlayer:"Open player",play:"Play",pause:"Pause",previous:"Previous",next:"Next",close:"Close",playerTitle:"Linka · Atmosphere",playerSubtitle:"A little quiet between thoughts",volume:"Volume",playlist:"Your playlist",playlistHint:"Audio stays on this device",addTracks:"Add audio",footer:"Soft sound · quiet background",localTrack:"On this device",customTrack:"Background audio",audioUnavailable:"Sound is unavailable here. Choose an audio file.",playbackError:"Could not play this track. Check the connection or choose a device file.",playPrompt:"Press Play to start playback."},
+    ru:{ambientTrack:"Лесная атмосфера",ambientArtist:"Тихий фон Linka",playerLabel:"Музыкальный плеер",openPlayer:"Открыть плеер",play:"Воспроизвести",pause:"Пауза",previous:"Предыдущий",next:"Следующий",close:"Закрыть",playerTitle:"Linka · Атмосфера",playerSubtitle:"Немного тишины между мыслями",volume:"Громкость",playlist:"Твой плейлист",playlistHint:"Аудиофайлы остаются на устройстве",addTracks:"Добавить музыку",footer:"Мягкий звук · спокойный фон",localTrack:"На этом устройстве",customTrack:"Фоновая музыка",audioUnavailable:"Звук здесь недоступен. Выбери аудиофайл.",playbackError:"Не удалось воспроизвести трек. Проверь соединение или выбери файл с устройства.",playPrompt:"Нажми Play, чтобы начать воспроизведение."},
+    az:{ambientTrack:"Meşə atmosferi",ambientArtist:"Linka-nın sakit fonu",playerLabel:"Musiqi pleyeri",openPlayer:"Pleyeri aç",play:"Oynat",pause:"Fasilə",previous:"Əvvəlki",next:"Növbəti",close:"Bağla",playerTitle:"Linka · Atmosfer",playerSubtitle:"Fikirlər arasında bir az sakitlik",volume:"Səs səviyyəsi",playlist:"Sənin siyahın",playlistHint:"Audio fayllar bu cihazda qalır",addTracks:"Musiqi əlavə et",footer:"Yumşaq səs · sakit fon",localTrack:"Bu cihazda",customTrack:"Fon musiqisi",audioUnavailable:"Səs burada əlçatan deyil. Audio faylı seç.",playbackError:"Bu treki oxutmaq olmadı. Bağlantını yoxla və ya cihazdakı faylı seç.",playPrompt:"Oxutmağa başlamaq üçün Play düyməsinə bas."},
+    tr:{ambientTrack:"Orman atmosferi",ambientArtist:"Linka'nın sakin fonu",playerLabel:"Müzik çalar",openPlayer:"Çaları aç",play:"Oynat",pause:"Duraklat",previous:"Önceki",next:"Sonraki",close:"Kapat",playerTitle:"Linka · Atmosfer",playerSubtitle:"Düşünceler arasında küçük bir sessizlik",volume:"Ses seviyesi",playlist:"Çalma listen",playlistHint:"Ses dosyaları bu cihazda kalır",addTracks:"Müzik ekle",footer:"Yumuşak ses · sakin arka plan",localTrack:"Bu cihazda",customTrack:"Arka plan müziği",audioUnavailable:"Ses burada kullanılamıyor. Bir ses dosyası seç.",playbackError:"Bu parça çalınamadı. Bağlantıyı kontrol et veya cihazdan bir dosya seç.",playPrompt:"Çalmaya başlamak için Play düğmesine bas."}
+  };
+  return copy[language]||copy.en;
+}
+
+function renderPlayer(){
+  const t=track(),copy=atmosphereCopy();
+  document.querySelectorAll("[data-player-title]").forEach(e=>e.textContent=t.generated?copy.ambientTrack:t.name);
+  document.querySelectorAll("[data-player-artist]").forEach(e=>e.textContent=t.generated?copy.ambientArtist:(t.artist||(t.localId?copy.localTrack:copy.customTrack)));
+  document.querySelectorAll("[data-player-play]").forEach(e=>{
+    e.innerHTML=icon(state.playing?"pause":"play");
+    e.setAttribute("aria-label",state.playing?copy.pause:copy.play);
+  });
+  $(".linka-player-panel")?.classList.toggle("playing",state.playing);
+  $("#linka-atmosphere")?.classList.toggle("music-playing",state.playing);
+  const a=state.audio;
+  if(!a)return;
+  const cur=$(".linka-player-time-current"),dur=$(".linka-player-time-duration"),seek=$(".linka-player-seek");
+  if(cur)cur.textContent=time(t.generated?(state.ambient?.elapsed||0):a.currentTime);
+  if(dur)dur.textContent=t.generated?"∞":time(a.duration);
+  if(seek){
+    seek.disabled=Boolean(t.generated);
+    if(t.generated)seek.value="0";
+    else if(Number.isFinite(a.duration)&&a.duration>0&&!seek.matches(":active"))seek.value=String(a.currentTime/a.duration*1000);
+  }
+  const list=$(".linka-player-playlist");
+  const signature=state.index+"|"+state.playlist.map(it=>it.id+":"+it.name).join("|");
+  if(list&&list.dataset.signature!==signature){
+    list.dataset.signature=signature;
+    list.replaceChildren();
+    state.playlist.forEach((it,i)=>{
+      const row=document.createElement("button");
+      row.type="button";
+      row.className="linka-player-playlist-item"+(i===state.index?" active":"");
+      const no=document.createElement("span");
+      no.className="linka-player-track-no";
+      no.textContent=String(i+1).padStart(2,"0");
+      const label=document.createElement("span");
+      label.className="linka-player-list-label";
+      const strong=document.createElement("strong");
+      strong.textContent=it.generated?copy.ambientTrack:it.name;
+      const sub=document.createElement("small");
+      sub.textContent=it.generated?copy.ambientArtist:(it.localId?copy.localTrack:it.artist||copy.customTrack);
+      label.append(strong,sub);
+      row.append(no,label);
+      if(it.id!==DEFAULT_TRACK.id){
+        const del=btn(copy.close,"close");
+        del.addEventListener("click",e=>{e.stopPropagation();void removeTrack(it.id)});
+        row.append(del);
+      }
+      row.addEventListener("click",()=>void loadTrack(i,true));
+      list.append(row);
+    });
+  }
+}
+
 function toast(msg){const status=$(".linka-atmosphere-state");if(status)status.textContent=msg;const app=$("#status");if(app){app.textContent=msg;app.style.opacity="1"}}
-function playing(v){state.playing=Boolean(v&&state.audio&&!state.audio.paused);renderPlayer()}
-async function loadTrack(i,autoplay=false){if(!state.playlist.length)state.playlist=[DEFAULT_TRACK];state.index=(i+state.playlist.length)%state.playlist.length;write("index",state.index);write("playlist",state.playlist);const t=track();if(t.localId&&!state.urls.has(t.localId)){const rec=await getMedia(t.localId);if(rec?.blob)state.urls.set(t.localId,URL.createObjectURL(rec.blob))}const a=state.audio;if(!a)return;a.pause();a.removeAttribute("src");a.load();const src=source(t);if(src){a.src=src;a.load()}a.volume=state.volume;renderPlayer();if(autoplay&&src){try{await a.play();playing(true)}catch{playing(false);toast("Нажми Play, чтобы начать воспроизведение.")}}else playing(false)}
+function playing(v){state.playing=Boolean(v&&(track().generated?state.ambient:state.audio&&!state.audio.paused));renderPlayer()}
+function stopAmbient(){
+  const current=state.ambient;
+  if(!current)return;
+  state.ambient=null;
+  if(current.timer)window.clearInterval(current.timer);
+  for(const node of current.nodes){
+    try{node.stop?.()}catch{}
+    try{node.disconnect?.()}catch{}
+  }
+  try{current.context.close().catch(()=>{})}catch{}
+  playing(false);
+}
+async function startAmbient(){
+  if(state.ambient){
+    try{await state.ambient.context.resume()}catch{}
+    return true;
+  }
+  const AudioContextClass=window.AudioContext||window.webkitAudioContext;
+  if(!AudioContextClass){toast(atmosphereCopy().audioUnavailable);return false}
+  let context;
+  try{context=new AudioContextClass()}catch{toast(atmosphereCopy().audioUnavailable);return false}
+  const nodes=[];
+  try{
+    const output=context.createGain();
+    output.gain.value=state.volume;
+    output.connect(context.destination);
+    const lowpass=context.createBiquadFilter();
+    lowpass.type="lowpass";
+    lowpass.frequency.value=680;
+    lowpass.Q.value=.55;
+    lowpass.connect(output);
+    nodes.push(output,lowpass);
+    const tones=[[110,.22],[164.81,.15],[220,.085],[261.63,.045]];
+    tones.forEach(([frequency,level],i)=>{
+      const oscillator=context.createOscillator();
+      oscillator.type="sine";
+      oscillator.frequency.value=frequency;
+      const gain=context.createGain();
+      gain.gain.value=level;
+      const lfo=context.createOscillator();
+      lfo.type="sine";
+      lfo.frequency.value=.045+i*.012;
+      const depth=context.createGain();
+      depth.gain.value=level*.1;
+      lfo.connect(depth);
+      depth.connect(gain.gain);
+      oscillator.connect(gain);
+      gain.connect(lowpass);
+      oscillator.start();
+      lfo.start();
+      nodes.push(oscillator,gain,lfo,depth);
+    });
+    // A filtered, looping noise bed adds a soft air/wind texture without loading audio files.
+    const buffer=context.createBuffer(1,context.sampleRate*2,context.sampleRate);
+    const samples=buffer.getChannelData(0);
+    for(let i=0;i<samples.length;i++)samples[i]=(Math.random()*2-1)*.12;
+    const noise=context.createBufferSource();
+    noise.buffer=buffer;
+    noise.loop=true;
+    const windFilter=context.createBiquadFilter();
+    windFilter.type="lowpass";
+    windFilter.frequency.value=620;
+    windFilter.Q.value=.45;
+    const windGain=context.createGain();
+    windGain.gain.value=.065;
+    noise.connect(windFilter);
+    windFilter.connect(windGain);
+    windGain.connect(output);
+    noise.start();
+    nodes.push(noise,windFilter,windGain);
+    state.ambient={context,output,nodes,elapsed:0,timer:0};
+    await context.resume();
+    state.music=true;
+    write("music",true);
+    state.ambient.timer=window.setInterval(()=>{
+      if(state.ambient){state.ambient.elapsed++;renderPlayer()}
+    },1000);
+    playing(true);
+    return true;
+  }catch(error){
+    stopAmbient();
+    toast(atmosphereCopy().audioUnavailable);
+    return false;
+  }
+}
+async function loadTrack(i,autoplay=false){
+  if(!state.playlist.length)state.playlist=[DEFAULT_TRACK];
+  state.index=(i+state.playlist.length)%state.playlist.length;
+  write("index",state.index);
+  write("playlist",state.playlist);
+  const t=track();
+  if(t.localId&&!state.urls.has(t.localId)){
+    const rec=await getMedia(t.localId);
+    if(rec?.blob)state.urls.set(t.localId,URL.createObjectURL(rec.blob));
+  }
+  const a=state.audio;
+  if(!a)return;
+  if(state.ambient)stopAmbient();
+  a.pause();
+  a.removeAttribute("src");
+  a.load();
+  const src=source(t);
+  if(t.generated){
+    a.volume=state.volume;
+    renderPlayer();
+    if(autoplay)await startAmbient();else playing(false);
+    return;
+  }
+  if(src){a.src=src;a.load()}
+  a.volume=state.volume;
+  renderPlayer();
+  if(autoplay&&src){
+    try{await a.play();playing(true)}
+    catch{playing(false);toast(atmosphereCopy().playPrompt)}
+  }else playing(false);
+}
+
 async function removeTrack(id){
  const i=state.playlist.findIndex(t=>t.id===id);
  if(i<0)return;
@@ -233,10 +410,58 @@ async function removeTrack(id){
 let playerPreviousFocus=null;
 function openPlayer(){const p=$(".linka-player-panel");if(!p)return;if(!p.classList.contains("open"))playerPreviousFocus=document.activeElement;p.inert=false;p.classList.add("open");p.setAttribute("aria-hidden","false");renderPlayer()}
 function closePlayer(){const p=$(".linka-player-panel");if(!p||!p.classList.contains("open"))return;p.classList.remove("open");p.setAttribute("aria-hidden","true");p.inert=true;const target=playerPreviousFocus;playerPreviousFocus=null;if(target?.isConnected)requestAnimationFrame(()=>target.focus?.({preventScroll:true}))}
-async function togglePlay(){const a=state.audio;if(!a)return;if(!a.src)await loadTrack(state.index,false);if(a.paused){try{await a.play();playing(true)}catch{toast("Не удалось открыть трек. Проверь подключение или выбери локальный файл.")}}else{a.pause();playing(false)}}
-function createPlayer(){const dock=document.createElement("div");dock.className="linka-player-dock";dock.setAttribute("role","group");dock.setAttribute("aria-label","Музыкальный плеер");dock.innerHTML='<div class="linka-player-art">'+icon("music")+'</div><div class="linka-player-track"><strong data-player-title></strong><span data-player-artist>Фоновая музыка</span></div>';const play=btn("Воспроизвести","play","linka-player-play");play.dataset.playerPlay="true";play.addEventListener("click",e=>{e.stopPropagation();void togglePlay()});const open=btn("Открыть плеер","open");open.addEventListener("click",e=>{e.stopPropagation();openPlayer()});dock.append(play,open);dock.addEventListener("click",e=>{if(!e.target.closest("button"))openPlayer()});document.body.append(dock);
-const panel=document.createElement("div");panel.className="linka-player-panel";panel.setAttribute("aria-hidden","true");panel.inert=true;panel.innerHTML='<section class="linka-player-window" role="dialog" aria-modal="true" aria-label="Музыкальный плеер"><header class="linka-player-head"><div class="linka-player-art">'+icon("music")+'</div><div class="linka-player-head-copy"><strong>Linka · Atmosphere</strong><span>Немного тишины между мыслями</span></div><button data-close-player class="linka-player-button" type="button" aria-label="Закрыть">'+icon("close")+'</button></header><div class="linka-player-hero"><div class="linka-player-disc">'+icon("music")+'</div></div><div class="linka-player-current"><strong data-player-title></strong><span data-player-artist></span></div><div class="linka-player-time"><span class="linka-player-time-current">0:00</span><span class="linka-player-time-duration">0:00</span></div><input class="linka-player-seek" type="range" min="0" max="1000" value="0" aria-label="Позиция в треке"><div class="linka-player-controls"><button data-prev class="linka-player-button" aria-label="Предыдущий" type="button">'+icon("prev")+'</button><button data-player-play class="linka-player-button linka-player-play" aria-label="Воспроизвести" type="button">'+icon("play")+'</button><button data-next class="linka-player-button" aria-label="Следующий" type="button">'+icon("next")+'</button></div><label class="linka-player-volume">'+icon("volume")+'<span>Громкость</span><input data-volume type="range" min="0" max="100" value="14" aria-label="Громкость"><span data-volume-label>14%</span></label><header class="linka-player-head"><div class="linka-player-head-copy"><strong>Твой плейлист</strong><span>Локальные треки не загружаются в облако</span></div><button data-add-track class="linka-player-button" type="button" aria-label="Добавить треки">'+icon("plus")+'</button></header><div class="linka-player-playlist"></div><footer class="linka-player-footer"><span class="linka-player-muted">Мягкий звук · спокойный фон</span></footer></section>';document.body.append(panel);panel.addEventListener("click",e=>{if(e.target===panel||e.target.closest("[data-close-player]"))closePlayer()});$("[data-player-play]",panel).addEventListener("click",()=>void togglePlay());$("[data-prev]",panel).addEventListener("click",()=>void loadTrack(state.index-1,true));$("[data-next]",panel).addEventListener("click",()=>void loadTrack(state.index+1,true));$("[data-add-track]",panel).addEventListener("click",()=>$("#linka-atmosphere-audio-picker").click());$(".linka-player-seek",panel).addEventListener("input",e=>{if(Number.isFinite(state.audio?.duration)&&state.audio.duration>0)state.audio.currentTime=Number(e.target.value)/1000*state.audio.duration});$("[data-volume]",panel).addEventListener("input",e=>{state.volume=Number(e.target.value)/100;write("volume",state.volume);state.audio.volume=state.volume;$("[data-volume-label]",panel).textContent=Math.round(state.volume*100)+"%"});document.addEventListener("keydown",e=>{if(e.key==="Escape")closePlayer()})}
-function openSettings(){const previousFocus=document.activeElement;const layer=document.createElement("div");layer.className="linka-player-panel open";layer.style.zIndex="60";const panel=document.createElement("section");panel.className="linka-atmosphere-settings";panel.setAttribute("role","dialog");panel.setAttribute("aria-modal","true");panel.innerHTML='<div class="linka-atmosphere-title-row"><div><h2>Атмосфера Linka</h2><small>Сумеречный лес, ветер и плёночное зерно.</small></div><button class="linka-player-button" data-close type="button" aria-label="Закрыть">'+icon("close")+'</button></div><p>Фон и музыка настраиваются отдельно на каждом устройстве. Сохранённые записи остаются нетронутыми.</p><div class="linka-atmosphere-setting"><div class="linka-atmosphere-setting-copy"><strong>Лесное видео</strong><span>Медленное движение и затемнение для читаемости.</span></div><button class="linka-atmosphere-toggle" data-toggle="video" type="button"><i></i></button></div><div class="linka-atmosphere-setting"><div class="linka-atmosphere-setting-copy"><strong>Едва заметное зерно</strong><span>Мягкая плёночная текстура без резких помех.</span></div><button class="linka-atmosphere-toggle" data-toggle="grain" type="button"><i></i></button></div><div class="linka-atmosphere-setting"><div class="linka-atmosphere-setting-copy"><strong>Музыка</strong><span>Твой трек по умолчанию. Громкость можно менять в плеере.</span></div><button class="linka-atmosphere-toggle" data-toggle="music" type="button"><i></i></button></div><div class="linka-atmosphere-actions"><button data-pick>Выбрать фото или видео</button><button data-reset>Вернуть лес</button><button data-player>Плеер и плейлист</button></div><div class="linka-atmosphere-state" role="status"></div><input data-bg-picker type="file" accept="image/*,video/*" hidden></section>';layer.append(panel);document.body.append(layer);const onEscape=event=>{if(event.key==="Escape")close()};const close=()=>{if(!layer.isConnected||layer.dataset.closing==="true")return;layer.dataset.closing="true";layer.classList.remove("open");layer.setAttribute("aria-hidden","true");layer.inert=true;document.removeEventListener("keydown",onEscape);const reduced=Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches)||document.documentElement.classList.contains("reduced-motion");if(reduced)layer.remove();else window.setTimeout(()=>layer.remove(),440);if(previousFocus?.isConnected)requestAnimationFrame(()=>previousFocus.focus?.({preventScroll:true}))};document.addEventListener("keydown",onEscape);layer.addEventListener("click",e=>{if(e.target===layer||e.target.closest("[data-close]"))close()});panel.querySelectorAll("[data-toggle]").forEach(b=>{const key=b.dataset.toggle;const val=key==="video"?state.video:key==="grain"?state.grain:state.music;b.setAttribute("aria-pressed",String(val));b.addEventListener("click",()=>{const next=!(key==="video"?state.video:key==="grain"?state.grain:state.music);if(key==="video"){state.video=next;write("video",next);$("#linka-atmosphere")?.classList.toggle("disabled",!next);void loadBackground()}else if(key==="grain"){state.grain=next;write("grain",next);$("#linka-atmosphere")?.classList.toggle("no-grain",!next)}else{state.music=next;write("music",next);if(!next){state.audio.pause();playing(false)}else{void togglePlay()}}b.setAttribute("aria-pressed",String(next))})});$("[data-pick]",panel).addEventListener("click",()=>$("[data-bg-picker]",panel).click());$("[data-player]",panel).addEventListener("click",openPlayer);$("[data-reset]",panel).addEventListener("click",async()=>{if(state.background?.url)URL.revokeObjectURL(state.background.url);state.background=null;write("background",null);try{await db("background","readwrite",s=>s.delete("background"))}catch{}await loadBackground();$(".linka-atmosphere-state",panel).textContent="Вернул лес на закате."});$("[data-bg-picker]",panel).addEventListener("change",async e=>{const file=e.target.files?.[0];if(!file)return;const status=$(".linka-atmosphere-state",panel);try{if(!file.type.startsWith("image/")&&!file.type.startsWith("video/"))throw new Error("Выбери фото или видео.");await putMedia("background",file,"background");write("background",{id:"background",name:file.name,type:file.type});if(state.background?.url)URL.revokeObjectURL(state.background.url);state.background={id:"background",name:file.name,type:file.type};await loadBackground();status.textContent="Фон сохранён локально на этом устройстве."}catch(err){status.textContent=err.message||"Не удалось сохранить фон."}finally{e.target.value=""}})}
+async function togglePlay(){
+  if(track().generated){
+    if(state.ambient){state.music=false;write("music",false);stopAmbient()}
+    else await startAmbient();
+    return;
+  }
+  const a=state.audio;
+  if(!a)return;
+  if(!a.src)await loadTrack(state.index,false);
+  if(a.paused){
+    try{await a.play();playing(true)}
+    catch{toast(atmosphereCopy().playbackError)}
+  }else{a.pause();playing(false)}
+}
+function createPlayer(){
+  const copy=atmosphereCopy();
+  const dock=document.createElement("div");
+  dock.className="linka-player-dock";
+  dock.setAttribute("role","group");
+  dock.setAttribute("aria-label",copy.playerLabel);
+  dock.innerHTML='<div class="linka-player-art">'+icon("music")+'</div><div class="linka-player-track"><strong data-player-title></strong><span data-player-artist></span></div>';
+  const play=btn(copy.play,"play","linka-player-play");
+  play.dataset.playerPlay="true";
+  play.addEventListener("click",e=>{e.stopPropagation();void togglePlay()});
+  const open=btn(copy.openPlayer,"open");
+  open.addEventListener("click",e=>{e.stopPropagation();openPlayer()});
+  dock.append(play,open);
+  dock.addEventListener("click",e=>{if(!e.target.closest("button"))openPlayer()});
+  document.body.append(dock);
+
+  const panel=document.createElement("div");
+  panel.className="linka-player-panel";
+  panel.setAttribute("aria-hidden","true");
+  panel.inert=true;
+  panel.innerHTML='<section class="linka-player-window" role="dialog" aria-modal="true" aria-label="'+copy.playerLabel+'"><header class="linka-player-head"><div class="linka-player-art">'+icon("music")+'</div><div class="linka-player-head-copy"><strong>'+copy.playerTitle+'</strong><span>'+copy.playerSubtitle+'</span></div><button data-close-player class="linka-player-button" type="button" aria-label="'+copy.close+'">'+icon("close")+'</button></header><div class="linka-player-hero"><div class="linka-player-disc">'+icon("music")+'</div></div><div class="linka-player-current"><strong data-player-title></strong><span data-player-artist></span></div><div class="linka-player-time"><span class="linka-player-time-current">0:00</span><span class="linka-player-time-duration">∞</span></div><input class="linka-player-seek" type="range" min="0" max="1000" value="0" aria-label="'+copy.playerLabel+'" disabled><div class="linka-player-controls"><button data-prev class="linka-player-button" aria-label="'+copy.previous+'" type="button">'+icon("prev")+'</button><button data-player-play class="linka-player-button linka-player-play" aria-label="'+copy.play+'" type="button">'+icon("play")+'</button><button data-next class="linka-player-button" aria-label="'+copy.next+'" type="button">'+icon("next")+'</button></div><label class="linka-player-volume">'+icon("volume")+'<span>'+copy.volume+'</span><input data-volume type="range" min="0" max="100" value="14" aria-label="'+copy.volume+'"><span data-volume-label>14%</span></label><header class="linka-player-head"><div class="linka-player-head-copy"><strong>'+copy.playlist+'</strong><span>'+copy.playlistHint+'</span></div><button data-add-track class="linka-player-button" type="button" aria-label="'+copy.addTracks+'">'+icon("plus")+'</button></header><div class="linka-player-playlist"></div><footer class="linka-player-footer"><span class="linka-player-muted">'+copy.footer+'</span></footer></section>';
+  document.body.append(panel);
+  panel.addEventListener("click",e=>{if(e.target===panel||e.target.closest("[data-close-player]"))closePlayer()});
+  $("[data-player-play]",panel).addEventListener("click",()=>void togglePlay());
+  $("[data-prev]",panel).addEventListener("click",()=>void loadTrack(state.index-1,true));
+  $("[data-next]",panel).addEventListener("click",()=>void loadTrack(state.index+1,true));
+  $("#linka-atmosphere-audio-picker")&&$("[data-add-track]",panel).addEventListener("click",()=>$("#linka-atmosphere-audio-picker").click());
+  $(".linka-player-seek",panel).addEventListener("input",e=>{if(!track().generated&&Number.isFinite(state.audio?.duration)&&state.audio.duration>0)state.audio.currentTime=Number(e.target.value)/1000*state.audio.duration});
+  $("[data-volume]",panel).addEventListener("input",e=>{
+    state.volume=Number(e.target.value)/100;
+    write("volume",state.volume);
+    if(state.audio)state.audio.volume=state.volume;
+    if(state.ambient?.output)state.ambient.output.gain.setTargetAtTime(state.volume,state.ambient.context.currentTime,.16);
+    $("[data-volume-label]",panel).textContent=Math.round(state.volume*100)+"%";
+  });
+}
+
+function openSettings(){const previousFocus=document.activeElement;const layer=document.createElement("div");layer.className="linka-player-panel open";layer.style.zIndex="60";const panel=document.createElement("section");panel.className="linka-atmosphere-settings";panel.setAttribute("role","dialog");panel.setAttribute("aria-modal","true");panel.innerHTML='<div class="linka-atmosphere-title-row"><div><h2>Атмосфера Linka</h2><small>Сумеречный лес, ветер и плёночное зерно.</small></div><button class="linka-player-button" data-close type="button" aria-label="Закрыть">'+icon("close")+'</button></div><p>Фон и музыка настраиваются отдельно на каждом устройстве. Сохранённые записи остаются нетронутыми.</p><div class="linka-atmosphere-setting"><div class="linka-atmosphere-setting-copy"><strong>Лесное видео</strong><span>Медленное движение и затемнение для читаемости.</span></div><button class="linka-atmosphere-toggle" data-toggle="video" type="button"><i></i></button></div><div class="linka-atmosphere-setting"><div class="linka-atmosphere-setting-copy"><strong>Едва заметное зерно</strong><span>Мягкая плёночная текстура без резких помех.</span></div><button class="linka-atmosphere-toggle" data-toggle="grain" type="button"><i></i></button></div><div class="linka-atmosphere-setting"><div class="linka-atmosphere-setting-copy"><strong>Музыка</strong><span>Твой трек по умолчанию. Громкость можно менять в плеере.</span></div><button class="linka-atmosphere-toggle" data-toggle="music" type="button"><i></i></button></div><div class="linka-atmosphere-actions"><button data-pick>Выбрать фото или видео</button><button data-reset>Вернуть лес</button><button data-player>Плеер и плейлист</button></div><div class="linka-atmosphere-state" role="status"></div><input data-bg-picker type="file" accept="image/*,video/*" hidden></section>';layer.append(panel);document.body.append(layer);const onEscape=event=>{if(event.key==="Escape")close()};const close=()=>{if(!layer.isConnected||layer.dataset.closing==="true")return;layer.dataset.closing="true";layer.classList.remove("open");layer.setAttribute("aria-hidden","true");layer.inert=true;document.removeEventListener("keydown",onEscape);const reduced=Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches)||document.documentElement.classList.contains("reduced-motion");if(reduced)layer.remove();else window.setTimeout(()=>layer.remove(),440);if(previousFocus?.isConnected)requestAnimationFrame(()=>previousFocus.focus?.({preventScroll:true}))};document.addEventListener("keydown",onEscape);layer.addEventListener("click",e=>{if(e.target===layer||e.target.closest("[data-close]"))close()});panel.querySelectorAll("[data-toggle]").forEach(b=>{const key=b.dataset.toggle;const val=key==="video"?state.video:key==="grain"?state.grain:state.music;b.setAttribute("aria-pressed",String(val));b.addEventListener("click",()=>{const next=!(key==="video"?state.video:key==="grain"?state.grain:state.music);if(key==="video"){state.video=next;write("video",next);$("#linka-atmosphere")?.classList.toggle("disabled",!next);void loadBackground()}else if(key==="grain"){state.grain=next;write("grain",next);$("#linka-atmosphere")?.classList.toggle("no-grain",!next)}else{state.music=next;write("music",next);if(!next){if(state.ambient)stopAmbient();else state.audio.pause();playing(false)}else{void togglePlay()}}b.setAttribute("aria-pressed",String(next))})});$("[data-pick]",panel).addEventListener("click",()=>$("[data-bg-picker]",panel).click());$("[data-player]",panel).addEventListener("click",openPlayer);$("[data-reset]",panel).addEventListener("click",async()=>{if(state.background?.url)URL.revokeObjectURL(state.background.url);state.background=null;write("background",null);try{await db("background","readwrite",s=>s.delete("background"))}catch{}await loadBackground();$(".linka-atmosphere-state",panel).textContent="Вернул лес на закате."});$("[data-bg-picker]",panel).addEventListener("change",async e=>{const file=e.target.files?.[0];if(!file)return;const status=$(".linka-atmosphere-state",panel);try{if(!file.type.startsWith("image/")&&!file.type.startsWith("video/"))throw new Error("Выбери фото или видео.");await putMedia("background",file,"background");write("background",{id:"background",name:file.name,type:file.type});if(state.background?.url)URL.revokeObjectURL(state.background.url);state.background={id:"background",name:file.name,type:file.type};await loadBackground();status.textContent="Фон сохранён локально на этом устройстве."}catch(err){status.textContent=err.message||"Не удалось сохранить фон."}finally{e.target.value=""}})}
 function settingsTrigger(){const s=$("#settings-button");if(!s||$("#linka-atmosphere-settings-trigger"))return;const b=btn("Настройки атмосферы","music");b.id="linka-atmosphere-settings-trigger";b.style.width="38px";b.style.height="38px";b.addEventListener("click",openSettings);s.insertAdjacentElement("beforebegin",b)}
 function typingAnimation(){
    const ta=$("#capture-text");if(!ta||ta.dataset.linkaTyping)return;ta.dataset.linkaTyping="true";
@@ -288,7 +513,7 @@ function typingAnimation(){
   state.audio.addEventListener("ended",()=>void loadTrack(state.index+1,true));
   state.audio.addEventListener("timeupdate",renderPlayer);
   state.audio.addEventListener("loadedmetadata",renderPlayer);
-  state.audio.addEventListener("error",()=>{playing(false);toast("Не удалось загрузить музыку. Добавь MP3 с устройства или проверь соединение.")});
+  state.audio.addEventListener("error",()=>{playing(false);toast(atmosphereCopy().playbackError)});
   state.volume=Number(read("volume",.14));if(!Number.isFinite(state.volume))state.volume=.14;state.volume=Math.min(1,Math.max(0,state.volume));
   const savedPlaylist=read("playlist",[]);
    const userTracks=Array.isArray(savedPlaylist)?savedPlaylist.filter(t=>t&&t.id!==DEFAULT_TRACK.id&&t.id!=="linka-provided-track"):[];

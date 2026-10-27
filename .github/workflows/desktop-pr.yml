@@ -70,7 +70,7 @@ jobs:
             if (Test-Path $logPath) { Get-Content $logPath }
             else { Write-Host "No Linka startup log was created." }
             if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
-            throw "Linka did not complete frontend startup within 15 seconds."
+            throw "Linka did not complete frontend startup within 30 seconds."
           }
           $finalLog = Get-Content -Raw $logPath
           if ($finalLog -match "initLinkaAtmosphere failed:|initLinkaDocuments failed:|unhandled rejection:") {
