@@ -1,5 +1,13 @@
 # Changelog
 
+## Next — Desktop stability and forest fallback
+
+- The forest scene now has a bundled fallback, so the workspace never depends on an external poster image just to show a background.
+- Remote forest videos are attempted in the background; if a host, codec or autoplay policy fails, Linka keeps the local forest scene visible instead of leaving a black screen.
+- Bound the background's dimming control to the actual veil and reduce blur-based work in the typing animation.
+- Removed repeated “local-first / cloud sync / saved on this device” slogans from the main workspace and sidebar.
+- Added hit-testing safeguards for decorative layers and closed overlays, plus a one-column fallback for narrow Windows windows.
+
 ## Next — Utility surface, account entry and future plans
 
 - Android: brought the native Compose app into the Forest Atelier visual system with aligned forest/ivory/brass tokens, five saved accent palettes, adjustable glass opacity and background dimming, selectable motion/texture profiles, and a localized local-time card. Existing native navigation, local storage, forest/photo/video backgrounds, music player, and document flows remain in place.
