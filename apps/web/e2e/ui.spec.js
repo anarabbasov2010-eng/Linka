@@ -74,6 +74,17 @@ test("fresh profiles can save captures without an account overlay", async ({ pag
   await expect(page.locator("#capture-list")).toContainText("First-run capture");
 });
 
+test("large document edits avoid per-character DOM nodes", async ({ page }) => {
+  await openLinka(page);
+  await page.locator("#linka-document-button").click();
+  const editor = page.locator(".linka-doc-window");
+  await expect(editor).toBeVisible();
+  const body = editor.locator(".linka-doc-body");
+  await body.fill("x".repeat(600));
+  await expect(editor.locator(".linka-doc-body-wrap")).not.toHaveClass(/plain-text-mode/);
+  await expect(editor.locator(".linka-doc-type-mirror span")).toHaveCount(0);
+});
+
 test("the default forest ambience plays without an external audio file", async ({ page }) => {
   await openLinka(page);
   const play = page.locator(".linka-player-dock [data-player-play]");
