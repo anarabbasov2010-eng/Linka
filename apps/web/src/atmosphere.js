@@ -70,6 +70,9 @@ async function loadBackground(){
     image.onerror=()=>{image.classList.remove("ready");layer.classList.add("poster-unavailable")};
     image.src=DEFAULT_FOREST_POSTER;
     video.style.display="block";video.muted=true;video.loop=true;video.playsInline=true;video.preload="auto";
+    const reducedMotion=window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches===true;
+    const saveData=navigator.connection?.saveData===true;
+    if(reducedMotion||saveData){video.pause();video.removeAttribute("src");video.style.display="none";return}
     let attempt=0;
     const useNextVideo=()=>{
       video.classList.remove("ready");
