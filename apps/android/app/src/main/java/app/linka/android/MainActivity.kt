@@ -254,6 +254,7 @@ private class LinkaAmbientVideoView(context: Context) : TextureView(context), Te
     private var wantedPlaying = false
     private var candidateIndex = 0
     private var prepared = false
+    private var failedSource: String? = null
     private var player: MediaPlayer? = null
     private var videoSurface: Surface? = null
 
@@ -267,16 +268,23 @@ private class LinkaAmbientVideoView(context: Context) : TextureView(context), Te
         if (source != uri) {
             source = uri
             candidateIndex = 0
+            failedSource = null
             releasePlayer()
-            if (isAvailable) preparePlayer()
+            if (isAvailable && wantedPlaying) preparePlayer()
+            return
+        }
+        if (wantedPlaying && player == null && isAvailable && failedSource != uri) {
+            preparePlayer()
             return
         }
         updatePlayback()
     }
 
     private fun preparePlayer() {
+        if (!wantedPlaying) return
         val texture = surfaceTexture ?: return
         val requestedUri = source ?: return
+        if (failedSource == requestedUri) return
         val uri = if (requestedUri == DEFAULT_FOREST_VIDEO) FOREST_VIDEO_CANDIDATES[candidateIndex.coerceIn(0, FOREST_VIDEO_CANDIDATES.lastIndex)] else requestedUri
         releasePlayer()
         try {
@@ -293,10 +301,13 @@ private class LinkaAmbientVideoView(context: Context) : TextureView(context), Te
             }
             media.setOnErrorListener { _, _, _ ->
                 prepared = false
-                if (requestedUri == DEFAULT_FOREST_VIDEO && candidateIndex < FOREST_VIDEO_CANDIDATES.lastIndex) {
+                if (wantedPlaying && requestedUri == DEFAULT_FOREST_VIDEO && candidateIndex < FOREST_VIDEO_CANDIDATES.lastIndex) {
                     candidateIndex += 1
                     releasePlayer()
-                    post { if (source == requestedUri && isAvailable) preparePlayer() }
+                    post { if (source == requestedUri && isAvailable && wantedPlaying) preparePlayer() }
+                } else {
+                    if (wantedPlaying) failedSource = requestedUri
+                    releasePlayer()
                 }
                 true
             }
@@ -304,9 +315,11 @@ private class LinkaAmbientVideoView(context: Context) : TextureView(context), Te
             media.prepareAsync()
         } catch (_: Exception) {
             releasePlayer()
-            if (requestedUri == DEFAULT_FOREST_VIDEO && candidateIndex < FOREST_VIDEO_CANDIDATES.lastIndex) {
+            if (wantedPlaying && requestedUri == DEFAULT_FOREST_VIDEO && candidateIndex < FOREST_VIDEO_CANDIDATES.lastIndex) {
                 candidateIndex += 1
-                post { if (source == requestedUri && isAvailable) preparePlayer() }
+                post { if (source == requestedUri && isAvailable && wantedPlaying) preparePlayer() }
+            } else if (wantedPlaying) {
+                failedSource = requestedUri
             }
         }
     }
@@ -331,7 +344,7 @@ private class LinkaAmbientVideoView(context: Context) : TextureView(context), Te
     }
 
     override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
-        preparePlayer()
+        if (wantedPlaying && failedSource != source) preparePlayer()
     }
     override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) = Unit
     override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
@@ -1937,10 +1950,10 @@ private fun LinkaApp(
                 }
                 AndroidView(
                     modifier = Modifier.fillMaxSize().graphicsLayer { alpha = .68f },
-                    factory = { viewContext -> LinkaAmbientVideoView(viewContext).apply { tag = backgroundSource; configure(backgroundSource, appInForeground) } },
+                    factory = { viewContext -> LinkaAmbientVideoView(viewContext).apply { tag = backgroundSource; configure(backgroundSource, appInForeground && animations) } },
                     update = { view ->
                         view.tag = backgroundSource
-                        view.configure(backgroundSource, appInForeground)
+                        view.configure(backgroundSource, appInForeground && animations)
                     }
                 )
             }
