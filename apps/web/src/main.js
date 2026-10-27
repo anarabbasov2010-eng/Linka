@@ -12,6 +12,24 @@ import {
   startGoogleOAuth, completeGoogleOAuthCallback
 } from "./cloud-sync.js";
 import QRCode from "qrcode";
+import { invoke } from "@tauri-apps/api/core";
+
+function writeStartupDiagnostic(message) {
+  if (!window.__TAURI_INTERNALS__) return;
+  const safe = String(message || "Unknown startup diagnostic")
+    .slice(0, 2400)
+    .replace(/(access_token|refresh_token|token|secret|code|key)=([^&\\s]+)/gi, "$1=[redacted]");
+  try { void invoke("log_startup_diagnostic", { message: safe }).catch(() => {}); } catch {}
+}
+
+window.addEventListener("error", event => {
+  writeStartupDiagnostic(`window error: ${event.message || "Unknown error"} at ${event.filename || "unknown"}:${event.lineno || 0}:${event.colno || 0}${event.error?.stack ? "\\n" + event.error.stack : ""}`);
+});
+window.addEventListener("unhandledrejection", event => {
+  const reason = event.reason;
+  writeStartupDiagnostic(`unhandled rejection: ${reason?.stack || reason?.message || String(reason || "unknown rejection")}`);
+});
+writeStartupDiagnostic("frontend module execution started");
 
 const $ = selector => document.querySelector(selector);
 const form = $("#capture-form");
@@ -1257,9 +1275,13 @@ window.addEventListener("linka:open-cloud-settings", () => showCloudSyncНаст
 window.addEventListener("linka:open-atmosphere-settings", () => openAtmosphereSettings());
 window.addEventListener("linka:open-agreement", () => showAgreement({ mustAccept: false }));
 initLinkaExperience();
+writeStartupDiagnostic("initLinkaExperience completed");
 initLinkaSignature();
+writeStartupDiagnostic("initLinkaSignature completed");
 initVisualSystem();
+writeStartupDiagnostic("initVisualSystem completed");
 initLinkaUtilityPanel();
+writeStartupDiagnostic("initLinkaUtilityPanel completed");
 setTimeout(showCaptureRecoveryNotice, 700);
-void initLinkaAtmosphere().catch(error => console.warn("Linka atmosphere could not start", error));
-void initLinkaDocuments().catch(error => console.warn("Linka documents could not start", error));
+void initLinkaAtmosphere().then(() => writeStartupDiagnostic("initLinkaAtmosphere completed")).catch(error => { writeStartupDiagnostic("initLinkaAtmosphere failed: " + (error?.stack || error?.message || String(error))); console.warn("Linka atmosphere could not start", error); });
+void initLinkaDocuments().then(() => writeStartupDiagnostic("initLinkaDocuments completed")).catch(error => { writeStartupDiagnostic("initLinkaDocuments failed: " + (error?.stack || error?.message || String(error))); console.warn("Linka documents could not start", error); });
