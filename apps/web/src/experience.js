@@ -30,7 +30,7 @@ const COPY = {
     startTitle: "Welcome to Linka", startBody: "Create your account with your email. Your library will be ready on every signed-in device.",
     googleSignIn: "Continue with Google", emailFallback: "Use email code instead",
     email: "Email address", code: "Six-digit code", sendCreate: "Create account · send code",
-    sendLogin: "Sign in · send code", verify: "Verify and continue", continueOffline: "Continue offline",
+    sendLogin: "Sign in · send code", verify: "Verify and continue", continueOffline: "Continue without an account",
     profileTitle: "A little about you", profileBody: "Choose the name you want to see in Linka. Real details aren't required.",
     name: "What should we call you?", age: "Age (optional)", finish: "Finish setup",
     config: "Cloud service settings", projectUrl: "Supabase project URL", publishableKey: "Public publishable key",
@@ -1304,15 +1304,11 @@ export function initLinkaExperience() {
   updateTimer = setInterval(() => checkForRelease({ notify: true }), 15 * 60 * 1000);
   handleIncomingPairing();
   const oauthCallbackPending = /(?:access_token|error)=/.test(location.hash || "");
-  if (!oauthCallbackPending && localStorage.getItem("linka.termsAccepted") === "2026-10-23-v2") {
-    if (!localStorage.getItem(ONBOARDED_KEY)) {
-      const session = getCloudSession();
-      if (session && readLinkaProfile()) localStorage.setItem(ONBOARDED_KEY, "true");
-      else setTimeout(() => showAccount({ firstRun: true }), 240);
-    }
-  } else if (!oauthCallbackPending) {
-    window.addEventListener("linka:agreement-accepted", () => {
-      if (!localStorage.getItem(ONBOARDED_KEY)) setTimeout(() => showAccount({ firstRun: true }), 240);
-    }, { once: true });
+  // Account setup is optional. A first-run sign-in overlay used to cover the
+  // entire workspace until the user discovered "Continue without an account",
+  // making the app appear frozen on a fresh install. Keep the workspace usable
+  // after the agreement; account setup is opened only from an explicit action.
+  if (!oauthCallbackPending && getCloudSession() && readLinkaProfile()) {
+    localStorage.setItem(ONBOARDED_KEY, "true");
   }
 }

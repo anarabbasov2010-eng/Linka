@@ -65,12 +65,13 @@ test("reduced motion uses the static local forest and skips remote video", async
   expect(videoRequests).toHaveLength(0);
 });
 
-test("first-run onboarding can continue without an account", async ({ page }) => {
+test("fresh profiles can save captures without an account overlay", async ({ page }) => {
   await openLinka(page, { onboarded: false });
-  const firstRun = page.getByRole("dialog");
-  await expect(firstRun).toContainText("Welcome to Linka");
-  await firstRun.getByRole("button", { name: "Continue offline" }).click();
-  await expect(page.getByRole("dialog")).toContainText("A little about you");
+  await expect(page.locator("#modal-root .linka-auth-panel")).toHaveCount(0);
+  const draft = page.locator("#capture-text");
+  await draft.fill("First-run capture");
+  await page.locator("#save-button").click();
+  await expect(page.locator("#capture-list")).toContainText("First-run capture");
 });
 
 test("turning forest video off prevents remote media requests", async ({ page }) => {
