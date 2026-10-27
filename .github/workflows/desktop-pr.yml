@@ -39,6 +39,34 @@ jobs:
       - name: Build Windows installer
         working-directory: apps/desktop
         run: npm run build
+      - name: Smoke-test packaged Windows startup and frontend boot
+        shell: pwsh
+        run: |
+          $app = Join-Path $env:GITHUB_WORKSPACE "apps/desktop/src-tauri/target/release/linka-desktop.exe"
+          $logPath = Join-Path $env:LOCALAPPDATA "Linka/startup.log"
+          if (-not (Test-Path $app)) { throw "Built Linka executable was not found: $app" }
+          if (Test-Path $logPath) { Remove-Item $logPath -Force }
+          $proc = Start-Process -FilePath $app -WorkingDirectory (Split-Path $app) -PassThru
+          $deadline = (Get-Date).AddSeconds(15)
+          $booted = $false
+          while ((Get-Date) -lt $deadline) {
+            $proc.Refresh()
+            if ($proc.HasExited) { break }
+            if (Test-Path $logPath) {
+              $log = Get-Content -Raw $logPath
+              if ($log.Contains("initLinkaUtilityPanel completed")) { $booted = $true; break }
+            }
+            Start-Sleep -Milliseconds 500
+          }
+          if (-not $booted) {
+            $proc.Refresh()
+            if (Test-Path $logPath) { Get-Content $logPath }
+            else { Write-Host "No Linka startup log was created." }
+            if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
+            throw "Linka did not complete frontend startup within 15 seconds."
+          }
+          Write-Host "Linka frontend startup completed successfully."
+          Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
       - name: Save preview installer
         uses: actions/upload-artifact@v4
         with:
