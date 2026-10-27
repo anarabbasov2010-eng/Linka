@@ -57,7 +57,14 @@ pub fn run() {
     builder
         .setup(|app| {
             #[cfg(desktop)]
-            app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
+            if option_env!("LINKA_UPDATER_ENABLED") == Some("true") {
+                app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
+            } else {
+                // Unsigned builds intentionally omit the updater config. Registering
+                // the plugin anyway makes Tauri fail during startup because its
+                // expected configuration is missing.
+                eprintln!("Linka updater disabled: signing configuration is not available.");
+            }
 
             let startup_document = std::env::args().skip(1)
                 .find_map(|argument| read_linka_document(&argument));
