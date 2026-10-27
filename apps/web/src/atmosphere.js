@@ -26,6 +26,7 @@ function addStyles(){if($("#linka-atmosphere-styles"))return;const s=document.cr
 '#linka-atmosphere video,#linka-atmosphere img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transform:scale(1.04);filter:saturate(.72) contrast(1.04);transition:opacity 1.8s ease;animation:linka-forest 78s ease-in-out infinite alternate}',
 '#linka-atmosphere img{display:none}',
 '#linka-atmosphere .veil{position:absolute;inset:0;opacity:var(--atelier-background-dim,.72);background:linear-gradient(180deg,rgba(7,6,13,.16),rgba(6,6,10,.28) 48%,rgba(4,4,7,.48)),radial-gradient(ellipse at 52% 14%,rgba(188,151,128,.075),transparent 55%)}',
+    '#linka-atmosphere.poster-unavailable{background:radial-gradient(ellipse at 52% 38%,rgba(103,131,105,.46),transparent 44%),linear-gradient(180deg,#263c31 0%,#14291f 54%,#09140f 100%)}',
 '#linka-atmosphere .grain{position:absolute;inset:-40%;opacity:.026;background-image:url("data:image/svg+xml,%3Csvg viewBox=%270 0 180 180%27 xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cfilter id=%27n%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.8%27 numOctaves=%273%27 stitchTiles=%27stitch%27/%3E%3C/filter%3E%3Crect width=%27100%25%27 height=%27100%25%27 filter=%27url(%23n)%27 opacity=%27.8%27/%3E%3C/svg%3E");animation:linka-grain .24s steps(2) infinite}',
 '#linka-atmosphere .wind{position:absolute;inset:-15%;opacity:.23;background:radial-gradient(ellipse at 20% 45%,rgba(153,157,186,.09),transparent 50%),radial-gradient(ellipse at 85% 60%,rgba(135,112,169,.08),transparent 45%);animation:linka-wind 52s ease-in-out infinite alternate}',
 '#linka-atmosphere .ready{opacity:.78!important}#linka-atmosphere.disabled video,#linka-atmosphere.disabled img{opacity:0!important}#linka-atmosphere.no-grain .grain{display:none}',
@@ -123,11 +124,6 @@ async function loadBackground(){
       video.oncanplay=startPlayback;
       video.src=FOREST_VIDEO_CANDIDATES[activeAttempt];
       try{video.load()}catch{}
-      Promise.resolve(video.play()).then(()=>{
-        if(activeAttempt!==attempt)return;
-        video.classList.add("ready");
-        image.style.display="none";
-      }).catch(()=>{});
     };
     useNextVideo();
   }
